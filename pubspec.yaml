@@ -1,0 +1,53 @@
+name: watering_app
+description: IoT Smart Watering System Mobile App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.7
+
+  # Dependency Injection
+  get_it: ^9.2.1
+
+  # Networking
+  dio: ^5.8.0+1
+
+  # Real-time WebSocket (STOMP for Spring Boot)
+  stomp_dart_client: ^3.0.1
+
+  # Navigation
+  go_router: ^14.8.0
+
+  # Secure Storage
+  flutter_secure_storage: ^11.2.0
+  shared_preferences: ^2.3.5
+
+  # Charts
+  fl_chart: ^1.2.0
+
+  # Data classes
+  json_annotation: ^4.9.0
+
+  # Utilities
+  intl: ^0.20.2
+
+  # UI
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  bloc_test: ^10.0.0
+  mocktail: ^1.0.5
+  build_runner: ^2.4.15
+  json_serializable: ^6.9.0
