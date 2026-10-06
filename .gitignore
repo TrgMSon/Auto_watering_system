@@ -1,16 +1,8 @@
-# Compiled class file
+# ==========================================
+# 1. Spring Boot / Java (Backend)
+# ==========================================
 *.class
-
-# Log file
 *.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
@@ -19,6 +11,110 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# Maven & Gradle build outputs
+target/
+build/
+.gradle/
+bin/
+out/
+
+# Crash logs
 hs_err_pid*
 replay_pid*
+
+# React js
+node_modules
+/frontend/node_modules/
+
+# ==========================================
+# 2. Flutter / Dart (Mobile App)
+# ==========================================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Flutter Build outputs
+/build/
+app.*.symbols
+app.*.map.json
+
+# Android specific (Nằm trong thư mục android/ của Flutter)
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/key.properties
+/android/.gradle
+/android/local.properties
+
+# iOS specific (Nằm trong thư mục ios/ của Flutter)
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/DerivedData/
+*.xcworkspace
+*.xcuserdata
+
+# ==========================================
+# 3. ESP32 Firmware (PlatformIO / Arduino / ESP-IDF)
+# ==========================================
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# ESP-IDF
+build/
+sdkconfig.old
+
+# Arduino IDE / C++ temporary files
+*.hex
+*.bin
+*.elf
+*.o
+*.o-a
+
+# ==========================================
+# 4. Environment Variables & Security (Môi trường & Khóa)
+# ==========================================
+.env
+*.env
+.env.local
+backend/.env
+frontend/.env
+flutter/.env
+
+# Keystores & Certificates (Tránh push nhầm private key / keystore)
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+
+# ==========================================
+# 5. IDEs & Editors (IntelliJ, VS Code, Android Studio, Xcode)
+# ==========================================
+# IntelliJ / Android Studio
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+*.code-workspace
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# OS system files
+.DS_Store
+Thumbs.db
