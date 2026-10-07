@@ -3,6 +3,8 @@ import 'dart:math';
 
 import '../../features/auth/domain/entities/user.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/dashboard/data/models/device_model.dart';
+import '../../features/dashboard/data/models/telemetry_model.dart';
 import '../../features/dashboard/domain/entities/dashboard_summary.dart';
 import '../../features/dashboard/domain/repositories/dashboard_repository.dart';
 import '../../features/sensor_monitor/domain/entities/sensor_reading.dart';
@@ -21,7 +23,7 @@ class MockAuthRepository implements AuthRepository {
     _currentUser = User(
       id: 1,
       username: username,
-      email: '\$username@example.com',
+      email: '$username@example.com',
       fullName: 'Người dùng Thử nghiệm',
       role: UserRole.admin,
     );
@@ -49,6 +51,7 @@ class MockAuthRepository implements AuthRepository {
 
 class MockDashboardRepository implements DashboardRepository {
   bool _isAutoWatering = false;
+  bool _isPumpOn = false;
 
   @override
   Future<DashboardSummary> getDashboardSummary() async {
@@ -70,6 +73,49 @@ class MockDashboardRepository implements DashboardRepository {
     await Future.delayed(const Duration(milliseconds: 500));
     _isAutoWatering = enabled;
     return true;
+  }
+
+  @override
+  Future<List<DeviceModel>> getDevices() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return const [
+      DeviceModel(
+        id: 'ESP_001',
+        deviceName: 'Vườn Lan Ban Công',
+        status: 'ONLINE',
+        permission: 'OWNER',
+        blePassKey: '123456',
+      ),
+      DeviceModel(
+        id: 'ESP_002',
+        deviceName: 'Vườn Hồng Sân Thượng',
+        status: 'OFFLINE',
+        permission: 'VIEWER',
+      ),
+    ];
+  }
+
+  @override
+  Future<void> togglePump(String deviceId, bool turnOn, {int duration = 120}) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+    _isPumpOn = turnOn;
+  }
+
+  @override
+  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey) async* {
+    final random = Random();
+    while (true) {
+      await Future.delayed(const Duration(seconds: 5));
+      yield TelemetryModel(
+        deviceId: deviceId,
+        soilMoisture: 40.0 + random.nextDouble() * 20,
+        temperature: 25.0 + random.nextDouble() * 10,
+        humidity: 60.0 + random.nextDouble() * 30,
+        waterLevel: 80.0 - random.nextDouble() * 5,
+        isPumpOn: _isPumpOn,
+        recordedAt: DateTime.now(),
+      );
+    }
   }
 }
 

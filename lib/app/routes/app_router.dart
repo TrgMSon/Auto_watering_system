@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'route_names.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../injection.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
-import '../../features/sensor_monitor/presentation/pages/sensor_monitor_page.dart';
 import '../../features/device_management/presentation/pages/device_list_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/user_management/presentation/pages/user_management_page.dart';
-import '../../core/theme/app_colors.dart';
+import '../../features/automation/presentation/pages/automation_page.dart';
+import '../../features/automation/presentation/bloc/automation_bloc.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -32,19 +34,20 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
+
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: RouteNames.analytics,
-              builder: (context, state) => const SensorMonitorPage(),
+              builder: (context, state) => const AutomationPage(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: RouteNames.devices,
-              builder: (context, state) => const DeviceListPage(),
+              path: RouteNames.userManagement,
+              builder: (context, state) => const UserManagementPage(),
             ),
           ],
         ),
@@ -55,9 +58,9 @@ final GoRouter appRouter = GoRouter(
               builder: (context, state) => const ProfilePage(),
               routes: [
                 GoRoute(
-                  path: 'users',
+                  path: 'devices',
                   parentNavigatorKey: rootNavigatorKey,
-                  builder: (context, state) => const UserManagementPage(),
+                  builder: (context, state) => const DeviceListPage(),
                 ),
               ],
             ),
@@ -87,22 +90,22 @@ class _ScaffoldWithBottomNav extends StatelessWidget {
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
-            label: 'T\u1ed5ng quan',
+            label: 'Tổng quan',
           ),
           NavigationDestination(
-            icon: Icon(Icons.show_chart_outlined),
-            selectedIcon: Icon(Icons.show_chart),
-            label: 'Th\u1ed1ng k\u00ea',
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: 'Tự động hóa',
           ),
           NavigationDestination(
-            icon: Icon(Icons.devices_other_outlined),
-            selectedIcon: Icon(Icons.devices_other),
-            label: 'Thi\u1ebft b\u1ecb',
+            icon: Icon(Icons.group_outlined),
+            selectedIcon: Icon(Icons.group),
+            label: 'Thành viên',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
-            label: 'C\u00e0i \u0111\u1eb7t',
+            label: 'Cài đặt',
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/dashboard_summary.dart';
+import '../../data/models/device_model.dart';
+import '../../data/models/telemetry_model.dart';
 
 sealed class DashboardState extends Equatable {
   const DashboardState();
@@ -17,26 +18,39 @@ class DashboardLoading extends DashboardState {
 }
 
 class DashboardLoaded extends DashboardState {
-  final DashboardSummary summary;
-  final bool isTogglingWatering;
+  final List<DeviceModel> devices;
+  final DeviceModel? selectedDevice;
+  final TelemetryModel? telemetry;
+  final bool isTogglingPump;
+  final bool isBleConnected;
 
   const DashboardLoaded({
-    required this.summary,
-    this.isTogglingWatering = false,
+    required this.devices,
+    this.selectedDevice,
+    this.telemetry,
+    this.isTogglingPump = false,
+    this.isBleConnected = false,
   });
 
   DashboardLoaded copyWith({
-    DashboardSummary? summary,
-    bool? isTogglingWatering,
+    List<DeviceModel>? devices,
+    DeviceModel? selectedDevice,
+    TelemetryModel? telemetry,
+    bool clearTelemetry = false,
+    bool? isTogglingPump,
+    bool? isBleConnected,
   }) {
     return DashboardLoaded(
-      summary: summary ?? this.summary,
-      isTogglingWatering: isTogglingWatering ?? this.isTogglingWatering,
+      devices: devices ?? this.devices,
+      selectedDevice: selectedDevice ?? this.selectedDevice,
+      telemetry: clearTelemetry ? null : (telemetry ?? this.telemetry),
+      isTogglingPump: isTogglingPump ?? this.isTogglingPump,
+      isBleConnected: isBleConnected ?? this.isBleConnected,
     );
   }
 
   @override
-  List<Object?> get props => [summary, isTogglingWatering];
+  List<Object?> get props => [devices, selectedDevice, telemetry, isTogglingPump, isBleConnected];
 }
 
 class DashboardError extends DashboardState {

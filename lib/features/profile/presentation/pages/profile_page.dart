@@ -64,7 +64,7 @@ class ProfilePage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          user.isAdmin ? 'Qu\u1ea3n tr\u1ecb vi\u00ean' : 'Ng\u01b0\u1eddi d\u00f9ng',
+                          user.isAdmin ? 'Chủ thiết bị' : 'Người dùng',
                           style: Theme.of(context).textTheme.labelMedium?.copyWith(
                             color: user.isAdmin ? AppColors.warning : AppColors.info,
                             fontWeight: FontWeight.w600,
@@ -81,10 +81,10 @@ class ProfilePage extends StatelessWidget {
                   children: [
                     if (user.isAdmin) ...[
                       ListTile(
-                        leading: const Icon(Icons.group_outlined, color: AppColors.warning),
-                        title: const Text('Qu\u1ea3n l\u00fd ng\u01b0\u1eddi d\u00f9ng'),
+                        leading: const Icon(Icons.devices_other_outlined, color: AppColors.primary),
+                        title: const Text('Quản lý thiết bị'),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.go(RouteNames.userManagement),
+                        onTap: () => context.go('${RouteNames.settings}/devices'),
                       ),
                       const Divider(height: 1),
                     ],
@@ -158,7 +158,7 @@ class ProfilePage extends StatelessWidget {
     if (user.fullName != null && user.fullName!.isNotEmpty) {
       final parts = user.fullName!.split(' ');
       if (parts.length >= 2) {
-        return '\${parts.first[0]}\${parts.last[0]}'.toUpperCase();
+        return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
       }
       return parts.first[0].toUpperCase();
     }

@@ -4,9 +4,9 @@ import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../features/auth/presentation/bloc/auth_event.dart';
 import '../features/dashboard/presentation/bloc/dashboard_bloc.dart';
-import '../features/dashboard/presentation/bloc/dashboard_event.dart';
 import '../features/sensor_monitor/presentation/bloc/sensor_bloc.dart';
 import '../features/device_management/presentation/bloc/device_bloc.dart';
+import '../features/automation/presentation/bloc/automation_bloc.dart';
 import '../injection.dart';
 import 'routes/app_router.dart';
 
@@ -21,6 +21,7 @@ class WateringApp extends StatelessWidget {
         BlocProvider(create: (_) => getIt<DashboardBloc>()),
         BlocProvider(create: (_) => getIt<SensorBloc>()),
         BlocProvider(create: (_) => getIt<DeviceBloc>()),
+        BlocProvider(create: (_) => getIt<AutomationBloc>()),
       ],
       child: MaterialApp.router(
         title: 'Smart Watering',

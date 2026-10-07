@@ -17,11 +17,9 @@ dependencies:
   # Dependency Injection
   get_it: ^9.2.1
 
-  # Networking
-  dio: ^5.8.0+1
+  # Networking (Removed for UI-only mode)
 
-  # Real-time WebSocket (STOMP for Spring Boot)
-  stomp_dart_client: ^3.0.1
+  # Real-time WebSocket (Removed for UI-only mode)
 
   # Navigation
   go_router: ^14.8.0
@@ -51,3 +49,6 @@ dev_dependencies:
   mocktail: ^1.0.5
   build_runner: ^2.4.15
   json_serializable: ^6.9.0
+
+flutter:
+  uses-material-design: true

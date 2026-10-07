@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+﻿import 'package:equatable/equatable.dart';
+import '../../data/models/device_model.dart';
+import '../../data/models/telemetry_model.dart';
 
 sealed class DashboardEvent extends Equatable {
   const DashboardEvent();
@@ -11,22 +13,26 @@ class DashboardLoadRequested extends DashboardEvent {
   const DashboardLoadRequested();
 }
 
-class DashboardRefreshRequested extends DashboardEvent {
-  const DashboardRefreshRequested();
-}
-
-class DashboardAutoWateringToggled extends DashboardEvent {
-  final bool enabled;
-  const DashboardAutoWateringToggled({required this.enabled});
+class DashboardDeviceSelected extends DashboardEvent {
+  final DeviceModel device;
+  const DashboardDeviceSelected(this.device);
 
   @override
-  List<Object?> get props => [enabled];
+  List<Object?> get props => [device];
 }
 
-class DashboardSensorDataUpdated extends DashboardEvent {
-  final Map<String, dynamic> sensorData;
-  const DashboardSensorDataUpdated({required this.sensorData});
+class DashboardTelemetryUpdated extends DashboardEvent {
+  final TelemetryModel telemetry;
+  const DashboardTelemetryUpdated(this.telemetry);
 
   @override
-  List<Object?> get props => [sensorData];
+  List<Object?> get props => [telemetry];
+}
+
+class DashboardPumpToggled extends DashboardEvent {
+  final bool turnOn;
+  const DashboardPumpToggled(this.turnOn);
+
+  @override
+  List<Object?> get props => [turnOn];
 }

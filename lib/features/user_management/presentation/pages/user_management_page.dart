@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../auth/domain/entities/user.dart';
-import '../../domain/entities/managed_user.dart';
 
 class UserManagementPage extends StatelessWidget {
   const UserManagementPage({super.key});

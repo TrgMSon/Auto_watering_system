@@ -1,22 +1,20 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/entities/dashboard_summary.dart';
-import '../../domain/usecases/get_dashboard_summary_usecase.dart';
-import '../../domain/usecases/toggle_auto_watering_usecase.dart';
+import '../../domain/repositories/dashboard_repository.dart';
 import 'dashboard_event.dart';
 import 'dashboard_state.dart';
+import '../../data/models/device_model.dart';
+import '../../data/models/telemetry_model.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
-  final GetDashboardSummaryUseCase getDashboardSummary;
-  final ToggleAutoWateringUseCase toggleAutoWatering;
+  final DashboardRepository repository;
+  StreamSubscription<TelemetryModel>? _telemetrySubscription;
 
-  DashboardBloc({
-    required this.getDashboardSummary,
-    required this.toggleAutoWatering,
-  }) : super(const DashboardInitial()) {
+  DashboardBloc({required this.repository}) : super(const DashboardInitial()) {
     on<DashboardLoadRequested>(_onLoadRequested);
-    on<DashboardRefreshRequested>(_onRefreshRequested);
-    on<DashboardAutoWateringToggled>(_onAutoWateringToggled);
-    on<DashboardSensorDataUpdated>(_onSensorDataUpdated);
+    on<DashboardDeviceSelected>(_onDeviceSelected);
+    on<DashboardTelemetryUpdated>(_onTelemetryUpdated);
+    on<DashboardPumpToggled>(_onPumpToggled);
   }
 
   Future<void> _onLoadRequested(
@@ -25,69 +23,70 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   ) async {
     emit(const DashboardLoading());
     try {
-      final summary = await getDashboardSummary();
-      emit(DashboardLoaded(summary: summary));
+      final devices = await repository.getDevices();
+      if (devices.isNotEmpty) {
+        emit(DashboardLoaded(devices: devices, selectedDevice: devices.first));
+        _listenToTelemetry(devices.first);
+      } else {
+        emit(const DashboardLoaded(devices: []));
+      }
     } catch (e) {
       emit(DashboardError(message: e.toString()));
     }
   }
 
-  Future<void> _onRefreshRequested(
-    DashboardRefreshRequested event,
+  void _onDeviceSelected(
+    DashboardDeviceSelected event,
     Emitter<DashboardState> emit,
-  ) async {
-    try {
-      final summary = await getDashboardSummary();
-      emit(DashboardLoaded(summary: summary));
-    } catch (e) {
-      emit(DashboardError(message: e.toString()));
+  ) {
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      emit(currentState.copyWith(selectedDevice: event.device, clearTelemetry: true));
+      _listenToTelemetry(event.device);
     }
   }
 
-  Future<void> _onAutoWateringToggled(
-    DashboardAutoWateringToggled event,
+  void _onTelemetryUpdated(
+    DashboardTelemetryUpdated event,
+    Emitter<DashboardState> emit,
+  ) {
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      emit(currentState.copyWith(telemetry: event.telemetry));
+    }
+  }
+
+  Future<void> _onPumpToggled(
+    DashboardPumpToggled event,
     Emitter<DashboardState> emit,
   ) async {
-    final currentState = state;
-    if (currentState is DashboardLoaded) {
-      emit(currentState.copyWith(isTogglingWatering: true));
-
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      if (currentState.selectedDevice == null) return;
+      
+      emit(currentState.copyWith(isTogglingPump: true));
       try {
-        final success = await toggleAutoWatering(enabled: event.enabled);
-        if (success) {
-          final summary = await getDashboardSummary();
-          emit(DashboardLoaded(summary: summary));
-        } else {
-          emit(currentState.copyWith(isTogglingWatering: false));
-        }
-      } catch (_) {
-        emit(currentState.copyWith(isTogglingWatering: false));
+        await repository.togglePump(currentState.selectedDevice!.id, event.turnOn);
+        // We don't artificially flip the pump status here, we wait for the stream to update it
+        emit(currentState.copyWith(isTogglingPump: false));
+      } catch (e) {
+        emit(currentState.copyWith(isTogglingPump: false));
       }
     }
   }
 
-  void _onSensorDataUpdated(
-    DashboardSensorDataUpdated event,
-    Emitter<DashboardState> emit,
-  ) {
-    final currentState = state;
-    if (currentState is DashboardLoaded) {
-      final data = event.sensorData;
-      final updatedSummary = DashboardSummary(
-        isAutoWateringEnabled: currentState.summary.isAutoWateringEnabled,
-        soilMoisture: (data['soilMoisture'] as num?)?.toDouble() ??
-            currentState.summary.soilMoisture,
-        temperature: (data['temperature'] as num?)?.toDouble() ??
-            currentState.summary.temperature,
-        humidity: (data['humidity'] as num?)?.toDouble() ??
-            currentState.summary.humidity,
-        lightIntensity: (data['lightIntensity'] as num?)?.toDouble() ??
-            currentState.summary.lightIntensity,
-        totalDevices: currentState.summary.totalDevices,
-        onlineDevices: currentState.summary.onlineDevices,
-        lastWateredAt: currentState.summary.lastWateredAt,
-      );
-      emit(DashboardLoaded(summary: updatedSummary));
-    }
+  void _listenToTelemetry(DeviceModel device) {
+    _telemetrySubscription?.cancel();
+    _telemetrySubscription = repository
+        .watchTelemetry(device.id, device.blePassKey)
+        .listen((telemetry) {
+      add(DashboardTelemetryUpdated(telemetry));
+    });
+  }
+
+  @override
+  Future<void> close() {
+    _telemetrySubscription?.cancel();
+    return super.close();
   }
 }

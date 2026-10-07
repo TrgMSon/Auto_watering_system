@@ -1,0 +1,69 @@
+# Build app iOS trên máy macOS của GitHub (miễn phí cho repo public) → file .ipa CHƯA KÝ.
+# Kết quả được đăng lên mục Releases với link cố định (không cần đăng nhập):
+#   https://github.com/<owner>/<repo>/releases/download/ios-latest-<nhánh>/smart-watering-unsigned.ipa
+# Trên Windows: tải về, dùng Sideloadly ký bằng Apple ID và cài lên iPhone.
+name: iOS build (IPA chưa ký)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feature/**']
+    paths-ignore: ['**.md', 'tool/**']
+
+# Push mới lên cùng nhánh → huỷ lần build cũ đang chờ/chạy, tránh dồn hàng đợi máy Mac
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # để đăng file lên Releases
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Nếu cần fix cứng version, hãy mở comment dòng dưới và điền version máy bạn đang dùng (VD: 3.24.3)
+          # flutter-version: 3.24.3
+          cache: true
+
+      - name: Cài thư viện
+        run: flutter pub get
+
+      # (Đã lược bỏ bước 'flutter test' vì project hiện tại tập trung làm UI và đã xoá thư mục test)
+
+      - name: Disable code signing requirement in Xcode
+        run: |
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = \(.*\);/PRODUCT_BUNDLE_IDENTIFIER = \1; CODE_SIGNING_ALLOWED = "NO"; CODE_SIGNING_REQUIRED = "NO"; DEVELOPMENT_TEAM = "V8VXY724Y2";/g' ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Build iOS (release, không ký)
+        run: flutter build ios --release --no-codesign
+
+      - name: Đóng gói IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr smart-watering-unsigned.ipa Payload
+          ls -lh smart-watering-unsigned.ipa
+
+      - name: Đăng lên Releases (link tải cố định)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ios-latest-${GITHUB_REF_NAME//\//-}"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" smart-watering-unsigned.ipa --prerelease --target "$GITHUB_SHA" \
+            --title "iOS mới nhất – $GITHUB_REF_NAME" \
+            --notes "IPA chưa ký từ commit ${GITHUB_SHA::7}. Tải về, cài lên iPhone bằng Sideloadly."
+          echo "Link tải: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/smart-watering-unsigned.ipa"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: smart-watering-ios-unsigned
+          path: smart-watering-unsigned.ipa
+          retention-days: 14
