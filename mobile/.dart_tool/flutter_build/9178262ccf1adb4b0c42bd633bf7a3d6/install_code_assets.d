@@ -1,0 +1,1 @@
+ D:\\Nam_4\\IOT\\watering-system\\.dart_tool\\flutter_build\\9178262ccf1adb4b0c42bd633bf7a3d6\\native_assets.json: 

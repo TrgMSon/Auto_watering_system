@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="32ffbdf3-c6cd-4b55-87d0-0112810b90a6" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ios_build.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/markdown.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/watering-system.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/build.gradle.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/debug/AndroidManifest.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/AndroidManifest.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/kotlin/com/wateringsystem/watering_app/MainActivity.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/drawable-v21/launch_background.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/drawable/launch_background.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/mipmap-mdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/values-night/styles.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/main/res/values/styles.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/src/profile/AndroidManifest.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/build.gradle.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/gradle.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/settings.gradle.kts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/plans/api-integration-design.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/plans/flutter-iot-watering-app.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/app/app.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/app/routes/app_router.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/app/routes/route_names.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/constants/api_endpoints.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/constants/app_constants.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/mock/mock_repositories.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/theme/app_colors.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/theme/app_theme.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/theme/app_typography.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/utils/formatters.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/widgets/app_error_widget.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/widgets/app_loading_indicator.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/widgets/sensor_status_badge.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/domain/entities/user.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/domain/repositories/auth_repository.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/domain/usecases/get_current_user_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/domain/usecases/login_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/domain/usecases/logout_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/presentation/bloc/auth_bloc.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/presentation/bloc/auth_event.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/presentation/bloc/auth_state.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/auth/presentation/pages/login_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/data/models/device_config_model.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/data/models/schedule_model.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/data/repositories/automation_repository_impl.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/domain/repositories/i_automation_repository.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/presentation/bloc/automation_bloc.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/presentation/bloc/automation_event.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/presentation/bloc/automation_state.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/presentation/pages/automation_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/presentation/widgets/advanced_config_bottom_sheet.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/automation/presentation/widgets/schedule_bottom_sheet.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/data/models/device_model.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/data/models/telemetry_model.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/data/repositories/dashboard_repository_impl.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/domain/entities/dashboard_summary.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/domain/repositories/dashboard_repository.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/domain/usecases/get_dashboard_summary_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/domain/usecases/toggle_auto_watering_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/presentation/bloc/dashboard_bloc.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/presentation/bloc/dashboard_event.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/presentation/bloc/dashboard_state.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/dashboard/presentation/pages/dashboard_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/domain/entities/device.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/domain/repositories/device_repository.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/domain/usecases/add_device_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/domain/usecases/delete_device_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/domain/usecases/get_devices_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/presentation/bloc/device_bloc.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/presentation/bloc/device_event.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/presentation/bloc/device_state.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/presentation/pages/device_list_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/device_management/presentation/widgets/device_card.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/profile/presentation/pages/profile_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/domain/entities/sensor_reading.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/domain/repositories/sensor_repository.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/domain/usecases/get_realtime_readings_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/domain/usecases/get_sensor_history_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/presentation/bloc/sensor_bloc.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/presentation/bloc/sensor_event.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/presentation/bloc/sensor_state.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/presentation/pages/sensor_monitor_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/presentation/widgets/sensor_telemetry_card.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/sensor_monitor/presentation/widgets/telemetry_line_chart.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/user_management/domain/entities/managed_user.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/user_management/domain/repositories/user_repository.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/user_management/domain/usecases/delete_user_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/user_management/domain/usecases/get_users_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/user_management/domain/usecases/update_user_role_usecase.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/features/user_management/presentation/pages/user_management_page.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/injection.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/main.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/.gitignore" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;langvietthanh&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/TrgMSon/Auto_watering_system.git&quot;,
+    &quot;accountId&quot;: &quot;eb439966-82cf-45af-91be-5a55f3235b5c&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3JrgauHbz1XiZp3bb6gJynfsmYV" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Flutter.main.dart.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;mobile__app&quot;,
+    &quot;io.flutter.project.isFirstOpen&quot;: &quot;true&quot;,
+    &quot;io.flutter.reload.alreadyRun&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Nam_4/BTL/watering-system&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;flutter.settings&quot;,
+    &quot;settings.editor.splitter.proportion&quot;: &quot;0.31059062&quot;,
+    &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\Nam_4\BTL\watering-system\mobile" />
+    </key>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="32ffbdf3-c6cd-4b55-87d0-0112810b90a6" name="Changes" comment="" />
+      <created>1790424668321</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1790424668321</updated>
+    </task>
+    <servers />
+  </component>
+</project>

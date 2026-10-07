@@ -1,0 +1,1 @@
+ D:\\Nam_4\\BTL\\watering-system\\.dart_tool\\flutter_build\\a01e74d172e852218d9665454c5024f9\\build_hooks_result.json:  D:\\Nam_4\\BTL\\watering-system\\.dart_tool\\package_config.json D:\\Nam_4\\BTL\\watering-system\\pubspec.yaml D:\\app\\flutter\\bin\\cache\\dart-sdk\\version d:\\nam_4\\btl\\watering-system\\.dart_tool\\package_config.json
