@@ -35,6 +35,9 @@ jobs:
       - name: Cài thư viện
         run: flutter pub get
 
+      - name: Tạo cấu trúc iOS (nếu dự án chưa có)
+        run: flutter create --platforms=ios .
+
       - name: Disable code signing requirement in Xcode
         run: |
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = \(.*\);/PRODUCT_BUNDLE_IDENTIFIER = \1; CODE_SIGNING_ALLOWED = "NO"; CODE_SIGNING_REQUIRED = "NO"; DEVELOPMENT_TEAM = "V8VXY724Y2";/g' ios/Runner.xcodeproj/project.pbxproj

@@ -5,7 +5,122 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="32ffbdf3-c6cd-4b55-87d0-0112810b90a6" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/ios_build.yml" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/runConfigurations/main_dart.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/extension_discovery/devtools.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/extension_discovery/vs_code.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/.filecache" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/app.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/build_hooks.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/build_hooks.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/build_hooks_result.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/debug_android_application.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/flutter_assets.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/gen_dart_plugin_registrant.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/gen_localizations.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/install_code_assets.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/install_code_assets.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/kernel_snapshot_program.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/kernel_snapshot_program.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/link_hooks.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/link_hooks.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/link_hooks_result.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/native_assets.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/outputs.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/3717a6f8c7186acc35be1c69b7a6f683/recorded_uses.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/.filecache" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/app.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/build_hooks.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/build_hooks.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/build_hooks_result.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/debug_android_application.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/flutter_assets.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/gen_dart_plugin_registrant.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/gen_localizations.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/install_code_assets.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/install_code_assets.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/kernel_snapshot_program.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/kernel_snapshot_program.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/link_hooks.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/link_hooks.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/link_hooks_result.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/native_assets.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/outputs.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/9178262ccf1adb4b0c42bd633bf7a3d6/recorded_uses.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/.filecache" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/app.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/build_hooks.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/build_hooks.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/build_hooks_result.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/debug_android_application.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/flutter_assets.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/gen_dart_plugin_registrant.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/gen_localizations.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/install_code_assets.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/install_code_assets.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/kernel_snapshot_program.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/kernel_snapshot_program.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/link_hooks.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/link_hooks.stamp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/link_hooks_result.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/native_assets.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/outputs.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/a01e74d172e852218d9665454c5024f9/recorded_uses.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/flutter_build/dart_plugin_registrant.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/dependencies.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/hook.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/hook.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/hook.dill.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/input.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/output.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/stderr.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/2c9907321a/stdout.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/dependencies.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/hook.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/hook.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/hook.dill.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/input.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/output.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/stderr.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/337ce265dc/stdout.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/dependencies.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/hook.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/hook.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/hook.dill.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/input.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/output.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/stderr.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/576bc4a9a8/stdout.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/dependencies.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/hook.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/hook.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/hook.dill.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/input.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/output.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/stderr.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/8e04c28b44/stdout.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/dependencies.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/hook.dependencies_hash_file.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/hook.dill" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/hook.dill.d" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/input.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/output.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/stderr.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/objective_c/e3de717584/stdout.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/hooks_runner/shared/objective_c/.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/package_config.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/package_graph.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/.dart_tool/version" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/coverage/lcov.info" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/docs/architecture.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/docs/plans/2026-10-06-ui-architecture-decision.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile/docs/plans/2026-10-07-tab2-automation-architecture.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ios_build.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ios_build.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/markdown.xml" beforeDir="false" />
@@ -31,8 +146,8 @@
       <change beforePath="$PROJECT_DIR$/android/gradle.properties" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/android/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/android/settings.gradle.kts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/plans/api-integration-design.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/plans/flutter-iot-watering-app.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/plans/api-integration-design.md" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/docs/plans/api-integration-design.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/plans/flutter-iot-watering-app.md" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/docs/plans/flutter-iot-watering-app.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/app/app.dart" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/app/routes/app_router.dart" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/app/routes/route_names.dart" beforeDir="false" />
@@ -105,6 +220,7 @@
       <change beforePath="$PROJECT_DIR$/lib/features/user_management/presentation/pages/user_management_page.dart" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/injection.dart" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/main.dart" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile/.github/workflows/ios_build.yml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/.gitignore" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
