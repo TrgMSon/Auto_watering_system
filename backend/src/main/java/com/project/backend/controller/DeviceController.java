@@ -26,6 +26,10 @@ public class DeviceController {
         config.put("soil_moisture_min", 35.0);
         config.put("soil_moisture_max", 70.0);
         config.put("max_watering_duration", 10);
+        config.put("air_humidity_min", 50.0);
+        config.put("air_humidity_max", 70.0);
+        config.put("air_temperature_min", 29);
+        config.put("air_temperature_max", 31);
         return config; // Trả về JSON mock ngay lập tức
     }
 
