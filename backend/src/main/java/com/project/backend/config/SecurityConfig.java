@@ -20,20 +20,23 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.backend.common.ApiResponse;
 import com.project.backend.security.JwtAuthFilter;
 
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final ObjectMapper objectMapper;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ObjectMapper objecMapper) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.objectMapper = objecMapper;
+    }
 
     @Value("${app.cors.allowed-origin-patterns}")
     private String[] allowedOriginPatterns;

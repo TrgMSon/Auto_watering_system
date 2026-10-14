@@ -3,7 +3,6 @@ package com.project.backend.common;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,7 +11,6 @@ import lombok.experimental.FieldDefaults;
 @Data
 @Builder
 @NoArgsConstructor
-@AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ApiResponse<T> {
@@ -20,6 +18,13 @@ public class ApiResponse<T> {
     int statusCode;
     String message;
     T data;
+
+    public ApiResponse(boolean success, int statusCode, String message, T data) {
+        this.success = success;
+        this.statusCode = statusCode;
+        this.message = message;
+        this.data = data;
+    }
 
     public static <T> ApiResponse<T> success(T data) {
         return success("Success", data);

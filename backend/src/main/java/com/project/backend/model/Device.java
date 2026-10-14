@@ -5,12 +5,12 @@ import java.time.LocalDateTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Data
-@AllArgsConstructor
+@NoArgsConstructor
 public class Device {
     @Id
     @Column(nullable = false)
@@ -38,5 +38,17 @@ public class Device {
 
     @Column(name = "ble_pass_key")
     private String blePassKey;
+
+    public Device(String id, String deviceName, String hardwareVesrsion, String firmwareVersion, String status,
+            LocalDateTime lastActiveAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                this.id = id;
+                this.deviceName = deviceName;
+                this.hardwareVersion = hardwareVesrsion;
+                this.firmwareVersion = firmwareVersion;
+                this.status = status;
+                this.lastActiveAt = lastActiveAt;
+                this.createdAt = createdAt;
+                this.updatedAt = updatedAt;
+    }
 
 }

@@ -13,12 +13,13 @@ import com.project.backend.model.User;
 import com.project.backend.repository.RefreshTokenRepository;
 import com.project.backend.service.RefreshTokenService;
 
-import lombok.RequiredArgsConstructor;
-
 @Service
-@RequiredArgsConstructor
 public class RefreshTokenServiceImpl implements RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
+
+    public RefreshTokenServiceImpl(RefreshTokenRepository refreshTokenRepository) {
+        this.refreshTokenRepository = refreshTokenRepository;
+    }
 
     @Value("${app.refresh-token.expiration-days}")
     private long expirationDays;

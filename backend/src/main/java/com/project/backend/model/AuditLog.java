@@ -9,13 +9,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "audit_log")
 @Data
-@AllArgsConstructor
+@NoArgsConstructor
 public class AuditLog {
     @Id
     @Column(nullable = false)
@@ -33,7 +33,18 @@ public class AuditLog {
     private String action;
 
     @Column(name = "ip_address")
-    private String idAddress;
+    private String ipAddress;
 
     private String status;
+
+    public AuditLog(int id, LocalDateTime timestamp, User user, String userName, String action, String ipAddress,
+            String status) {
+                this.id = id;
+                this.timestamp = timestamp;
+                this.user = user;
+                this.userName = userName;
+                this.action = action;
+                this.ipAddress = ipAddress;
+                this.status = status;
+    }
 }

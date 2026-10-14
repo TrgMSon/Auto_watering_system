@@ -9,13 +9,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Entity
 @Table(name = "user_device")
 @Data
-@AllArgsConstructor
 public class UserDevice {
     @Id
     @Column(nullable = false)
@@ -34,6 +32,14 @@ public class UserDevice {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "fcm_token")
-    private String fcmToken;
+    public UserDevice() {
+    }
+
+    public UserDevice(int id, User user, Device device, String permission, LocalDateTime createdAt) {
+        this.id = id;
+        this.user = user;
+        this.device = device;
+        this.permission = permission;
+        this.createdAt = createdAt;
+    }
 }

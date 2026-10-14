@@ -12,15 +12,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Entity
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @Builder 
 public class User {
     @Id
@@ -44,4 +40,17 @@ public class User {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    public User() {
+    }
+
+    public User(int id, String email, String passwordHash, String phoneNumber, Role role, AccountStatus status, LocalDateTime createdAt) {
+        this.id = id;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.phoneNumber = phoneNumber;
+        this.role = role;
+        this.status = status;
+        this.createdAt = createdAt;
+    }
 }
