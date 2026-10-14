@@ -61,7 +61,7 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     @Transactional
-    public void registerDevice(String deviceId, int userId) {
+    public void registerDevice(String deviceId, int userId, int userCreateId) {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new NotFoundException("Thiết bị không tồn tại"));
         User user = userRepository.findById(userId)
@@ -77,7 +77,10 @@ public class DeviceServiceImpl implements DeviceService {
             throw new ConflictException("Thiết bị đã được đăng ký");
         }
 
-        userRepository.assignOwner("owner", userId);
+        User userCreate = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Người dùng đăng ký thiết bị không tồn tại"));
+        if (userCreate.getRole() == Role.ADMIN)
+            userRepository.assignOwner("owner", userId);
 
         if (deviceRepository.updateDeviceStatus("active", deviceId) != 1) {
             throw new ConflictException("Không thể cập nhật trạng thái thiết bị");
