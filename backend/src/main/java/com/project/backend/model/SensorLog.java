@@ -7,13 +7,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Entity
 @Table(name = "sensor_log")
 @Data
-@AllArgsConstructor
 public class SensorLog {
     @Id
     @Column(nullable = false)
@@ -34,5 +32,18 @@ public class SensorLog {
 
     @Column(name = "recorded_at")
     private float recordedAt;
+
+    public SensorLog() {
+    }
+
+    public SensorLog(int id, Device device, float soilMoisture, float temperature, float humidity, float waterLevel, float recordedAt) {
+        this.id = id;
+        this.device = device;
+        this.soilMoisture = soilMoisture;
+        this.temperature = temperature;
+        this.humidity = humidity;
+        this.waterLevel = waterLevel;
+        this.recordedAt = recordedAt;
+    }
 
 }

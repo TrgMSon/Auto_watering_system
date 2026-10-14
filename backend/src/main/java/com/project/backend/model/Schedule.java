@@ -11,40 +11,56 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.Table;
 import lombok.Data;
 
-@Entity 
+@Entity
+@Table(name = "schedule")
 @Data
-@AllArgsConstructor 
 public class Schedule {
-    @Id 
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(nullable = false)
     private int id;
 
-    @ManyToOne(fetch=FetchType.LAZY)
-    @JoinColumn(name="device_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "device_id", nullable = false)
     private Device device;
 
-    @Column(name="start_time")
+    @Column(name = "start_time")
     private LocalTime startTime;
 
-    @Column(name="end_time")
+    @Column(name = "end_time")
     private LocalTime endTime;
 
-    @Column(name="duration_minutes")
+    @Column(name = "duration_minutes")
     private int durationMinutes;
 
-    @Column(name="days_of_week")
+    @Column(name = "days_of_week")
     private String daysOfWeek;
 
-    @Column(name="is_enabled")
+    @Column(name = "is_enabled")
     private boolean isEnabled;
 
-    @Column(name="created_at")
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name="updated_at")
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public Schedule() {
+    }
+
+    public Schedule(int id, Device device, LocalTime starTime, LocalTime endTime, int durationMinutes,
+            String daysOfWeek, boolean isEnabled, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
+        this.device = device;
+        this.startTime = starTime;
+        this.endTime = endTime;
+        this.durationMinutes = durationMinutes;
+        this.daysOfWeek = daysOfWeek;
+        this.isEnabled = isEnabled;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
 }

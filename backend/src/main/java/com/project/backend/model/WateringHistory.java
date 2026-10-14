@@ -9,13 +9,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Entity
 @Table(name = "watering_history")
 @Data
-@AllArgsConstructor
 public class WateringHistory {
     @Id
     @Column(nullable = false)
@@ -36,4 +34,16 @@ public class WateringHistory {
     private LocalTime endTime;
 
     private String status;
+
+    public WateringHistory() {
+    }
+
+    public WateringHistory(int id, Device device, User user, LocalTime startTime, LocalTime endTime, String status) {
+        this.id = id;
+        this.device = device;
+        this.user = user;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.status = status;
+    }
 }

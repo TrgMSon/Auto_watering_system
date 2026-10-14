@@ -1,12 +1,10 @@
 package com.project.backend.dto.user;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 @Builder
 public class UserResponse {
@@ -14,4 +12,11 @@ public class UserResponse {
     private String email;
     private String phoneNumber;
     private String role;
+
+    public UserResponse(int id, String email, String phoneNumber, String role) {
+        this.id = id;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
+        this.role = role;
+    }
 }

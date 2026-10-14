@@ -4,23 +4,19 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "device_config")
 @Data
-@AllArgsConstructor
+@NoArgsConstructor
 public class DeviceConfig {
     @Id
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "device_id", nullable = false)
-    private Device device;
+    @Column(name = "device_id", nullable = false)
+    private String deviceId;
 
     @Column(name = "auto_mode")
     private int autoMode;
@@ -48,4 +44,19 @@ public class DeviceConfig {
 
     @Column(name = "air_temperature_max")
     private float airTemperatureMax;
+
+    public DeviceConfig(String deviceId, int autoMode, float soilMoistureMin, float soiMoistureMax,
+            int maxWateringDuration, LocalDateTime updatedAt, float airHumidityMin, float airHumidityMax,
+            float airTemperatureMin, float airTemperatureMax) {
+                this.deviceId = deviceId;
+                this.autoMode = autoMode;
+                this.soilMoistureMin = soilMoistureMin;
+                this.soilMoistureMax = soiMoistureMax;
+                this.maxWateringDuration = maxWateringDuration;
+                this.updatedAt = updatedAt;
+                this.airHumidityMax = airHumidityMax;
+                this.airHumidityMin = airHumidityMin;
+                this.airTemperatureMax = airTemperatureMax;
+                this.airTemperatureMin = airTemperatureMin;
+    }
 }
