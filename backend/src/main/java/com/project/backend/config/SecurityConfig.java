@@ -38,7 +38,7 @@ public class SecurityConfig {
         this.objectMapper = objecMapper;
     }
 
-    @Value("${app.cors.allowed-origin-patterns}")
+    @Value("${app.cors.allowed-origin-patterns:}")
     private String[] allowedOriginPatterns;
 
     @Bean

@@ -12,12 +12,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import lombok.Builder;
-import lombok.Data;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 @Entity
-@Data
-@Builder 
+@Table(name = "user") // Nên bổ sung @Table nếu cần chỉ định tên bảng rõ ràng
+@Getter
+@Setter
+@ToString
 public class User {
     @Id
     @Column(nullable = false)
@@ -52,5 +56,58 @@ public class User {
         this.role = role;
         this.status = status;
         this.createdAt = createdAt;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private int id;
+        private String email;
+        private String passwordHash;
+        private String phoneNumber;
+        private Role role;
+        private AccountStatus status;
+        private LocalDateTime createdAt;
+
+        public Builder id(int id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder email(String email) {
+            this.email = email;
+            return this;
+        }
+
+        public Builder passwordHash(String passwordHash) {
+            this.passwordHash = passwordHash;
+            return this;
+        }
+
+        public Builder phoneNumber(String phoneNumber) {
+            this.phoneNumber = phoneNumber;
+            return this;
+        }
+
+        public Builder role(Role role) {
+            this.role = role;
+            return this;
+        }
+
+        public Builder status(AccountStatus status) {
+            this.status = status;
+            return this;
+        }
+
+        public Builder createdAt(LocalDateTime createdAt) {
+            this.createdAt = createdAt;
+            return this;
+        }
+
+        public User build() {
+            return new User(id, email, passwordHash, phoneNumber, role, status, createdAt);
+        }
     }
 }

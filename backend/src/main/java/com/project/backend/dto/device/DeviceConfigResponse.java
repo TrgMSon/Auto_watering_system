@@ -1,7 +1,9 @@
 package com.project.backend.dto.device;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record DeviceConfigResponse(
         @JsonProperty("device_id") String deviceId,
         @JsonProperty("auto_mode") boolean autoMode,
@@ -11,5 +13,8 @@ public record DeviceConfigResponse(
         @JsonProperty("air_humidity_min") float airHumidityMin,
         @JsonProperty("air_humidity_max") float airHumidityMax,
         @JsonProperty("air_temperature_min") float airTemperatureMin,
-        @JsonProperty("air_temperature_max") float airTemperatureMax) {
+        @JsonProperty("air_temperature_max") float airTemperatureMax,
+        @JsonProperty("water_level_min") int waterLevelMin,
+        @JsonProperty("command_id") String commandId,
+        @JsonProperty("command_status") String commandStatus) {
 }

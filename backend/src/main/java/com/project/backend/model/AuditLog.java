@@ -15,7 +15,6 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "audit_log")
 @Data
-@NoArgsConstructor
 public class AuditLog {
     @Id
     @Column(nullable = false)
@@ -36,6 +35,9 @@ public class AuditLog {
     private String ipAddress;
 
     private String status;
+
+    public AuditLog() {
+    }
 
     public AuditLog(int id, LocalDateTime timestamp, User user, String userName, String action, String ipAddress,
             String status) {

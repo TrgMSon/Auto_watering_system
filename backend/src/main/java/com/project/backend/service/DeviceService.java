@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
+import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
@@ -18,6 +19,9 @@ public interface DeviceService {
     DeviceConfigResponse updateDeviceConfig(String deviceId, int userId, DeviceConfigRequest request);
 
     DeviceCommandResponse controlPump(String deviceId, int userId, DeviceCommandRequest request);
+
+    CommandAcknowledgmentResponse getCommandAcknowledgment(
+            String deviceId, String commandId, int userId);
 
     DeviceConfigResponse setWateringMode(String deviceId, int userId, DeviceModeRequest request);
 

@@ -50,4 +50,9 @@ public class DeviceConfigRequest {
     @NotNull
     @JsonProperty("air_temperature_max")
     private Float airTemperatureMax;
+
+    @NotNull
+    @Min(0)
+    @JsonProperty("water_level_min")
+    private Integer waterLevelMin;
 }

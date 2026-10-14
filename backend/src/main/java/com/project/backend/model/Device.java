@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Data
-@NoArgsConstructor
 public class Device {
     @Id
     @Column(nullable = false)
@@ -38,6 +37,9 @@ public class Device {
 
     @Column(name = "ble_pass_key")
     private String blePassKey;
+
+    public Device() {
+    }
 
     public Device(String id, String deviceName, String hardwareVesrsion, String firmwareVersion, String status,
             LocalDateTime lastActiveAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
