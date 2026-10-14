@@ -1,14 +1,17 @@
 package com.project.backend.service.impl;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
+import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
@@ -27,6 +30,7 @@ import com.project.backend.repository.ScheduleRepository;
 import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.repository.UserRepository;
 import com.project.backend.service.DeviceService;
+import com.project.backend.service.MqttCommandAcknowledgmentService;
 
 @Service
 public class DeviceServiceImpl implements DeviceService {
@@ -36,6 +40,7 @@ public class DeviceServiceImpl implements DeviceService {
     private final UserDeviceRepository userDeviceRepository;
     private final UserRepository userRepository;
     private final MqttDeviceCommandPublisher commandPublisher;
+    private final MqttCommandAcknowledgmentService acknowledgmentService;
 
     public DeviceServiceImpl(
             DeviceRepository deviceRepository,
@@ -43,13 +48,15 @@ public class DeviceServiceImpl implements DeviceService {
             ScheduleRepository scheduleRepository,
             UserDeviceRepository userDeviceRepository,
             UserRepository userRepository,
-            MqttDeviceCommandPublisher commandPublisher) {
+            MqttDeviceCommandPublisher commandPublisher,
+            MqttCommandAcknowledgmentService acknowledgmentService) {
         this.deviceRepository = deviceRepository;
         this.deviceConfigRepository = deviceConfigRepository;
         this.scheduleRepository = scheduleRepository;
         this.userDeviceRepository = userDeviceRepository;
         this.userRepository = userRepository;
         this.commandPublisher = commandPublisher;
+        this.acknowledgmentService = acknowledgmentService;
     }
 
     @Override
@@ -69,6 +76,8 @@ public class DeviceServiceImpl implements DeviceService {
         if (device.getStatus() != null && device.getStatus().equalsIgnoreCase("active")) {
             throw new ConflictException("Thiết bị đã được đăng ký");
         }
+
+        userRepository.assignOwner("owner", userId);
 
         if (deviceRepository.updateDeviceStatus("active", deviceId) != 1) {
             throw new ConflictException("Không thể cập nhật trạng thái thiết bị");
@@ -101,7 +110,8 @@ public class DeviceServiceImpl implements DeviceService {
                 "Nhiệt độ tối thiểu phải nhỏ hơn hoặc bằng tối đa");
 
         DeviceConfig config = deviceConfigRepository.findById(deviceId)
-                .orElseGet(() -> new DeviceConfig(deviceId, 0, 0, 0, 1, LocalDateTime.now(), 0, 0, 0, 0));
+                .orElseGet(() -> new DeviceConfig(deviceId, 0, 0, 0, 1,
+                        LocalDateTime.now(), 0, 0, 0, 0, 0));
         config.setAutoMode(request.getAutoMode() ? 1 : 0);
         config.setSoilMoistureMin(request.getSoilMoistureMin());
         config.setSoilMoistureMax(request.getSoilMoistureMax());
@@ -110,11 +120,12 @@ public class DeviceServiceImpl implements DeviceService {
         config.setAirHumidityMax(request.getAirHumidityMax());
         config.setAirTemperatureMin(request.getAirTemperatureMin());
         config.setAirTemperatureMax(request.getAirTemperatureMax());
+        config.setWaterLevelMin(request.getWaterLevelMin());
         config.setUpdatedAt(LocalDateTime.now());
 
         DeviceConfig savedConfig = deviceConfigRepository.save(config);
-        commandPublisher.publish(deviceId, configPayload(savedConfig));
-        return toConfigResponse(savedConfig);
+        String commandId = commandPublisher.publishConfiguration(deviceId, configPayload(savedConfig));
+        return toConfigResponse(savedConfig, commandId);
     }
 
     @Override
@@ -127,8 +138,30 @@ public class DeviceServiceImpl implements DeviceService {
             throw new IllegalArgumentException("action chỉ nhận giá trị ON hoặc OFF");
         }
 
-        commandPublisher.publish(deviceId, "{\"action\":\"" + action + "\"}");
-        return new DeviceCommandResponse(deviceId, action, "COMMAND_SENT_VIA_MQTT");
+        int durationSeconds = 0;
+        if (action.equals("ON")) {
+            int maxDurationSeconds = deviceConfigRepository.findById(deviceId)
+                    .map(config -> Math.multiplyExact(config.getMaxWateringDuration(), 60))
+                    .orElse(600);
+            durationSeconds = request.getDurationSeconds() == null
+                    ? Math.min(300, maxDurationSeconds)
+                    : request.getDurationSeconds();
+            if (durationSeconds > maxDurationSeconds) {
+                throw new IllegalArgumentException(
+                        "duration_seconds không được vượt quá thời gian tưới tối đa đã cấu hình");
+            }
+        }
+        String commandId = commandPublisher.publishPumpControl(deviceId, action, durationSeconds);
+        return new DeviceCommandResponse(deviceId, action, "PENDING", commandId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommandAcknowledgmentResponse getCommandAcknowledgment(
+            String deviceId, String commandId, int userId) {
+        requireOwnedDevice(deviceId, userId);
+        return acknowledgmentService.find(deviceId, commandId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái xác nhận lệnh"));
     }
 
     @Override
@@ -147,8 +180,8 @@ public class DeviceServiceImpl implements DeviceService {
         config.setUpdatedAt(LocalDateTime.now());
         DeviceConfig savedConfig = deviceConfigRepository.save(config);
 
-        commandPublisher.publish(deviceId, "{\"mode\":\"" + mode + "\"}");
-        return toConfigResponse(savedConfig);
+        String commandId = commandPublisher.publishConfiguration(deviceId, configPayload(savedConfig));
+        return toConfigResponse(savedConfig, commandId);
     }
 
     @Override
@@ -220,6 +253,10 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     private DeviceConfigResponse toConfigResponse(DeviceConfig config) {
+        return toConfigResponse(config, null);
+    }
+
+    private DeviceConfigResponse toConfigResponse(DeviceConfig config, String commandId) {
         return new DeviceConfigResponse(
                 config.getDeviceId(),
                 config.getAutoMode() != 0,
@@ -229,7 +266,10 @@ public class DeviceServiceImpl implements DeviceService {
                 config.getAirHumidityMin(),
                 config.getAirHumidityMax(),
                 config.getAirTemperatureMin(),
-                config.getAirTemperatureMax());
+                config.getAirTemperatureMax(),
+                config.getWaterLevelMin(),
+                commandId,
+                commandId == null ? null : "PENDING");
     }
 
     private ScheduleResponse toScheduleResponse(Schedule schedule) {
@@ -243,14 +283,17 @@ public class DeviceServiceImpl implements DeviceService {
                 schedule.isEnabled());
     }
 
-    private String configPayload(DeviceConfig config) {
-        return "{\"auto_mode\":" + (config.getAutoMode() != 0)
-                + ",\"soil_moisture_min\":" + config.getSoilMoistureMin()
-                + ",\"soil_moisture_max\":" + config.getSoilMoistureMax()
-                + ",\"max_watering_duration\":" + config.getMaxWateringDuration()
-                + ",\"air_humidity_min\":" + config.getAirHumidityMin()
-                + ",\"air_humidity_max\":" + config.getAirHumidityMax()
-                + ",\"air_temperature_min\":" + config.getAirTemperatureMin()
-                + ",\"air_temperature_max\":" + config.getAirTemperatureMax() + "}";
+    private Map<String, Object> configPayload(DeviceConfig config) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("auto_mode", config.getAutoMode() != 0);
+        payload.put("soil_moisture_min", config.getSoilMoistureMin());
+        payload.put("soil_moisture_max", config.getSoilMoistureMax());
+        payload.put("max_watering_duration_minutes", config.getMaxWateringDuration());
+        payload.put("air_humidity_min", config.getAirHumidityMin());
+        payload.put("air_humidity_max", config.getAirHumidityMax());
+        payload.put("air_temperature_min", config.getAirTemperatureMin());
+        payload.put("air_temperature_max", config.getAirTemperatureMax());
+        payload.put("min_water_level_alert", config.getWaterLevelMin());
+        return payload;
     }
 }

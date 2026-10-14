@@ -1,95 +1,169 @@
 package com.project.backend.service.impl;
 
-import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.backend.config.MqttGateway;
+import com.project.backend.service.MqttCommandAcknowledgmentService;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.MessagingException;
 import org.springframework.stereotype.Component;
 
 import com.project.backend.exception.DeviceCommandException;
 
-import jakarta.annotation.PreDestroy;
-
 @Component
 public class MqttDeviceCommandPublisher {
-    private final String brokerUrl;
-    private final String username;
-    private final String password;
-    private final String topicTemplate;
-    private MqttClient client;
+    private static final int MAX_PUBLISH_ATTEMPTS = 3;
 
+    private final String brokerUrl;
+    private final String commandTopicTemplate;
+    private final String configTopicTemplate;
+    private final MqttGateway mqttGateway;
+    private final ObjectMapper objectMapper;
+    private final MqttCommandAcknowledgmentService acknowledgmentService;
+
+    @Autowired
     public MqttDeviceCommandPublisher(
+            ObjectProvider<MqttGateway> mqttGatewayProvider,
+            ObjectMapper objectMapper,
+            MqttCommandAcknowledgmentService acknowledgmentService,
             @Value("${app.mqtt.broker-url:}") String brokerUrl,
-            @Value("${app.mqtt.username:}") String username,
-            @Value("${app.mqtt.password:}") String password,
-            @Value("${app.mqtt.control-topic:devices/%s/control}") String topicTemplate) {
-        this.brokerUrl = brokerUrl;
-        this.username = username;
-        this.password = password;
-        this.topicTemplate = topicTemplate;
+            @Value("${MQTT_COMMAND_TOPIC:iot/garden/{deviceId}/cmd}") String commandTopicTemplate,
+            @Value("${MQTT_CONFIG_TOPIC:iot/garden/{deviceId}/config}") String configTopicTemplate) {
+        this(
+                mqttGatewayProvider.getIfAvailable(),
+                objectMapper,
+                acknowledgmentService,
+                brokerUrl,
+                commandTopicTemplate,
+                configTopicTemplate);
     }
 
-    public synchronized void publish(String deviceId, String payload) {
-        if (brokerUrl.isBlank()) {
+    MqttDeviceCommandPublisher(String brokerUrl, String commandTopicTemplate) {
+        this((MqttGateway) null, new ObjectMapper(), null, brokerUrl, commandTopicTemplate,
+                "iot/garden/{deviceId}/config");
+    }
+
+    MqttDeviceCommandPublisher(
+            MqttGateway mqttGateway,
+            ObjectMapper objectMapper,
+            String brokerUrl,
+            String commandTopicTemplate,
+            String configTopicTemplate) {
+        this(mqttGateway, objectMapper, null, brokerUrl, commandTopicTemplate, configTopicTemplate);
+    }
+
+    MqttDeviceCommandPublisher(
+            MqttGateway mqttGateway,
+            ObjectMapper objectMapper,
+            MqttCommandAcknowledgmentService acknowledgmentService,
+            String brokerUrl,
+            String commandTopicTemplate,
+            String configTopicTemplate) {
+        this.mqttGateway = mqttGateway;
+        this.objectMapper = objectMapper;
+        this.acknowledgmentService = acknowledgmentService;
+        this.brokerUrl = brokerUrl;
+        this.commandTopicTemplate = commandTopicTemplate;
+        this.configTopicTemplate = configTopicTemplate;
+    }
+
+    public String publishPumpControl(String deviceId, String state, int durationSeconds) {
+        Map<String, Object> payload = buildPumpControlPayload(deviceId, state, durationSeconds);
+        return publish(deviceId, commandTopicTemplate, payload);
+    }
+
+    Map<String, Object> buildPumpControlPayload(String deviceId, String state, int durationSeconds) {
+        if (!"ON".equals(state) && !"OFF".equals(state)) {
+            throw new IllegalArgumentException("state chỉ nhận giá trị ON hoặc OFF");
+        }
+        if (durationSeconds < 0 || ("ON".equals(state) && durationSeconds == 0)) {
+            throw new IllegalArgumentException("duration_seconds phải lớn hơn 0 khi bật máy bơm");
+        }
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("state", state);
+        params.put("duration_seconds", "OFF".equals(state) ? 0 : durationSeconds);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("command_id", "CMD-" + UUID.randomUUID());
+        payload.put("device_id", deviceId);
+        payload.put("timestamp", Instant.now().toString());
+        payload.put("action", "PUMP_CONTROL");
+        payload.put("params", params);
+        return payload;
+    }
+
+    public String publishConfiguration(String deviceId, Map<String, Object> config) {
+        Map<String, Object> payload = buildConfigurationPayload(deviceId, config);
+        return publish(deviceId, configTopicTemplate, payload);
+    }
+
+    Map<String, Object> buildConfigurationPayload(String deviceId, Map<String, Object> config) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("command_id", "CMD-" + UUID.randomUUID());
+        payload.put("device_id", deviceId);
+        payload.put("timestamp", Instant.now().toString());
+        payload.put("config", new LinkedHashMap<>(config));
+        return payload;
+    }
+
+    private String publish(String deviceId, String topicTemplate, Map<String, Object> payload) {
+        if (brokerUrl == null || brokerUrl.isBlank()) {
             throw new DeviceCommandException("MQTT chưa được cấu hình trên máy chủ");
         }
-        if (topicTemplate.isBlank() || deviceId.contains("+") || deviceId.contains("#")) {
+        if (mqttGateway == null) {
+            throw new DeviceCommandException("MQTT chưa được bật hoặc chưa có kết nối gửi bản tin");
+        }
+        if (deviceId == null || deviceId.isBlank() || deviceId.contains("/")
+                || deviceId.contains("+") || deviceId.contains("#")
+                || topicTemplate == null || topicTemplate.isBlank()) {
             throw new DeviceCommandException("Cấu hình topic MQTT không hợp lệ");
         }
 
+        String topic = topicTemplate
+                .replace("{deviceId}", deviceId)
+                .replace("%s", deviceId);
+        if (topic.contains("+") || topic.contains("#")) {
+            throw new DeviceCommandException("Cấu hình topic MQTT không hợp lệ");
+        }
+
+        String commandId = (String) payload.get("command_id");
+        if (commandId == null || commandId.isBlank()) {
+            commandId = "CMD-" + UUID.randomUUID();
+            payload.put("command_id", commandId);
+        }
+
+        final String messagePayload;
         try {
-            MqttClient mqttClient = connectedClient();
-            String topic = topicTemplate
-                    .replace("{deviceId}", deviceId)
-                    .replace("%s", deviceId);
-            MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
-            message.setQos(1);
-            mqttClient.publish(topic, message);
-        } catch (MqttException ex) {
-            throw new DeviceCommandException("Không thể gửi lệnh đến thiết bị qua MQTT", ex);
+            messagePayload = objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            throw new DeviceCommandException("Không thể tạo bản tin MQTT", ex);
         }
-    }
 
-    private MqttClient connectedClient() throws MqttException {
-        if (client == null || !client.isConnected()) {
-            if (client == null) {
-                client = new MqttClient(
-                        brokerUrl,
-                        "watering-api-" + UUID.randomUUID(),
-                        new MemoryPersistence());
-            }
-
-            MqttConnectOptions options = new MqttConnectOptions();
-            options.setAutomaticReconnect(true);
-            options.setCleanSession(true);
-            options.setConnectionTimeout(10);
-            if (!username.isBlank()) {
-                options.setUserName(username);
-                options.setPassword(password.toCharArray());
-            }
-            client.connect(options);
+        MessagingException lastFailure = null;
+        if (acknowledgmentService != null) {
+            acknowledgmentService.register(deviceId, commandId);
         }
-        return client;
-    }
-
-    @PreDestroy
-    public synchronized void close() {
-        if (client != null) {
+        for (int attempt = 1; attempt <= MAX_PUBLISH_ATTEMPTS; attempt++) {
             try {
-                if (client.isConnected()) {
-                    client.disconnect();
-                }
-                client.close();
-            } catch (MqttException ex) {
-                throw new DeviceCommandException("Không thể đóng kết nối MQTT", ex);
-            } finally {
-                client = null;
+                mqttGateway.sendToMqtt(messagePayload, topic);
+                return commandId;
+            } catch (MessagingException ex) {
+                lastFailure = ex;
             }
         }
+        if (acknowledgmentService != null) {
+            acknowledgmentService.markPublishFailed(
+                    deviceId, commandId, "Không gửi được bản tin MQTT sau 3 lần thử");
+        }
+        throw new DeviceCommandException(
+                "Không thể gửi bản tin đến thiết bị qua MQTT sau 3 lần thử", lastFailure);
     }
 }
