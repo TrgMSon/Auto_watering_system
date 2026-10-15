@@ -23,9 +23,11 @@ import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
 import com.project.backend.dto.device.PumpControlRequest;
+import com.project.backend.dto.device.RegisterDeviceRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
 import com.project.backend.service.DeviceService;
+import com.project.backend.service.WateringHistoryService;
 
 import jakarta.validation.Valid;
 
@@ -33,9 +35,11 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/devices/{id}")
 public class DeviceController {
         private final DeviceService deviceService;
+        private final WateringHistoryService wateringHistoryService;
 
-        public DeviceController(DeviceService deviceService) {
+        public DeviceController(DeviceService deviceService, WateringHistoryService wateringHistoryService) {
                 this.deviceService = deviceService;
+                this.wateringHistoryService = wateringHistoryService;
         }
 
         @GetMapping("/config")
@@ -128,8 +132,9 @@ public class DeviceController {
         @PostMapping("/register")
         @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<ApiResponse<Void>> registerDevice(
-                        @PathVariable("id") String deviceId, Authentication authentication) {
-                deviceService.registerDevice(deviceId, userId(authentication));
+                        @PathVariable("id") String deviceId, @Valid @RequestBody RegisterDeviceRequest request,
+                        Authentication authentication) {
+                deviceService.registerDevice(deviceId, request.getUserId(), userId(authentication));
                 return ResponseEntity.ok(ApiResponse.success("Đăng ký thiết bị thành công", null));
         }
 

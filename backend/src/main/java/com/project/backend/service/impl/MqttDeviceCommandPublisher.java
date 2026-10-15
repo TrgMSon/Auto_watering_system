@@ -34,8 +34,8 @@ public class MqttDeviceCommandPublisher {
             ObjectMapper objectMapper,
             MqttCommandAcknowledgmentService acknowledgmentService,
             @Value("${app.mqtt.broker-url:}") String brokerUrl,
-            @Value("${MQTT_COMMAND_TOPIC:iot/garden/{deviceId}/cmd}") String commandTopicTemplate,
-            @Value("${MQTT_CONFIG_TOPIC:iot/garden/{deviceId}/config}") String configTopicTemplate) {
+            @Value("${app.mqtt.command.topic:}") String commandTopicTemplate,
+            @Value("${app.mqtt.config.topic:}") String configTopicTemplate) {
         this(
                 mqttGatewayProvider.getIfAvailable(),
                 objectMapper,

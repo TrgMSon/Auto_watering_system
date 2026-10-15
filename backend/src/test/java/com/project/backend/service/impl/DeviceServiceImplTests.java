@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class DeviceServiceImplTests {
                         LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now())));
         when(userDeviceRepository.existsByUser_IdAndDevice_Id(7, deviceId)).thenReturn(true);
         when(configRepository.findById(deviceId)).thenReturn(Optional.empty());
-        when(configRepository.save(any(DeviceConfig.class)))
+        when(configRepository.save(Objects.requireNonNull(any(DeviceConfig.class))))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         DeviceServiceImpl service = new DeviceServiceImpl(

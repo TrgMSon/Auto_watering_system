@@ -1,6 +1,7 @@
 package com.project.backend.service.impl;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,7 +53,7 @@ public class AuthServiceImpl implements AuthService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        userRepository.save(user);
+        userRepository.save(Objects.requireNonNull(user, "Không tìm thấy người dùng"));
     }
 
     @Override

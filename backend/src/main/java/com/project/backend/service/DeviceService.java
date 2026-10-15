@@ -12,7 +12,7 @@ import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
 
 public interface DeviceService {
-    void registerDevice(String deviceId, int userId);
+    void registerDevice(String deviceId, int userId, int userCreateId);
 
     DeviceConfigResponse getDeviceConfig(String deviceId, int userId);
 

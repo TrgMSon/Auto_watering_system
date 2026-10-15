@@ -1,0 +1,57 @@
+{"properties": [
+  {
+    "name": "app.mqtt.config.topic",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.config.topic'"
+  },
+  {
+    "name": "app.mqtt.command.topic",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.command.topic'"
+  },
+  {
+    "name": "app.mqtt.client.id",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.client.id'"
+  },
+  {
+    "name": "app.mqtt.password",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.password'"
+  },
+  {
+    "name": "app.mqtt.username",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.username'"
+  },
+  {
+    "name": "app.mqtt.broker-url",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.broker-url'"
+  },
+  {
+    "name": "app.mqtt.enabled",
+    "type": "java.lang.String",
+    "description": "A description for 'app.mqtt.enabled'"
+  },
+  {
+    "name": "app.refresh-token.expiration-days",
+    "type": "java.lang.String",
+    "description": "A description for 'app.refresh-token.expiration-days'"
+  },
+  {
+    "name": "app.cors.allowed-origin-patterns",
+    "type": "java.lang.String",
+    "description": "A description for 'app.cors.allowed-origin-patterns'"
+  },
+  {
+    "name": "jwt.access-token-expiration",
+    "type": "java.lang.String",
+    "description": "A description for 'jwt.access-token-expiration'"
+  },
+  {
+    "name": "jwt.secret-key",
+    "type": "java.lang.String",
+    "description": "A description for 'jwt.secret-key'"
+  }
+]}
