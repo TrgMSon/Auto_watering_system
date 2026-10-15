@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +63,9 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     @Transactional
     public void registerDevice(String deviceId, int userId, int userCreateId) {
+        if (deviceId == null || deviceId.isEmpty())
+            throw new IllegalArgumentException("Tham số không hợp lệ");
+
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new NotFoundException("Thiết bị không tồn tại"));
         User user = userRepository.findById(userId)
@@ -91,6 +95,9 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     @Transactional(readOnly = true)
     public DeviceConfigResponse getDeviceConfig(String deviceId, int userId) {
+        if (deviceId == null || deviceId.isEmpty())
+            throw new IllegalArgumentException("Tham số không hợp lệ");
+
         requireOwnedDevice(deviceId, userId);
         DeviceConfig config = deviceConfigRepository.findById(deviceId)
                 .orElseThrow(() -> new NotFoundException("Chưa có cấu hình cho thiết bị này"));
@@ -101,7 +108,10 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public DeviceConfigResponse updateDeviceConfig(
             String deviceId, int userId, DeviceConfigRequest request) {
-        Device device = requireOwnedDevice(deviceId, userId);
+        if (deviceId == null || deviceId.isEmpty())
+            throw new IllegalArgumentException("Tham số không hợp lệ");
+
+        requireOwnedDevice(deviceId, userId);
         validateThresholds(
                 request.getSoilMoistureMin(), request.getSoilMoistureMax(),
                 "Độ ẩm đất tối thiểu phải nhỏ hơn hoặc bằng tối đa");
@@ -135,6 +145,9 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public DeviceCommandResponse controlPump(
             String deviceId, int userId, DeviceCommandRequest request) {
+        if (deviceId == null || deviceId.isEmpty())
+            throw new IllegalArgumentException("Tham số không hợp lệ");
+
         requireOwnedDevice(deviceId, userId);
         String action = request.getAction().trim().toUpperCase(Locale.ROOT);
         if (!action.equals("ON") && !action.equals("OFF")) {
@@ -171,6 +184,9 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public DeviceConfigResponse setWateringMode(
             String deviceId, int userId, DeviceModeRequest request) {
+        if (deviceId == null || deviceId.isEmpty())
+            throw new IllegalArgumentException("Tham số không hợp lệ");
+
         requireOwnedDevice(deviceId, userId);
         String mode = request.getMode().trim().toLowerCase(Locale.ROOT);
         if (!mode.equals("auto") && !mode.equals("manual")) {
@@ -237,10 +253,14 @@ public class DeviceServiceImpl implements DeviceService {
         requireOwnedDevice(deviceId, userId);
         Schedule schedule = scheduleRepository.findByIdAndDevice_Id(scheduleId, deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy lịch tưới"));
-        scheduleRepository.delete(schedule);
+
+        scheduleRepository.delete(Objects.requireNonNull(schedule, "Không tìm thấy lịch tưới"));
     }
 
     private Device requireOwnedDevice(String deviceId, int userId) {
+        if (deviceId == null || deviceId.isEmpty())
+            throw new IllegalArgumentException("Tham số không hợp lệ");
+
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
         if (!userDeviceRepository.existsByUser_IdAndDevice_Id(userId, deviceId)) {

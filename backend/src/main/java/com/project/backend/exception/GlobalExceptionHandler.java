@@ -1,5 +1,7 @@
 package com.project.backend.exception;
 
+import java.util.Objects;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -65,7 +67,7 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiResponse<Void>> error(HttpStatus status, String message) {
-        return ResponseEntity.status(status)
+        return ResponseEntity.status(Objects.requireNonNull(status, "Https status không được để trống"))
                 .body(ApiResponse.error(status.value(), message));
     }
 }

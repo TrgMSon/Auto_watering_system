@@ -1,6 +1,7 @@
 package com.project.backend.service.impl;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -33,7 +34,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .expiresAt(LocalDateTime.now().plusDays(expirationDays))
                 .revoked(false)
                 .build();
-        refreshTokenRepository.save(entity);
+        refreshTokenRepository.save(Objects.requireNonNull(entity, "Không tìm thấy token"));
         return rawToken;
     }
 

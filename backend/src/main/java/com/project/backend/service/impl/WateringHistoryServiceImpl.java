@@ -1,5 +1,7 @@
 package com.project.backend.service.impl;
 
+import java.util.Objects;
+
 import org.springframework.stereotype.Service;
 
 import com.project.backend.dto.wateringHistory.RecordHistoryRequest;
@@ -14,32 +16,33 @@ import com.project.backend.service.WateringHistoryService;
 
 @Service
 public class WateringHistoryServiceImpl implements WateringHistoryService {
-    private final WateringHistoryRepository wateringHistoryRepository;
-    private final UserRepository userRepository;
-    private final DeviceRepository deviceRepository;
+        private final WateringHistoryRepository wateringHistoryRepository;
+        private final UserRepository userRepository;
+        private final DeviceRepository deviceRepository;
 
-    public WateringHistoryServiceImpl(WateringHistoryRepository wateringHistoryRepository,
-            UserRepository userRepository, DeviceRepository deviceRepository) {
-        this.wateringHistoryRepository = wateringHistoryRepository;
-        this.userRepository = userRepository;
-        this.deviceRepository = deviceRepository;
-    }
+        public WateringHistoryServiceImpl(WateringHistoryRepository wateringHistoryRepository,
+                        UserRepository userRepository, DeviceRepository deviceRepository) {
+                this.wateringHistoryRepository = wateringHistoryRepository;
+                this.userRepository = userRepository;
+                this.deviceRepository = deviceRepository;
+        }
 
-    @Override
-    public void recordWateringHistory(RecordHistoryRequest request) {
-        Device device = deviceRepository.findById(request.getDeviceId())
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
+        @Override
+        public void recordWateringHistory(RecordHistoryRequest request) {
+                Device device = deviceRepository
+                                .findById(Objects.requireNonNull(request.getDeviceId(), "Không tìm thấy thiết bị"))
+                                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+                User user = userRepository.findById(request.getUserId())
+                                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
-        WateringHistory record = WateringHistory.builder()
-                .device(device)
-                .user(user)
-                .startTime(request.getStartTime())
-                .endTime(request.getEndTime())
-                .status(request.getStatus())
-                .build();
+                WateringHistory record = WateringHistory.builder()
+                                .device(device)
+                                .user(user)
+                                .startTime(request.getStartTime())
+                                .endTime(request.getEndTime())
+                                .status(request.getStatus())
+                                .build();
 
-        wateringHistoryRepository.save(record);
-    }
+                wateringHistoryRepository.save(Objects.requireNonNull(record, "Không tìm thấy bản ghi tưới cây"));
+        }
 }
