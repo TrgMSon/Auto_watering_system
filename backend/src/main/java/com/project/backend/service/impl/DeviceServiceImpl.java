@@ -154,20 +154,7 @@ public class DeviceServiceImpl implements DeviceService {
             throw new IllegalArgumentException("action chỉ nhận giá trị ON hoặc OFF");
         }
 
-        int durationSeconds = 0;
-        if (action.equals("ON")) {
-            int maxDurationSeconds = deviceConfigRepository.findById(deviceId)
-                    .map(config -> Math.multiplyExact(config.getMaxWateringDuration(), 60))
-                    .orElse(600);
-            durationSeconds = request.getDurationSeconds() == null
-                    ? Math.min(300, maxDurationSeconds)
-                    : request.getDurationSeconds();
-            if (durationSeconds > maxDurationSeconds) {
-                throw new IllegalArgumentException(
-                        "duration_seconds không được vượt quá thời gian tưới tối đa đã cấu hình");
-            }
-        }
-        String commandId = commandPublisher.publishPumpControl(deviceId, action, durationSeconds);
+        String commandId = commandPublisher.publishPumpControl(deviceId, action);
         return new DeviceCommandResponse(deviceId, action, "PENDING", commandId);
     }
 

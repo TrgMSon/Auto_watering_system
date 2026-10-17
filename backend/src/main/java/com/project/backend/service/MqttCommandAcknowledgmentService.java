@@ -2,6 +2,7 @@ package com.project.backend.service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
@@ -24,9 +25,11 @@ public class MqttCommandAcknowledgmentService {
 
     private final ObjectMapper objectMapper;
     private final Map<String, TrackedCommand> commands = new ConcurrentHashMap<>();
+    private final WateringHistoryService wateringHistoryService;
 
-    public MqttCommandAcknowledgmentService(ObjectMapper objectMapper) {
+    public MqttCommandAcknowledgmentService(ObjectMapper objectMapper, WateringHistoryService wateringHistoryService) {
         this.objectMapper = objectMapper;
+        this.wateringHistoryService = wateringHistoryService;
     }
 
     public synchronized void register(String deviceId, String commandId) {
@@ -69,6 +72,7 @@ public class MqttCommandAcknowledgmentService {
             String payloadDeviceId = textValue(acknowledgment, "device_id");
             String commandId = textValue(acknowledgment, "command_id");
             String status = textValue(acknowledgment, "status");
+            String action = textValue(acknowledgment, "action");
             String message = textValue(acknowledgment, "message");
             if (!deviceId.equals(payloadDeviceId) || commandId == null || status == null) {
                 logger.warn("Ignoring invalid MQTT acknowledgment on topic {}", topic);
@@ -77,6 +81,12 @@ public class MqttCommandAcknowledgmentService {
 
             if ("SUCCESS".equalsIgnoreCase(status) || "SUCCEEDED".equalsIgnoreCase(status)) {
                 updateStatus(deviceId, commandId, "SUCCEEDED", message);
+                if (action.equals("OFF")){
+                    wateringHistoryService.recordEndWatering(deviceId, LocalDateTime.now());
+                } 
+                else if (action.equals("ON")) {
+                    wateringHistoryService.recordStartWatering(deviceId, LocalDateTime.now());
+                }
             } else if ("FAILED".equalsIgnoreCase(status) || "ERROR".equalsIgnoreCase(status)) {
                 updateStatus(deviceId, commandId, "FAILED", message);
             } else {
