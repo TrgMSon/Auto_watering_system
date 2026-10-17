@@ -1,0 +1,71 @@
+# Build app iOS trên máy macOS của GitHub → file .ipa CHƯA KÝ.
+name: iOS build (IPA chưa ký)
+
+on:
+  workflow_dispatch: # Cho phép trigger bằng tay
+  push:
+    branches: [ 'mobile_app' ] # Chỉ chạy khi push lên nhánh mobile_app
+    paths-ignore: ['**.md', 'tool/**']
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # để đăng file lên Releases
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    
+    # Rất quan trọng: Báo cho GitHub Actions biết thư mục chứa Flutter project là "mobile"
+    defaults:
+      run:
+        working-directory: ./mobile
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cài thư viện
+        run: flutter pub get
+
+      - name: Tạo cấu trúc iOS (nếu dự án chưa có)
+        run: flutter create --platforms=ios .
+
+      - name: Disable code signing requirement in Xcode
+        run: |
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = \(.*\);/PRODUCT_BUNDLE_IDENTIFIER = \1; CODE_SIGNING_ALLOWED = "NO"; CODE_SIGNING_REQUIRED = "NO"; DEVELOPMENT_TEAM = "V8VXY724Y2";/g' ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Build iOS (release, không ký)
+        run: flutter build ios --release --no-codesign
+
+      - name: Đóng gói IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr watering-app-unsigned.ipa Payload
+          ls -lh watering-app-unsigned.ipa
+
+      - name: Đăng lên Releases (link tải cố định)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ios-latest-${GITHUB_REF_NAME//\//-}"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" watering-app-unsigned.ipa --prerelease --target "$GITHUB_SHA" \
+            --title "iOS mới nhất – $GITHUB_REF_NAME" \
+            --notes "IPA chưa ký từ commit ${GITHUB_SHA::7} trên nhánh $GITHUB_REF_NAME. Tải về, cài lên iPhone bằng Sideloadly."
+          echo "Link tải: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/watering-app-unsigned.ipa"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: watering-app-ios-unsigned
+          # Do actions (ngoại trừ run) luôn lấy root repo làm gốc, ta cần trỏ vào thư mục mobile
+          path: mobile/watering-app-unsigned.ipa
+          retention-days: 14
