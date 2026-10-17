@@ -23,10 +23,6 @@ public class WateringHistory {
     @JoinColumn(name = "device_id")
     private Device device;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
-
     @Column(name = "start_time")
     private LocalDateTime startTime;
 
@@ -38,10 +34,9 @@ public class WateringHistory {
     public WateringHistory() {
     }
 
-    public WateringHistory(int id, Device device, User user, LocalDateTime startTime, LocalDateTime endTime, String status) {
+    public WateringHistory(int id, Device device, LocalDateTime startTime, LocalDateTime endTime, String status) {
         this.id = id;
         this.device = device;
-        this.user = user;
         this.startTime = startTime;
         this.endTime = endTime;
         this.status = status;
@@ -54,7 +49,6 @@ public class WateringHistory {
     public static class Builder {
         private int id;
         private Device device;
-        private User user;
         private LocalDateTime startTime;
         private LocalDateTime endTime;
         private String status;
@@ -66,11 +60,6 @@ public class WateringHistory {
 
         public Builder device(Device device) {
             this.device = device;
-            return this;
-        }
-
-        public Builder user(User user) {
-            this.user = user;
             return this;
         }
 
@@ -90,7 +79,7 @@ public class WateringHistory {
         }
 
         public WateringHistory build() {
-            return new WateringHistory(id, device, user, startTime, endTime, status);
+            return new WateringHistory(id, device, startTime, endTime, status);
         }
     }
 }

@@ -27,7 +27,6 @@ import com.project.backend.dto.device.RegisterDeviceRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
 import com.project.backend.service.DeviceService;
-import com.project.backend.service.WateringHistoryService;
 
 import jakarta.validation.Valid;
 
@@ -35,11 +34,9 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/devices/{id}")
 public class DeviceController {
         private final DeviceService deviceService;
-        private final WateringHistoryService wateringHistoryService;
 
-        public DeviceController(DeviceService deviceService, WateringHistoryService wateringHistoryService) {
+        public DeviceController(DeviceService deviceService) {
                 this.deviceService = deviceService;
-                this.wateringHistoryService = wateringHistoryService;
         }
 
         @GetMapping("/config")
@@ -147,7 +144,6 @@ public class DeviceController {
                         Authentication authentication) {
                 DeviceCommandRequest commandRequest = new DeviceCommandRequest();
                 commandRequest.setAction(request.getState());
-                commandRequest.setDurationSeconds(request.getDurationSeconds());
                 return ResponseEntity.ok(ApiResponse.success(
                                 "Đã gửi lệnh, đang chờ thiết bị xác nhận",
                                 deviceService.controlPump(
