@@ -2,32 +2,35 @@
 
 ## Giới thiệu
 
-Auto Watering System là hệ thống IoT hỗ trợ theo dõi môi trường trồng cây và điều khiển tưới. Backend cung cấp API cho tài khoản, thiết bị và dữ liệu cảm biến; giao tiếp với thiết bị qua MQTT. Frontend web hiện là trang quản trị, cho phép đăng nhập bằng tài khoản `ADMIN` và xem thống kê cảm biến theo thiết bị.
+Auto Watering System là hệ thống IoT hỗ trợ theo dõi môi trường trồng cây và điều khiển tưới. Dự án gồm backend cung cấp API cho tài khoản, thiết bị và dữ liệu cảm biến; frontend web quản trị; và ứng dụng mobile Flutter để người dùng quản lý thiết bị IoT.
 
-Các khả năng chính:
+Các chức năng chính:
 
 - Đăng ký, đăng nhập và xác thực API bằng JWT.
 - Quản lý thiết bị, cấu hình ngưỡng cảm biến, chế độ tưới và lịch tưới.
 - Gửi lệnh bật/tắt máy bơm và nhận xác nhận từ thiết bị.
 - Nhận dữ liệu cảm biến qua MQTT và lưu vào MySQL.
 - Xem thống kê môi trường và mực nước trên dashboard quản trị.
+- Ứng dụng mobile có màn hình tổng quan, tự động hóa, quản lý thành viên, cài đặt và danh sách thiết bị.
 
 ## Kiến trúc
 
 ```mermaid
 flowchart LR
     Admin[Quản trị viên] --> Web[Frontend web - React]
-    User[Ứng dụng mobile] -->|REST API| API[Backend - Spring Boot]
+    API[Backend - Spring Boot]
     Web -->|REST API / JWT| API
     API --> DB[(MySQL)]
     API <-->|MQTT| Broker[MQTT Broker]
     Broker <-->|Telemetry / lệnh / xác nhận| Device[Thiết bị IoT]
+    User[Người dùng] --> Mobile[Ứng dụng mobile - Flutter]
+    Mobile --> Mock[Dữ liệu giả lập trong ứng dụng]
 ```
 
 - **Backend (`backend/`)**: Java 21 và Spring Boot 3, tổ chức theo controller, service, repository và model. Spring Security/JWT xác thực người dùng; Spring Data JPA truy cập MySQL; Spring Integration MQTT nhận telemetry/trạng thái/xác nhận và gửi lệnh/cấu hình. Backend cũng cung cấp API thống kê và cấu hình WebSocket.
 - **Frontend (`frontend/`)**: React, ứng dụng dashboard quản trị Gardenia. Dashboard gọi API đăng nhập và thống kê của backend.
+- **Mobile (`mobile/`)**: Ứng dụng Flutter sử dụng BLoC để quản lý trạng thái, GoRouter để điều hướng và GetIt để đăng ký phụ thuộc. Mã nguồn tổ chức theo tính năng (`auth`, `dashboard`, `automation`, `sensor_monitor`, `device_management`, `user_management`, `profile`) với các lớp domain, data và presentation. Các repository hiện được đăng ký chủ yếu là mock để chạy thử giao diện; mobile chưa kết nối API/MQTT thực tế.
 - **Thiết bị IoT**: Gửi dữ liệu cảm biến lên MQTT, nhận lệnh điều khiển/cấu hình và phản hồi trên topic xác nhận.
-- **Mobile (`mobile/`)**: Thư mục hiện có tài liệu thiết kế/kiến trúc Flutter, chưa có mã nguồn Dart hoặc `pubspec.yaml` trong repository; do đó chưa thể cài đặt và chạy ứng dụng mobile từ checkout này.
 
 ### Luồng MQTT
 
@@ -47,6 +50,7 @@ Thiết bị gửi xác nhận sau khi xử lý lệnh hoặc cấu hình. Backe
 - MySQL và một database đã được tạo, có schema phù hợp với ứng dụng. Hibernate hiện đặt `ddl-auto=none`, repository không cung cấp tập tin SQL khởi tạo schema.
 - Một MQTT broker có thể truy cập được từ backend.
 - Node.js và npm để chạy frontend.
+- Flutter SDK (Dart SDK tương thích với ràng buộc `sdk: ^3.5.0` trong `mobile/pubspec.yaml`) và Android emulator hoặc thiết bị Android để chạy mobile.
 - Git nếu cần lấy mã nguồn.
 
 ## Cài đặt và chạy
@@ -114,6 +118,17 @@ Tạo bản build production bằng:
 npm run build
 ```
 
+### 4. Cài đặt và chạy ứng dụng mobile
+
+Mở terminal tại thư mục `mobile`, tải dependencies và khởi chạy ứng dụng trên emulator/thiết bị đang kết nối:
+
+```powershell
+flutter pub get
+flutter run
+```
+
+Có thể xem các thiết bị Flutter nhận diện bằng `flutter devices`, sau đó chọn thiết bị cụ thể với `flutter run -d <device_id>`. Mobile hiện hoạt động ở chế độ UI với repository mock; đăng nhập, số liệu cảm biến và thao tác thiết bị là dữ liệu thử nghiệm, chưa được gửi đến backend. Vì vậy có thể chạy mobile độc lập, không cần cấu hình MySQL hoặc MQTT.
+
 ## API thiết bị và xác nhận lệnh
 
 Các API thiết bị yêu cầu bearer token. Thiết bị phải thuộc người dùng đã xác thực.
@@ -144,4 +159,4 @@ API dashboard thống kê:
 
 ## Tài liệu mobile
 
-Tài liệu kiến trúc và thiết kế mobile nằm trong [`mobile/docs/`](mobile/docs/), bao gồm [architecture.md](mobile/docs/architecture.md). Hiện repository chưa có mã nguồn Flutter để chạy ứng dụng.
+Tài liệu kiến trúc và thiết kế mobile nằm trong [`mobile/docs/`](mobile/docs/), bao gồm [architecture.md](mobile/docs/architecture.md).
