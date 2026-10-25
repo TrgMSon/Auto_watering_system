@@ -21,9 +21,15 @@ See the section about [running tests](https://facebook.github.io/create-react-ap
 
 ## Gardenia admin dashboard
 
-Set `REACT_APP_API_BASE_URL` when the frontend and backend run on different
-origins. Sign-in uses `POST /api/auth/login`; the authenticated home page is
-restricted to accounts whose response role is `ADMIN`.
+Development uses `REACT_APP_API_BASE_URL=http://localhost:8080` from the
+committed `.env.development` file. Change it there if the backend runs at a
+different address, then restart `npm start`. For production, set
+`REACT_APP_API_BASE_URL` to the public backend URL before running `npm run build`;
+Create React App embeds this value at build time. The backend must allow the
+frontend origin through CORS.
+
+Sign-in uses `POST /api/auth/login`; the authenticated home page is restricted
+to accounts whose response role is `ADMIN`.
 
 The dashboard queries:
 
