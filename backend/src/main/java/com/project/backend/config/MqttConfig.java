@@ -24,12 +24,19 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
 import com.project.backend.service.MqttCommandAcknowledgmentService;
+import com.project.backend.service.impl.SensorDataServiceImpl;
+
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 
 @Configuration
 @ConditionalOnProperty(name = "app.mqtt.enabled", havingValue = "true")
 public class MqttConfig {
     private static final Logger logger = LoggerFactory.getLogger(MqttConfig.class);
+    private SensorDataServiceImpl sensorDataServiceImpl;
+
+    public MqttConfig(SensorDataServiceImpl sensorDataServiceImpl) {
+        this.sensorDataServiceImpl = sensorDataServiceImpl;
+    }
 
     @Value("${app.mqtt.broker-url:}")
     private String brokerUrl;
@@ -102,7 +109,11 @@ public class MqttConfig {
                     : messagePayload.toString();
             if (topicName.endsWith("/ack")) {
                 acknowledgmentService.handleMessage(topicName, payload);
-            } else {
+            } 
+            else if (topicName.endsWith("/telemetry")) {
+                sensorDataServiceImpl.recordSensorLog(topicName, payload);
+            }
+            else {
                 logger.info("MQTT message received; topic={}, payload={}", topicName, payload);
             }
         };

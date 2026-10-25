@@ -19,6 +19,24 @@ You may also see any lint errors in the console.
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
+## Gardenia admin dashboard
+
+Set `REACT_APP_API_BASE_URL` when the frontend and backend run on different
+origins. Sign-in uses `POST /api/auth/login`; the authenticated home page is
+restricted to accounts whose response role is `ADMIN`.
+
+The dashboard queries:
+
+- `GET /api/admin/statistics/environmental?deviceId={id}&range={24h|7d|30d}`
+- `GET /api/admin/statistics/water-level?deviceId={id}&range={24h|7d|30d}`
+
+Both endpoints should return an `ApiResponse` with `data` as an array. The
+environmental array accepts `timestamp`/`recordedAt` and soil moisture,
+humidity, and temperature values; the water-level array accepts timestamps
+and `waterLevel`. The backend currently has no admin statistics controller,
+so these charts display an explicit empty/error state until those endpoints
+are implemented.
+
 ### `npm run build`
 
 Builds the app for production to the `build` folder.\

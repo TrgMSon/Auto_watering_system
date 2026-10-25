@@ -18,11 +18,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         this.userInterceptor = userInterceptor;
     }
 
+    @SuppressWarnings("null")
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws").withSockJS();
     }
 
+    @SuppressWarnings("null")
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.setApplicationDestinationPrefixes("/app");
@@ -30,6 +32,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setUserDestinationPrefix("/users");
     }
 
+    @SuppressWarnings("null")
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(userInterceptor);
