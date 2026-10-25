@@ -1,4 +1,4 @@
-# Kiến trúc Ứng dụng Mobile - Smart Watering System
+# Kiến trúc Ứng dụng Mobile - Auto Watering System
 
 Dự án này sử dụng mô hình **Feature-First Clean Architecture** (Kiến trúc Sạch chia theo Tính năng) kết hợp với **BLoC Pattern** để quản lý trạng thái.
 
