@@ -3,9 +3,9 @@ name: Build Flutter APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "mobile_app" ]
+    branches: [ "mobile_app" ]
   pull_request:
-    branches: [ "main", "mobile_app" ]
+    branches: [ "mobile_app" ]
 
 jobs:
   build:
