@@ -5,14 +5,9 @@ import '../../domain/entities/device.dart';
 
 class DeviceCard extends StatelessWidget {
   final Device device;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onDelete;
-
   const DeviceCard({
     super.key,
     required this.device,
-    required this.onToggle,
-    required this.onDelete,
   });
 
   IconData get _deviceIcon => switch (device.type) {
@@ -20,6 +15,7 @@ class DeviceCard extends StatelessWidget {
     DeviceType.valve => Icons.toggle_on_outlined,
     DeviceType.sensor => Icons.sensors,
     DeviceType.gateway => Icons.router,
+    DeviceType.unknown => Icons.device_hub,
   };
 
   @override
@@ -64,22 +60,6 @@ class DeviceCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            if (device.type == DeviceType.pump || device.type == DeviceType.valve)
-              Switch(
-                value: device.isActive,
-                onChanged: device.isOnline ? onToggle : null,
-              ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'delete') onDelete();
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('X\u00f3a', style: TextStyle(color: AppColors.error)),
-                ),
-              ],
             ),
           ],
         ),

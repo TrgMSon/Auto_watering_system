@@ -5,6 +5,7 @@ class ScheduleModel {
   final String endTime;   // Format: "HH:MM:SS"
   final String daysOfWeek; // Format: "MON,WED,FRI"
   final bool isEnabled;
+  final int durationMinutes;
 
   const ScheduleModel({
     this.id,
@@ -13,16 +14,20 @@ class ScheduleModel {
     required this.endTime,
     required this.daysOfWeek,
     required this.isEnabled,
+    this.durationMinutes = 15,
   });
 
   factory ScheduleModel.fromJson(Map<String, dynamic> json) {
     return ScheduleModel(
-      id: json['id'],
+      id: json['id'] is num ? (json['id'] as num).toInt() : null,
       deviceId: json['device_id'] ?? '',
-      startTime: json['start_time'] ?? '00:00:00',
-      endTime: json['end_time'] ?? '00:00:00',
+      startTime: json['start_time']?.toString() ?? '00:00:00',
+      endTime: json['end_time']?.toString() ?? '00:00:00',
       daysOfWeek: json['days_of_week'] ?? '',
       isEnabled: json['is_enabled'] == 1 || json['is_enabled'] == true,
+      durationMinutes: json['duration_minutes'] is num
+          ? (json['duration_minutes'] as num).toInt()
+          : 15,
     );
   }
 
@@ -33,7 +38,8 @@ class ScheduleModel {
       'start_time': startTime,
       'end_time': endTime,
       'days_of_week': daysOfWeek,
-      'is_enabled': isEnabled ? 1 : 0,
+      'is_enabled': isEnabled,
+      'duration_minutes': durationMinutes,
     };
   }
 }

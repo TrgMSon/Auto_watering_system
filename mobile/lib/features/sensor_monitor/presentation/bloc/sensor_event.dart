@@ -31,3 +31,11 @@ class SensorRealtimeDataReceived extends SensorEvent {
   @override
   List<Object?> get props => [reading];
 }
+
+class SensorRealtimeFailed extends SensorEvent {
+  final String message;
+  const SensorRealtimeFailed({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}

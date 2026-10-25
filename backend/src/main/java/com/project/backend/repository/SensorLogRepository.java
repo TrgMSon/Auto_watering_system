@@ -9,6 +9,11 @@ import org.springframework.data.jpa.repository.Query;
 import com.project.backend.model.SensorLog;
 
 public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
+    List<SensorLog> findByDevice_IdAndRecordedAtBetweenOrderByRecordedAtAsc(
+            String deviceId, LocalDateTime from, LocalDateTime to);
+
+    List<SensorLog> findTop1ByDevice_IdOrderByRecordedAtDesc(String deviceId);
+
     @Query(value = """
             SELECT
                 DATE_FORMAT(s.recorded_at, '%Y-%m-%d %H:00:00') AS time_label,

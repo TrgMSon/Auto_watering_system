@@ -164,10 +164,10 @@ class MockSensorRepository implements SensorRepository {
 
 class MockDeviceRepository implements DeviceRepository {
   final List<Device> _devices = [
-    Device(id: 1, name: 'Máy bơm khu A', type: DeviceType.pump, isOnline: true, isActive: false, location: 'Vườn trước'),
-    Device(id: 2, name: 'Van nước khu B', type: DeviceType.valve, isOnline: true, isActive: true, location: 'Vườn sau'),
-    Device(id: 3, name: 'Cảm biến đất 1', type: DeviceType.sensor, isOnline: true, location: 'Gốc cây táo'),
-    Device(id: 4, name: 'Gateway', type: DeviceType.gateway, isOnline: false, location: 'Phòng khách'),
+    Device(id: '1', name: 'Máy bơm khu A', type: DeviceType.pump, isOnline: true, isActive: false, location: 'Vườn trước'),
+    Device(id: '2', name: 'Van nước khu B', type: DeviceType.valve, isOnline: true, isActive: true, location: 'Vườn sau'),
+    Device(id: '3', name: 'Cảm biến đất 1', type: DeviceType.sensor, isOnline: true, location: 'Gốc cây táo'),
+    Device(id: '4', name: 'Gateway', type: DeviceType.gateway, isOnline: false, location: 'Phòng khách'),
   ];
 
   @override
@@ -177,7 +177,7 @@ class MockDeviceRepository implements DeviceRepository {
   }
 
   @override
-  Future<Device> getDeviceById(int id) async {
+  Future<Device> getDeviceById(String id) async {
     return _devices.firstWhere((d) => d.id == id);
   }
 
@@ -185,7 +185,7 @@ class MockDeviceRepository implements DeviceRepository {
   Future<void> addDevice({required String name, required String type, String? location}) async {
     await Future.delayed(const Duration(milliseconds: 500));
     final newDevice = Device(
-      id: DateTime.now().millisecondsSinceEpoch,
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       type: type == 'PUMP' ? DeviceType.pump : type == 'VALVE' ? DeviceType.valve : type == 'GATEWAY' ? DeviceType.gateway : DeviceType.sensor,
       isOnline: true,
@@ -195,16 +195,16 @@ class MockDeviceRepository implements DeviceRepository {
   }
 
   @override
-  Future<void> updateDevice({required int id, String? name, String? location}) async {}
+  Future<void> updateDevice({required String id, String? name, String? location}) async {}
 
   @override
-  Future<void> deleteDevice(int id) async {
+  Future<void> deleteDevice(String id) async {
     await Future.delayed(const Duration(milliseconds: 500));
     _devices.removeWhere((d) => d.id == id);
   }
 
   @override
-  Future<bool> toggleDevice({required int id, required bool activate}) async {
+  Future<bool> toggleDevice({required String id, required bool activate}) async {
     await Future.delayed(const Duration(milliseconds: 300));
     final index = _devices.indexWhere((d) => d.id == id);
     if (index >= 0) {

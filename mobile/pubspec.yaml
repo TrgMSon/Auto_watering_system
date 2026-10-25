@@ -17,9 +17,8 @@ dependencies:
   # Dependency Injection
   get_it: ^9.2.1
 
-  # Networking (Removed for UI-only mode)
-
-  # Real-time WebSocket (Removed for UI-only mode)
+  # Networking
+  http: ^1.3.0
 
   # Navigation
   go_router: ^14.8.0

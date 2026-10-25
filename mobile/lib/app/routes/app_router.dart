@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'route_names.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../injection.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/device_management/presentation/pages/device_list_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/user_management/presentation/pages/user_management_page.dart';
 import '../../features/automation/presentation/pages/automation_page.dart';
-import '../../features/automation/presentation/bloc/automation_bloc.dart';
+import '../../features/dashboard/presentation/bloc/dashboard_bloc.dart';
+import '../../features/dashboard/presentation/bloc/dashboard_state.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -39,7 +39,17 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: RouteNames.analytics,
-              builder: (context, state) => const AutomationPage(),
+              builder: (context, state) {
+                final deviceId = context.select<DashboardBloc, String?>((bloc) {
+                  final dashboardState = bloc.state;
+                  if (dashboardState is! DashboardLoaded) return null;
+                  return dashboardState.selectedDevice?.id ??
+                      (dashboardState.devices.isNotEmpty
+                          ? dashboardState.devices.first.id
+                          : null);
+                });
+                return AutomationPage(deviceId: deviceId ?? '');
+              },
             ),
           ],
         ),

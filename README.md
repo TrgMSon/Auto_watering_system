@@ -104,11 +104,12 @@ npm install
 npm start
 ```
 
-Frontend mặc định mở tại `http://localhost:3000`. Nếu backend không chạy cùng origin, tạo `frontend\.env` với địa chỉ API:
-
-```dotenv
-REACT_APP_API_BASE_URL=http://localhost:8080
-```
+Frontend mặc định mở tại `http://localhost:3000` và đã cấu hình gọi backend local tại
+`http://localhost:8080` trong `frontend\.env.development`. Nếu backend chạy ở
+máy hoặc địa chỉ khác, cập nhật biến `REACT_APP_API_BASE_URL` trong tệp này rồi
+khởi động lại frontend. Với bản production, đặt biến này thành URL backend
+production trước khi chạy `npm run build`; React đọc biến môi trường tại thời
+điểm build.
 
 Origin của frontend cũng cần được cho phép trong `CORS_ALLOWED_ORIGIN_PATTERNS` của backend. Đăng nhập bằng tài khoản có role `ADMIN`; tài khoản khác không được truy cập dashboard quản trị.
 

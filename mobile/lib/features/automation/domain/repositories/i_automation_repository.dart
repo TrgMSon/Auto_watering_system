@@ -2,26 +2,24 @@ import '../../data/models/device_config_model.dart';
 import '../../data/models/schedule_model.dart';
 
 abstract class IAutomationRepository {
-  /// Fetch the config for a specific device. 
-  /// Usually parsed from the /api/v1/devices payload or a specific endpoint.
+  /// Fetch the backend configuration for a specific device.
   Future<DeviceConfigModel> getDeviceConfig(String deviceId);
   
-  /// Update the config using Dual Sync (BLE + HTTP Queue).
-  /// Optimistically returns true if BLE or Local Queue accepts it.
+  /// Update the configuration through the backend and MQTT command publisher.
   Future<bool> updateDeviceConfig(DeviceConfigModel config);
 
   /// Fetch all schedules for a device
   Future<List<ScheduleModel>> getSchedules(String deviceId);
 
-  /// Add a new schedule (POST /api/v1/schedules) with Dual Sync
+  /// Add a schedule for the device.
   Future<bool> addSchedule(ScheduleModel schedule);
 
-  /// Update an existing schedule (PUT /api/v1/schedules/{id})
+  /// Update an existing device schedule.
   Future<bool> updateSchedule(ScheduleModel schedule);
 
-  /// Delete a schedule (DELETE /api/v1/schedules/{id})
-  Future<bool> deleteSchedule(int scheduleId);
+  /// Delete a schedule belonging to the device.
+  Future<bool> deleteSchedule(String deviceId, int scheduleId);
 
-  /// Run the queue processor when network becomes available
+  /// Kept for compatibility; the backend/device handle offline command delivery.
   Future<void> processOfflineQueue();
 }

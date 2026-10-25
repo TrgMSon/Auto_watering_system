@@ -144,6 +144,7 @@ public class DeviceController {
                         Authentication authentication) {
                 DeviceCommandRequest commandRequest = new DeviceCommandRequest();
                 commandRequest.setAction(request.getState());
+                commandRequest.setDurationSeconds(request.getDurationSeconds());
                 return ResponseEntity.ok(ApiResponse.success(
                                 "Đã gửi lệnh, đang chờ thiết bị xác nhận",
                                 deviceService.controlPump(
@@ -152,7 +153,7 @@ public class DeviceController {
 
         // API cấu hình thông số cho thiết bị (Ngưỡng độ ẩm, thời gian tưới tự động,...)
         @PostMapping("/config")
-        @PreAuthorize("hasRole('OWNER')")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
         public ResponseEntity<ApiResponse<DeviceConfigResponse>> updateConfiguration(
                         @PathVariable("id") String deviceId,
                         @Valid @RequestBody DeviceConfigRequest request,
@@ -164,7 +165,7 @@ public class DeviceController {
         }
 
         @PutMapping("/config")
-        @PreAuthorize("hasRole('OWNER')")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
         public ResponseEntity<ApiResponse<DeviceConfigResponse>> updateDeviceConfig(
                         @PathVariable("id") String deviceId,
                         @Valid @RequestBody DeviceConfigRequest request,

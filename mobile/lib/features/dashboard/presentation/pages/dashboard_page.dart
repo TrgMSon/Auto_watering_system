@@ -51,6 +51,7 @@ class _DashboardPageState extends State<DashboardPage> {
           
           final selectedDevice = state.selectedDevice ?? state.devices.first;
           final telemetry = state.telemetry;
+          final pumpStatus = state.pumpStatus ?? telemetry?.isPumpOn;
 
           return Scaffold(
             appBar: AppBar(
@@ -108,6 +109,14 @@ class _DashboardPageState extends State<DashboardPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  if (state.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        state.errorMessage!,
+                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
                   // Manual Pump Control Card
                   Card(
                     child: Padding(
@@ -138,11 +147,15 @@ class _DashboardPageState extends State<DashboardPage> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
-                                        telemetry?.isPumpOn == true ? 'Đang tưới nước' : 'Đang tắt',
+                                        pumpStatus == null
+                                            ? 'Chưa có trạng thái từ thiết bị'
+                                            : pumpStatus
+                                                ? 'Đang tưới nước'
+                                                : 'Đang tắt',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: telemetry?.isPumpOn == true ? AppColors.primary : AppColors.textSecondary,
+                                          color: pumpStatus == true ? AppColors.primary : AppColors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -162,7 +175,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ),
                                 )
                               : Switch(
-                                  value: telemetry?.isPumpOn ?? false,
+                                  value: pumpStatus ?? false,
                                   onChanged: (value) {
                                     context.read<DashboardBloc>().add(DashboardPumpToggled(value));
                                   },

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.project.backend.common.ApiResponse;
 import com.project.backend.dto.auth.AuthResponse;
 import com.project.backend.dto.auth.LoginRequest;
+import com.project.backend.dto.auth.LogoutRequest;
 import com.project.backend.dto.auth.RefreshTokenRequest;
 import com.project.backend.dto.auth.RegisterRequest;
 import com.project.backend.service.AuthService;
@@ -50,5 +51,9 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Access Token is  refreshed", response));
     }
 
-    
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody LogoutRequest req) {
+        authService.logout(req.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", null));
+    }
 }

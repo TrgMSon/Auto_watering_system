@@ -11,6 +11,7 @@ class DeviceConfigModel {
   final double temperatureMax;
 
   final int maxWateringDuration;
+  final int waterLevelMin;
 
   const DeviceConfigModel({
     required this.deviceId,
@@ -22,6 +23,7 @@ class DeviceConfigModel {
     required this.temperatureMin,
     required this.temperatureMax,
     required this.maxWateringDuration,
+    this.waterLevelMin = 0,
   });
 
   factory DeviceConfigModel.fromJson(Map<String, dynamic> json) {
@@ -32,23 +34,24 @@ class DeviceConfigModel {
       soilMoistureMax: (json['soil_moisture_max'] ?? 80).toDouble(),
       airHumidityMin: (json['air_humidity_min'] ?? 50).toDouble(),
       airHumidityMax: (json['air_humidity_max'] ?? 80).toDouble(),
-      temperatureMin: (json['temperature_min'] ?? 20).toDouble(),
-      temperatureMax: (json['temperature_max'] ?? 35).toDouble(),
+      temperatureMin: (json['air_temperature_min'] ?? json['temperature_min'] ?? 20).toDouble(),
+      temperatureMax: (json['air_temperature_max'] ?? json['temperature_max'] ?? 35).toDouble(),
       maxWateringDuration: json['max_watering_duration'] ?? 120,
+      waterLevelMin: json['water_level_min'] ?? 0,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'device_id': deviceId,
-      'auto_mode': autoMode ? 1 : 0,
+      'auto_mode': autoMode,
       'soil_moisture_min': soilMoistureMin,
       'soil_moisture_max': soilMoistureMax,
       'air_humidity_min': airHumidityMin,
       'air_humidity_max': airHumidityMax,
-      'temperature_min': temperatureMin,
-      'temperature_max': temperatureMax,
+      'air_temperature_min': temperatureMin,
+      'air_temperature_max': temperatureMax,
       'max_watering_duration': maxWateringDuration,
+      'water_level_min': waterLevelMin,
     };
   }
 
@@ -61,6 +64,7 @@ class DeviceConfigModel {
     double? temperatureMin,
     double? temperatureMax,
     int? maxWateringDuration,
+    int? waterLevelMin,
   }) {
     return DeviceConfigModel(
       deviceId: deviceId,
@@ -72,6 +76,7 @@ class DeviceConfigModel {
       temperatureMin: temperatureMin ?? this.temperatureMin,
       temperatureMax: temperatureMax ?? this.temperatureMax,
       maxWateringDuration: maxWateringDuration ?? this.maxWateringDuration,
+      waterLevelMin: waterLevelMin ?? this.waterLevelMin,
     );
   }
 }

@@ -10,8 +10,17 @@ import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
+import com.project.backend.dto.device.DeviceSummaryResponse;
+import com.project.backend.dto.sensor.SensorReadingResponse;
 
 public interface DeviceService {
+    List<DeviceSummaryResponse> getUserDevices(int userId);
+
+    List<SensorReadingResponse> getSensorReadings(
+            String deviceId, int userId, java.time.LocalDateTime from, java.time.LocalDateTime to);
+
+    SensorReadingResponse getLatestSensorReading(String deviceId, int userId);
+
     void registerDevice(String deviceId, int userId, int userCreateId);
 
     DeviceConfigResponse getDeviceConfig(String deviceId, int userId);

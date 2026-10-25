@@ -47,6 +47,7 @@ class _SensorMonitorPageState extends State<SensorMonitorPage> {
                   from: now.subtract(const Duration(hours: 24)),
                   to: now,
                 ));
+                context.read<SensorBloc>().add(const SensorRealtimeStarted());
               },
             );
           }
@@ -91,14 +92,6 @@ class _SensorMonitorPageState extends State<SensorMonitorPage> {
                     unit: '%',
                     icon: Icons.cloud,
                     color: AppColors.humidity,
-                  ),
-                  const SizedBox(height: 8),
-                  SensorTelemetryCard(
-                    title: 'C\u01b0\u1eddng \u0111\u1ed9 \u00e1nh s\u00e1ng',
-                    currentValue: latestReading.lightIntensity,
-                    unit: 'lux',
-                    icon: Icons.wb_sunny,
-                    color: AppColors.light,
                   ),
                   const SizedBox(height: 24),
                 ],

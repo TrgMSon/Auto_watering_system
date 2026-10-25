@@ -54,6 +54,7 @@ mobile/docs/
 *.class
 *.log
 *.jar
+!mobile/android/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear

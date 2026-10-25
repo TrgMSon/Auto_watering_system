@@ -105,6 +105,9 @@ class _LoginPageState extends State<LoginPage> {
                         if (value == null || value.trim().isEmpty) {
                           return 'Vui l\u00f2ng nh\u1eadp t\u00ean \u0111\u0103ng nh\u1eadp';
                         }
+                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value.trim())) {
+                          return 'Vui l\u00f2ng nh\u1eadp email h\u1ee3p l\u1ec7';
+                        }
                         return null;
                       },
                     ),

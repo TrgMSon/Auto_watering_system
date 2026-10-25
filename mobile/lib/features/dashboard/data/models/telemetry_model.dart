@@ -6,7 +6,7 @@ class TelemetryModel extends Equatable {
   final double temperature;
   final double humidity;
   final double waterLevel;
-  final bool isPumpOn;
+  final bool? isPumpOn;
   final DateTime recordedAt;
 
   const TelemetryModel({
@@ -20,18 +20,36 @@ class TelemetryModel extends Equatable {
   });
 
   factory TelemetryModel.fromJson(Map<String, dynamic> json) {
+    final pumpStatus = json['pump_status'];
     return TelemetryModel(
       deviceId: json['device_id'] ?? json['deviceId'] ?? '',
-      soilMoisture: (json['soil_moisture'] ?? json['soilMoisture'] ?? 0).toDouble(),
-      temperature: (json['temperature'] ?? 0).toDouble(),
-      humidity: (json['humidity'] ?? 0).toDouble(),
-      waterLevel: (json['water_level'] ?? json['waterLevel'] ?? 0).toDouble(),
-      isPumpOn: json['pump_status'] == 'ON' || json['pump_status'] == true || json['isPumpOn'] == true,
-      recordedAt: json['recorded_at'] != null 
-          ? DateTime.parse(json['recorded_at']) 
+      soilMoisture: _number(json['soil_moisture'] ?? json['soilMoisture']),
+      temperature: _number(json['temperature']),
+      humidity: _number(json['humidity']),
+      waterLevel: _number(json['water_level'] ?? json['waterLevel']),
+      isPumpOn: pumpStatus == null && json['isPumpOn'] == null
+          ? null
+          : pumpStatus == 'ON' ||
+              pumpStatus == true ||
+              json['isPumpOn'] == true,
+      recordedAt: json['recorded_at'] != null
+          ? DateTime.parse(json['recorded_at'].toString())
           : DateTime.now(),
     );
   }
+
+  TelemetryModel copyWith({bool? isPumpOn}) => TelemetryModel(
+        deviceId: deviceId,
+        soilMoisture: soilMoisture,
+        temperature: temperature,
+        humidity: humidity,
+        waterLevel: waterLevel,
+        isPumpOn: isPumpOn ?? this.isPumpOn,
+        recordedAt: recordedAt,
+      );
+
+  static double _number(dynamic value) =>
+      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 
   @override
   List<Object?> get props => [

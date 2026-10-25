@@ -1,6 +1,8 @@
 import 'package:get_it/get_it.dart';
 
-import 'core/mock/mock_repositories.dart';
+import 'core/network/api_client.dart';
+import 'features/auth/data/repositories/api_auth_repository.dart';
+import 'features/sensor_monitor/data/repositories/api_sensor_repository.dart';
 
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
@@ -24,6 +26,7 @@ import 'features/sensor_monitor/domain/usecases/get_sensor_history_usecase.dart'
 import 'features/sensor_monitor/presentation/bloc/sensor_bloc.dart';
 
 import 'features/device_management/domain/repositories/device_repository.dart';
+import 'features/device_management/data/repositories/api_device_repository.dart';
 import 'features/device_management/domain/usecases/get_devices_usecase.dart';
 import 'features/device_management/domain/usecases/add_device_usecase.dart';
 import 'features/device_management/domain/usecases/delete_device_usecase.dart';
@@ -32,12 +35,20 @@ import 'features/device_management/presentation/bloc/device_bloc.dart';
 final getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  // Repositories (Mocked for UI-only testing)
-  getIt.registerLazySingleton<AuthRepository>(() => MockAuthRepository());
-  getIt.registerLazySingleton<DashboardRepository>(() => DashboardRepositoryImpl());
-  getIt.registerLazySingleton<SensorRepository>(() => MockSensorRepository());
-  getIt.registerLazySingleton<DeviceRepository>(() => MockDeviceRepository());
-  getIt.registerLazySingleton<IAutomationRepository>(() => AutomationRepositoryImpl());
+  getIt.registerLazySingleton(() => ApiClient());
+  getIt.registerLazySingleton<AuthRepository>(() => ApiAuthRepository(getIt<ApiClient>()));
+  getIt.registerLazySingleton<DashboardRepository>(
+    () => DashboardRepositoryImpl(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<SensorRepository>(
+    () => ApiSensorRepository(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<DeviceRepository>(
+    () => ApiDeviceRepository(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<IAutomationRepository>(
+    () => AutomationRepositoryImpl(getIt<ApiClient>()),
+  );
 
   // UseCases - Auth
   getIt.registerLazySingleton(() => LoginUseCase(getIt<AuthRepository>()));

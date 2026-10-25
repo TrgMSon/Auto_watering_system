@@ -10,9 +10,9 @@ import '../widgets/advanced_config_bottom_sheet.dart';
 import '../widgets/schedule_bottom_sheet.dart';
 
 class AutomationPage extends StatefulWidget {
-  final String deviceId; // In a real app, this might come from route params or a shared selection Bloc
+  final String deviceId;
 
-  const AutomationPage({super.key, this.deviceId = 'ESP_001'});
+  const AutomationPage({super.key, this.deviceId = ''});
 
   @override
   State<AutomationPage> createState() => _AutomationPageState();
@@ -22,7 +22,17 @@ class _AutomationPageState extends State<AutomationPage> {
   @override
   void initState() {
     super.initState();
-    context.read<AutomationBloc>().add(AutomationLoadRequested(widget.deviceId));
+    if (widget.deviceId.isNotEmpty) {
+      context.read<AutomationBloc>().add(AutomationLoadRequested(widget.deviceId));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AutomationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.deviceId.isNotEmpty && widget.deviceId != oldWidget.deviceId) {
+      context.read<AutomationBloc>().add(AutomationLoadRequested(widget.deviceId));
+    }
   }
 
   @override
@@ -35,13 +45,24 @@ class _AutomationPageState extends State<AutomationPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (state is AutomationError) {
-            return Center(child: Text('Lỗi: \${state.message}'));
+            return Center(child: Text('Lỗi: ${state.message}'));
+          }
+          if (state is AutomationInitial) {
+            return const Center(child: Text('Chưa tìm thấy thiết bị của tài khoản.'));
           }
           if (state is AutomationLoaded) {
             final config = state.config;
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (state.errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      state.errorMessage!,
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
                 // Section 1: Auto Mode Thresholds
                 Text('Chế độ cảm biến', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
@@ -137,6 +158,7 @@ class _AutomationPageState extends State<AutomationPage> {
                                       endTime: schedule.endTime,
                                       daysOfWeek: schedule.daysOfWeek,
                                       isEnabled: val,
+                                      durationMinutes: schedule.durationMinutes,
                                     )
                                   )
                                 );

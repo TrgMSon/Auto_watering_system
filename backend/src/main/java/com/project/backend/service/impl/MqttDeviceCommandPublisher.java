@@ -75,17 +75,32 @@ public class MqttDeviceCommandPublisher {
     }
 
     public String publishPumpControl(String deviceId, String state) {
-        Map<String, Object> payload = buildPumpControlPayload(deviceId, state);
+        return publishPumpControl(deviceId, state, null);
+    }
+
+    public String publishPumpControl(String deviceId, String state, Integer durationSeconds) {
+        Map<String, Object> payload = buildPumpControlPayload(deviceId, state, durationSeconds);
         return publish(deviceId, commandTopicTemplate, payload);
     }
 
     Map<String, Object> buildPumpControlPayload(String deviceId, String state) {
+        return buildPumpControlPayload(deviceId, state, null);
+    }
+
+    Map<String, Object> buildPumpControlPayload(
+            String deviceId, String state, Integer durationSeconds) {
         if (!"ON".equals(state) && !"OFF".equals(state)) {
             throw new IllegalArgumentException("state chỉ nhận giá trị ON hoặc OFF");
+        }
+        if (durationSeconds != null && durationSeconds < 1) {
+            throw new IllegalArgumentException("duration_seconds phải lớn hơn 0");
         }
 
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("state", state);
+        if (durationSeconds != null) {
+            params.put("duration_seconds", durationSeconds);
+        }
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("command_id", "CMD-" + UUID.randomUUID());

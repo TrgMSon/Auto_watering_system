@@ -66,6 +66,7 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
       endTime: '$endH:$endM:00',
       daysOfWeek: selectedDays.join(','),
       isEnabled: widget.existingSchedule?.isEnabled ?? true,
+      durationMinutes: _durationMinutes(startTime, endTime),
     );
 
     if (widget.existingSchedule == null) {
@@ -75,6 +76,13 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
     }
     
     Navigator.pop(context);
+  }
+
+  int _durationMinutes(TimeOfDay start, TimeOfDay end) {
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+    final difference = (endMinutes - startMinutes) % (24 * 60);
+    return difference == 0 ? 1 : difference;
   }
 
   @override

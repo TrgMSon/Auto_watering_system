@@ -21,7 +21,7 @@ class DeviceAddRequested extends DeviceEvent {
 }
 
 class DeviceDeleteRequested extends DeviceEvent {
-  final int deviceId;
+  final String deviceId;
   const DeviceDeleteRequested({required this.deviceId});
 
   @override
@@ -29,7 +29,7 @@ class DeviceDeleteRequested extends DeviceEvent {
 }
 
 class DeviceToggleRequested extends DeviceEvent {
-  final int deviceId;
+  final String deviceId;
   final bool activate;
   const DeviceToggleRequested({required this.deviceId, required this.activate});
 

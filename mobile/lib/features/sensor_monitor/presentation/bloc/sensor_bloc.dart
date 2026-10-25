@@ -20,6 +20,9 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     on<SensorRealtimeStarted>(_onRealtimeStarted);
     on<SensorRealtimeStopped>(_onRealtimeStopped);
     on<SensorRealtimeDataReceived>(_onRealtimeDataReceived);
+    on<SensorRealtimeFailed>(
+      (event, emit) => emit(SensorError(message: event.message)),
+    );
   }
 
   Future<void> _onHistoryRequested(
@@ -45,6 +48,8 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     _realtimeSubscription?.cancel();
     _realtimeSubscription = getRealtimeReadings().listen(
       (reading) => add(SensorRealtimeDataReceived(reading: reading)),
+      onError: (Object error) =>
+          add(SensorRealtimeFailed(message: error.toString())),
     );
   }
 

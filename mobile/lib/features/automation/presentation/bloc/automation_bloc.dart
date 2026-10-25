@@ -35,13 +35,24 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
     if (state is AutomationLoaded) {
       final currentState = state as AutomationLoaded;
       
-      emit(currentState.copyWith(config: event.config, isSaving: true));
+      emit(currentState.copyWith(
+        config: event.config,
+        isSaving: true,
+        clearError: true,
+      ));
       
       try {
         await repository.updateDeviceConfig(event.config);
-        emit(currentState.copyWith(config: event.config, isSaving: false));
+        emit(currentState.copyWith(
+          config: event.config,
+          isSaving: false,
+          clearError: true,
+        ));
       } catch (e) {
-        emit(currentState.copyWith(isSaving: false));
+        emit(currentState.copyWith(
+          isSaving: false,
+          errorMessage: e.toString(),
+        ));
       }
     }
   }
@@ -52,14 +63,21 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
   ) async {
     if (state is AutomationLoaded) {
       final currentState = state as AutomationLoaded;
-      emit(currentState.copyWith(isSaving: true));
+      emit(currentState.copyWith(isSaving: true, clearError: true));
       
       try {
         await repository.addSchedule(event.schedule);
         final newSchedules = await repository.getSchedules(event.schedule.deviceId);
-        emit(currentState.copyWith(schedules: newSchedules, isSaving: false));
+        emit(currentState.copyWith(
+          schedules: newSchedules,
+          isSaving: false,
+          clearError: true,
+        ));
       } catch (e) {
-        emit(currentState.copyWith(isSaving: false));
+        emit(currentState.copyWith(
+          isSaving: false,
+          errorMessage: e.toString(),
+        ));
       }
     }
   }
@@ -70,14 +88,21 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
   ) async {
     if (state is AutomationLoaded) {
       final currentState = state as AutomationLoaded;
-      emit(currentState.copyWith(isSaving: true));
+      emit(currentState.copyWith(isSaving: true, clearError: true));
       
       try {
         await repository.updateSchedule(event.schedule);
         final newSchedules = await repository.getSchedules(event.schedule.deviceId);
-        emit(currentState.copyWith(schedules: newSchedules, isSaving: false));
+        emit(currentState.copyWith(
+          schedules: newSchedules,
+          isSaving: false,
+          clearError: true,
+        ));
       } catch (e) {
-        emit(currentState.copyWith(isSaving: false));
+        emit(currentState.copyWith(
+          isSaving: false,
+          errorMessage: e.toString(),
+        ));
       }
     }
   }
@@ -88,14 +113,21 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
   ) async {
     if (state is AutomationLoaded) {
       final currentState = state as AutomationLoaded;
-      emit(currentState.copyWith(isSaving: true));
+      emit(currentState.copyWith(isSaving: true, clearError: true));
       
       try {
-        await repository.deleteSchedule(event.scheduleId);
+        await repository.deleteSchedule(event.deviceId, event.scheduleId);
         final newSchedules = await repository.getSchedules(event.deviceId);
-        emit(currentState.copyWith(schedules: newSchedules, isSaving: false));
+        emit(currentState.copyWith(
+          schedules: newSchedules,
+          isSaving: false,
+          clearError: true,
+        ));
       } catch (e) {
-        emit(currentState.copyWith(isSaving: false));
+        emit(currentState.copyWith(
+          isSaving: false,
+          errorMessage: e.toString(),
+        ));
       }
     }
   }

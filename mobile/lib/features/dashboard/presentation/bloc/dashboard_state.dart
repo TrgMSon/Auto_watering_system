@@ -23,6 +23,8 @@ class DashboardLoaded extends DashboardState {
   final TelemetryModel? telemetry;
   final bool isTogglingPump;
   final bool isBleConnected;
+  final bool? pumpStatus;
+  final String? errorMessage;
 
   const DashboardLoaded({
     required this.devices,
@@ -30,6 +32,8 @@ class DashboardLoaded extends DashboardState {
     this.telemetry,
     this.isTogglingPump = false,
     this.isBleConnected = false,
+    this.pumpStatus,
+    this.errorMessage,
   });
 
   DashboardLoaded copyWith({
@@ -39,6 +43,10 @@ class DashboardLoaded extends DashboardState {
     bool clearTelemetry = false,
     bool? isTogglingPump,
     bool? isBleConnected,
+    bool? pumpStatus,
+    bool clearPumpStatus = false,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return DashboardLoaded(
       devices: devices ?? this.devices,
@@ -46,11 +54,21 @@ class DashboardLoaded extends DashboardState {
       telemetry: clearTelemetry ? null : (telemetry ?? this.telemetry),
       isTogglingPump: isTogglingPump ?? this.isTogglingPump,
       isBleConnected: isBleConnected ?? this.isBleConnected,
+      pumpStatus: clearPumpStatus ? null : (pumpStatus ?? this.pumpStatus),
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
 
   @override
-  List<Object?> get props => [devices, selectedDevice, telemetry, isTogglingPump, isBleConnected];
+  List<Object?> get props => [
+        devices,
+        selectedDevice,
+        telemetry,
+        isTogglingPump,
+        isBleConnected,
+        pumpStatus,
+        errorMessage,
+      ];
 }
 
 class DashboardError extends DashboardState {

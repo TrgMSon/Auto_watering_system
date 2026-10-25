@@ -15,9 +15,11 @@ import com.project.backend.dto.device.DeviceCommandResponse;
 import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
+import com.project.backend.dto.device.DeviceSummaryResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
+import com.project.backend.dto.sensor.SensorReadingResponse;
 import com.project.backend.exception.ConflictException;
 import com.project.backend.exception.NotFoundException;
 import com.project.backend.model.Device;
@@ -28,6 +30,7 @@ import com.project.backend.model.enums.Role;
 import com.project.backend.repository.DeviceConfigRepository;
 import com.project.backend.repository.DeviceRepository;
 import com.project.backend.repository.ScheduleRepository;
+import com.project.backend.repository.SensorLogRepository;
 import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.repository.UserRepository;
 import com.project.backend.service.DeviceService;
@@ -38,6 +41,7 @@ public class DeviceServiceImpl implements DeviceService {
     private final DeviceRepository deviceRepository;
     private final DeviceConfigRepository deviceConfigRepository;
     private final ScheduleRepository scheduleRepository;
+    private final SensorLogRepository sensorLogRepository;
     private final UserDeviceRepository userDeviceRepository;
     private final UserRepository userRepository;
     private final MqttDeviceCommandPublisher commandPublisher;
@@ -47,6 +51,7 @@ public class DeviceServiceImpl implements DeviceService {
             DeviceRepository deviceRepository,
             DeviceConfigRepository deviceConfigRepository,
             ScheduleRepository scheduleRepository,
+            SensorLogRepository sensorLogRepository,
             UserDeviceRepository userDeviceRepository,
             UserRepository userRepository,
             MqttDeviceCommandPublisher commandPublisher,
@@ -54,10 +59,51 @@ public class DeviceServiceImpl implements DeviceService {
         this.deviceRepository = deviceRepository;
         this.deviceConfigRepository = deviceConfigRepository;
         this.scheduleRepository = scheduleRepository;
+        this.sensorLogRepository = sensorLogRepository;
         this.userDeviceRepository = userDeviceRepository;
         this.userRepository = userRepository;
         this.commandPublisher = commandPublisher;
         this.acknowledgmentService = acknowledgmentService;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DeviceSummaryResponse> getUserDevices(int userId) {
+        return userDeviceRepository.findDevicesByUserId(userId).stream()
+                .map(userDevice -> {
+                    Device device = userDevice.getDevice();
+                    return new DeviceSummaryResponse(
+                            device.getId(),
+                            device.getDeviceName(),
+                            device.getStatus(),
+                            userDevice.getPermission());
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SensorReadingResponse> getSensorReadings(
+            String deviceId, int userId, LocalDateTime from, LocalDateTime to) {
+        requireOwnedDevice(deviceId, userId);
+        if (from == null || to == null || from.isAfter(to)) {
+            throw new IllegalArgumentException("Khoảng thời gian truy vấn không hợp lệ");
+        }
+        return sensorLogRepository
+                .findByDevice_IdAndRecordedAtBetweenOrderByRecordedAtAsc(deviceId, from, to)
+                .stream()
+                .map(this::toSensorReadingResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SensorReadingResponse getLatestSensorReading(String deviceId, int userId) {
+        requireOwnedDevice(deviceId, userId);
+        return sensorLogRepository.findTop1ByDevice_IdOrderByRecordedAtDesc(deviceId).stream()
+                .findFirst()
+                .map(this::toSensorReadingResponse)
+                .orElse(null);
     }
 
     @Override
@@ -153,8 +199,12 @@ public class DeviceServiceImpl implements DeviceService {
         if (!action.equals("ON") && !action.equals("OFF")) {
             throw new IllegalArgumentException("action chỉ nhận giá trị ON hoặc OFF");
         }
+        if (request.getDurationSeconds() != null && !action.equals("ON")) {
+            throw new IllegalArgumentException("duration_seconds chỉ hợp lệ khi bật bơm");
+        }
 
-        String commandId = commandPublisher.publishPumpControl(deviceId, action);
+        String commandId = commandPublisher.publishPumpControl(
+                deviceId, action, request.getDurationSeconds());
         return new DeviceCommandResponse(deviceId, action, "PENDING", commandId);
     }
 
@@ -254,6 +304,18 @@ public class DeviceServiceImpl implements DeviceService {
             throw new NotFoundException("Không tìm thấy thiết bị");
         }
         return device;
+    }
+
+    private SensorReadingResponse toSensorReadingResponse(
+            com.project.backend.model.SensorLog sensorLog) {
+        return new SensorReadingResponse(
+                sensorLog.getId(),
+                sensorLog.getDevice().getId(),
+                sensorLog.getSoilMoisture(),
+                sensorLog.getTemperature(),
+                sensorLog.getHumidity(),
+                sensorLog.getWaterLevel(),
+                sensorLog.getRecordedAt());
     }
 
     private void validateThresholds(float minimum, float maximum, String message) {

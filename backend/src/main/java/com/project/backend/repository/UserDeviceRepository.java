@@ -10,6 +10,13 @@ import com.project.backend.model.UserDevice;
 public interface UserDeviceRepository extends JpaRepository<UserDevice, Integer> {
     boolean existsByUser_IdAndDevice_Id(int userId, String deviceId);
 
+    @Query("""
+            SELECT userDevice FROM UserDevice userDevice
+            JOIN FETCH userDevice.device
+            WHERE userDevice.user.id = ?1
+            """)
+    List<UserDevice> findDevicesByUserId(int userId);
+
     @Query(value = """
             SELECT user_id FROM user_device WHERE device_id = ?1
             """, nativeQuery = true)

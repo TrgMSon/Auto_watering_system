@@ -1,9 +1,9 @@
 import 'package:equatable/equatable.dart';
 
-enum DeviceType { pump, valve, sensor, gateway }
+enum DeviceType { pump, valve, sensor, gateway, unknown }
 
 class Device extends Equatable {
-  final int id;
+  final String id;
   final String name;
   final DeviceType type;
   final bool isOnline;

@@ -21,27 +21,32 @@ class AutomationLoaded extends AutomationState {
   final DeviceConfigModel config;
   final List<ScheduleModel> schedules;
   final bool isSaving;
+  final String? errorMessage;
 
   const AutomationLoaded({
     required this.config,
     required this.schedules,
     this.isSaving = false,
+    this.errorMessage,
   });
 
   AutomationLoaded copyWith({
     DeviceConfigModel? config,
     List<ScheduleModel>? schedules,
     bool? isSaving,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return AutomationLoaded(
       config: config ?? this.config,
       schedules: schedules ?? this.schedules,
       isSaving: isSaving ?? this.isSaving,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
 
   @override
-  List<Object?> get props => [config, schedules, isSaving];
+  List<Object?> get props => [config, schedules, isSaving, errorMessage];
 }
 
 class AutomationError extends AutomationState {

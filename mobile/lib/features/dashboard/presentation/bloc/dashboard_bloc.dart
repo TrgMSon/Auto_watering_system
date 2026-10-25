@@ -14,6 +14,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     on<DashboardLoadRequested>(_onLoadRequested);
     on<DashboardDeviceSelected>(_onDeviceSelected);
     on<DashboardTelemetryUpdated>(_onTelemetryUpdated);
+    on<DashboardTelemetryFailed>(_onTelemetryFailed);
     on<DashboardPumpToggled>(_onPumpToggled);
   }
 
@@ -41,7 +42,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   ) {
     if (state is DashboardLoaded) {
       final currentState = state as DashboardLoaded;
-      emit(currentState.copyWith(selectedDevice: event.device, clearTelemetry: true));
+      emit(currentState.copyWith(
+        selectedDevice: event.device,
+        clearTelemetry: true,
+        clearPumpStatus: true,
+      ));
       _listenToTelemetry(event.device);
     }
   }
@@ -52,7 +57,20 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   ) {
     if (state is DashboardLoaded) {
       final currentState = state as DashboardLoaded;
-      emit(currentState.copyWith(telemetry: event.telemetry));
+      emit(currentState.copyWith(
+        telemetry: event.telemetry,
+        pumpStatus: event.telemetry.isPumpOn,
+        clearError: true,
+      ));
+    }
+  }
+
+  void _onTelemetryFailed(
+    DashboardTelemetryFailed event,
+    Emitter<DashboardState> emit,
+  ) {
+    if (state is DashboardLoaded) {
+      emit((state as DashboardLoaded).copyWith(errorMessage: event.message));
     }
   }
 
@@ -64,13 +82,19 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final currentState = state as DashboardLoaded;
       if (currentState.selectedDevice == null) return;
       
-      emit(currentState.copyWith(isTogglingPump: true));
+      emit(currentState.copyWith(isTogglingPump: true, clearError: true));
       try {
         await repository.togglePump(currentState.selectedDevice!.id, event.turnOn);
         // We don't artificially flip the pump status here, we wait for the stream to update it
-        emit(currentState.copyWith(isTogglingPump: false));
+        emit(currentState.copyWith(
+          isTogglingPump: false,
+          pumpStatus: event.turnOn,
+        ));
       } catch (e) {
-        emit(currentState.copyWith(isTogglingPump: false));
+        emit(currentState.copyWith(
+          isTogglingPump: false,
+          errorMessage: e.toString(),
+        ));
       }
     }
   }
@@ -81,6 +105,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         .watchTelemetry(device.id, device.blePassKey)
         .listen((telemetry) {
       add(DashboardTelemetryUpdated(telemetry));
+    }, onError: (Object error) {
+      add(DashboardTelemetryFailed(error.toString()));
     });
   }
 

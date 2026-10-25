@@ -29,6 +29,14 @@ class DashboardTelemetryUpdated extends DashboardEvent {
   List<Object?> get props => [telemetry];
 }
 
+class DashboardTelemetryFailed extends DashboardEvent {
+  final String message;
+  const DashboardTelemetryFailed(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class DashboardPumpToggled extends DashboardEvent {
   final bool turnOn;
   const DashboardPumpToggled(this.turnOn);

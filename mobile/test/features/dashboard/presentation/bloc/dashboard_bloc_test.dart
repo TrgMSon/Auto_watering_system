@@ -172,6 +172,7 @@ void main() {
             devices: [testDevice1, testDevice2],
             selectedDevice: testDevice1,
             telemetry: testTelemetry2,
+            pumpStatus: testTelemetry2.isPumpOn,
           ),
         ],
       );
@@ -203,6 +204,7 @@ void main() {
             selectedDevice: testDevice1,
             telemetry: testTelemetry1,
             isTogglingPump: false,
+            pumpStatus: true,
           ),
         ],
         verify: (_) {
@@ -235,6 +237,7 @@ void main() {
             selectedDevice: testDevice1,
             telemetry: testTelemetry2,
             isTogglingPump: false,
+            errorMessage: 'Exception: Device offline',
           ),
         ],
         verify: (_) {
