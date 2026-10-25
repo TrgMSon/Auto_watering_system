@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class UserInterceptor implements ChannelInterceptor {
 
+    @SuppressWarnings({ "null", "unchecked" })
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);

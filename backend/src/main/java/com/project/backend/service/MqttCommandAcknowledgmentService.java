@@ -26,10 +26,12 @@ public class MqttCommandAcknowledgmentService {
     private final ObjectMapper objectMapper;
     private final Map<String, TrackedCommand> commands = new ConcurrentHashMap<>();
     private final WateringHistoryService wateringHistoryService;
+    private final WebSocketService webSocketService;
 
-    public MqttCommandAcknowledgmentService(ObjectMapper objectMapper, WateringHistoryService wateringHistoryService) {
+    public MqttCommandAcknowledgmentService(ObjectMapper objectMapper, WateringHistoryService wateringHistoryService, WebSocketService webSocketService) {
         this.objectMapper = objectMapper;
         this.wateringHistoryService = wateringHistoryService;
+        this.webSocketService = webSocketService;
     }
 
     public synchronized void register(String deviceId, String commandId) {
@@ -82,13 +84,16 @@ public class MqttCommandAcknowledgmentService {
             if ("SUCCESS".equalsIgnoreCase(status) || "SUCCEEDED".equalsIgnoreCase(status)) {
                 updateStatus(deviceId, commandId, "SUCCEEDED", message);
                 if (action.equals("OFF")){
+                    webSocketService.changePumpStatus(deviceId, "OFF");
                     wateringHistoryService.recordEndWatering(deviceId, LocalDateTime.now());
                 } 
                 else if (action.equals("ON")) {
+                    webSocketService.changePumpStatus(deviceId, "ON");
                     wateringHistoryService.recordStartWatering(deviceId, LocalDateTime.now());
                 }
             } else if ("FAILED".equalsIgnoreCase(status) || "ERROR".equalsIgnoreCase(status)) {
                 updateStatus(deviceId, commandId, "FAILED", message);
+                webSocketService.sendNotification(message, deviceId);
             } else {
                 logger.warn("Ignoring MQTT acknowledgment with unsupported status: {}", status);
             }

@@ -1,8 +1,12 @@
 package com.project.backend.model;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -14,6 +18,7 @@ import lombok.Data;
 @Data
 public class SensorLog {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(nullable = false)
     private int id;
 
@@ -22,21 +27,21 @@ public class SensorLog {
     private Device device;
 
     @Column(name = "soil_moisture")
-    private float soilMoisture;
+    private Float soilMoisture;
 
-    private float temperature;
-    private float humidity;
+    private Float temperature;
+    private Float humidity;
 
     @Column(name = "water_level")
-    private float waterLevel;
+    private Float waterLevel;
 
     @Column(name = "recorded_at")
-    private float recordedAt;
+    private LocalDateTime recordedAt;
 
     public SensorLog() {
     }
 
-    public SensorLog(int id, Device device, float soilMoisture, float temperature, float humidity, float waterLevel, float recordedAt) {
+    public SensorLog(int id, Device device, Float soilMoisture, Float temperature, Float humidity, Float waterLevel, LocalDateTime recordedAt) {
         this.id = id;
         this.device = device;
         this.soilMoisture = soilMoisture;
