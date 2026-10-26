@@ -2,11 +2,14 @@ package com.project.backend.service;
 
 import java.util.List;
 
+import com.project.backend.dto.device.AdminDeviceResponse;
+import com.project.backend.dto.device.DeviceCreatedResponse;
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
 import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
+import com.project.backend.dto.device.CreateDeviceRequest;
 import com.project.backend.dto.device.DeviceModeRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
@@ -14,6 +17,10 @@ import com.project.backend.dto.device.DeviceSummaryResponse;
 import com.project.backend.dto.sensor.SensorReadingResponse;
 
 public interface DeviceService {
+    List<AdminDeviceResponse> getAllDevices();
+
+    DeviceCreatedResponse createDevice(CreateDeviceRequest request);
+
     List<DeviceSummaryResponse> getUserDevices(int userId);
 
     List<SensorReadingResponse> getSensorReadings(

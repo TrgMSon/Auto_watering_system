@@ -1,20 +1,26 @@
 package com.project.backend.service.impl;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.backend.dto.device.AdminDeviceResponse;
+import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
-import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
+import com.project.backend.dto.device.CreateDeviceRequest;
+import com.project.backend.dto.device.DeviceCreatedResponse;
 import com.project.backend.dto.device.DeviceSummaryResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
 import com.project.backend.dto.device.ScheduleRequest;
@@ -38,6 +44,8 @@ import com.project.backend.service.MqttCommandAcknowledgmentService;
 
 @Service
 public class DeviceServiceImpl implements DeviceService {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final DeviceRepository deviceRepository;
     private final DeviceConfigRepository deviceConfigRepository;
     private final ScheduleRepository scheduleRepository;
@@ -68,6 +76,58 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<AdminDeviceResponse> getAllDevices() {
+        return deviceRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
+                .map(device -> new AdminDeviceResponse(
+                        device.getId(),
+                        device.getDeviceName(),
+                        device.getStatus(),
+                        device.getHardwareVersion(),
+                        device.getFirmwareVersion(),
+                        device.getLastActiveAt()))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public DeviceCreatedResponse createDevice(CreateDeviceRequest request) {
+        String deviceId = request.getId().trim().replace('-', ':').toUpperCase(Locale.ROOT);
+        if (deviceRepository.existsById(deviceId)) {
+            throw new ConflictException("Thiết bị đã tồn tại");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        String bleSecret = generateSecret();
+        String mqttUsername = "dev_" + deviceId.replace(":", "");
+        String mqttPassword = generateSecret();
+
+        Device device = new Device();
+        device.setId(deviceId);
+        device.setDeviceName(trimToNull(request.getDeviceName()));
+        device.setHardwareVersion(trimToNull(request.getHardwareVersion()));
+        device.setFirmwareVersion(trimToNull(request.getFirmwareVersion()));
+        device.setStatus("inactive");
+        device.setBlePassKey(bleSecret);
+        device.setMqttUsername(mqttUsername);
+        device.setMqttPassword(mqttPassword);
+        device.setCreatedAt(now);
+        device.setUpdatedAt(now);
+
+        Device created = deviceRepository.save(device);
+        return new DeviceCreatedResponse(
+                created.getId(),
+                created.getDeviceName(),
+                created.getStatus(),
+                created.getHardwareVersion(),
+                created.getFirmwareVersion(),
+                created.getLastActiveAt(),
+                created.getBlePassKey(),
+                created.getMqttUsername(),
+                created.getMqttPassword());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<DeviceSummaryResponse> getUserDevices(int userId) {
         return userDeviceRepository.findDevicesByUserId(userId).stream()
                 .map(userDevice -> {
@@ -79,6 +139,19 @@ public class DeviceServiceImpl implements DeviceService {
                             userDevice.getPermission());
                 })
                 .toList();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String generateSecret() {
+        byte[] secret = new byte[32];
+        SECURE_RANDOM.nextBytes(secret);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
     }
 
     @Override
