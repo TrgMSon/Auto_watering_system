@@ -36,12 +36,26 @@ The dashboard queries:
 - `GET /api/admin/statistics/environmental?deviceId={id}&range={24h|7d|30d}`
 - `GET /api/admin/statistics/water-level?deviceId={id}&range={24h|7d|30d}`
 
-Both endpoints should return an `ApiResponse` with `data` as an array. The
-environmental array accepts `timestamp`/`recordedAt` and soil moisture,
-humidity, and temperature values; the water-level array accepts timestamps
-and `waterLevel`. The backend currently has no admin statistics controller,
-so these charts display an explicit empty/error state until those endpoints
-are implemented.
+Both endpoints return arrays. The environmental array accepts
+`timestamp`/`recordedAt` and soil moisture, humidity, and temperature values;
+the water-level array accepts timestamps and `waterLevel`.
+
+The **Thiết bị IoT** page lists devices, creates a new device, and registers an
+existing device to a user:
+
+- `GET /api/admin/devices` — list all devices (administrator token required).
+- `POST /api/admin/devices` — create a device using its MAC address (administrator token required).
+- `POST /api/devices/{id}/register`
+- Request body: `{ "userId": 12 }`
+- Requires an administrator token. The device must already exist and the
+  target account must have the `USER` role.
+
+Device creation accepts `{ "id": "AA:BB:CC:DD:EE:FF", "deviceName": "Garden pump", "hardwareVersion": "ESP32", "firmwareVersion": "1.0.0" }`. Only `id` is required. Newly created devices have status `inactive`; the create response includes `ble_secret_key`, `mqtt_username`, and `mqtt_password` once for provisioning. The page displays those values after creation; save them before leaving because the listing API never returns credentials. The MQTT username is derived from the normalized MAC (for example `dev_AABBCCDDEEFF`); both MQTT credential fields fit the database limit of 55 characters. Assigning a device to an owner changes its status to `active`.
+
+The device listing returns `id`, `device_name`, `status`, `hardware_version`,
+`firmware_version`, and `last_active_at`. There is no administrator API for
+listing users yet, so the page accepts the target user ID directly and shows
+the backend response after registration.
 
 ### `npm run build`
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import DeviceManagement from './DeviceManagement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 const DEVICE_STORAGE_KEY = 'garden-admin-device-id';
@@ -84,6 +85,7 @@ function buildQuery(deviceId, range) {
 }
 
 function Home({ auth, onLogout }) {
+  const [activePage, setActivePage] = useState('overview');
   const [deviceId, setDeviceId] = useState(
     () => localStorage.getItem(DEVICE_STORAGE_KEY) || '',
   );
@@ -176,12 +178,20 @@ function Home({ auth, onLogout }) {
 
         <div className="sidebar__section-label">WORKSPACE</div>
         <nav className="side-nav" aria-label="Điều hướng chính">
-          <a className="side-nav__item side-nav__item--active" href="/" aria-current="page">
+          <button
+            className={`side-nav__item side-nav__button ${activePage === 'overview' ? 'side-nav__item--active' : ''}`}
+            onClick={() => setActivePage('overview')}
+            aria-current={activePage === 'overview' ? 'page' : undefined}
+          >
             <GridIcon /> <span>Tổng quan</span>
-          </a>
-          <span className="side-nav__item side-nav__item--muted">
-            <DeviceIcon /> <span>Thiết bị IoT</span><span className="side-nav__soon">SẮP CÓ</span>
-          </span>
+          </button>
+          <button
+            className={`side-nav__item side-nav__button ${activePage === 'devices' ? 'side-nav__item--active' : ''}`}
+            onClick={() => setActivePage('devices')}
+            aria-current={activePage === 'devices' ? 'page' : undefined}
+          >
+            <DeviceIcon /> <span>Thiết bị IoT</span>
+          </button>
         </nav>
 
         <div className="sidebar__bottom">
@@ -201,7 +211,10 @@ function Home({ auth, onLogout }) {
 
       <main className="dashboard-main">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong>Tổng quan</strong></div>
+          <div className="breadcrumbs">
+            <span>Workspace</span><b>/</b>
+            <strong>{activePage === 'devices' ? 'Thiết bị IoT' : 'Tổng quan'}</strong>
+          </div>
           <div className="topbar__actions">
             <div className="system-status"><span className="status-dot" /> Hệ thống hoạt động</div>
             <button className="icon-button notification-button" aria-label="Thông báo"><BellIcon /><i /></button>
@@ -210,6 +223,10 @@ function Home({ auth, onLogout }) {
         </header>
 
         <div className="dashboard-content">
+          {activePage === 'devices' ? (
+            <DeviceManagement accessToken={auth.accessToken} />
+          ) : (
+            <>
           <section className="page-heading">
             <div>
               <span className="eyebrow">{todayLabel}</span>
@@ -342,6 +359,8 @@ function Home({ auth, onLogout }) {
             <span>© 2026 Gardenia · Hệ thống quản lý tưới thông minh</span>
             <span><span className="status-dot" /> Dữ liệu tự làm mới mỗi 30 giây</span>
           </footer>
+            </>
+          )}
         </div>
       </main>
     </div>
