@@ -30,6 +30,10 @@ public interface DeviceService {
 
     void registerDevice(String deviceId, int userId, int userCreateId);
 
+    void addViewer(String deviceId, int ownerId, int viewerId);
+
+    void removeViewer(String deviceId, int ownerId, int viewerId);
+
     DeviceConfigResponse getDeviceConfig(String deviceId, int userId);
 
     DeviceConfigResponse updateDeviceConfig(String deviceId, int userId, DeviceConfigRequest request);

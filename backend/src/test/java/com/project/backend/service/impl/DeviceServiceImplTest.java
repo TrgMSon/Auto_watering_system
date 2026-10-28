@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -24,6 +25,7 @@ import com.project.backend.dto.device.CreateDeviceRequest;
 import com.project.backend.exception.ConflictException;
 import com.project.backend.model.Device;
 import com.project.backend.model.User;
+import com.project.backend.model.UserDevice;
 import com.project.backend.model.enums.Role;
 import com.project.backend.repository.DeviceConfigRepository;
 import com.project.backend.repository.DeviceRepository;
@@ -31,6 +33,7 @@ import com.project.backend.repository.ScheduleRepository;
 import com.project.backend.repository.SensorLogRepository;
 import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.repository.UserRepository;
+import com.project.backend.service.EmqxManagementService;
 import com.project.backend.service.MqttCommandAcknowledgmentService;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,6 +54,8 @@ class DeviceServiceImplTest {
     private MqttDeviceCommandPublisher commandPublisher;
     @Mock
     private MqttCommandAcknowledgmentService acknowledgmentService;
+    @Mock
+    private EmqxManagementService emqxManagementService;
 
     private DeviceServiceImpl deviceService;
 
@@ -64,7 +69,8 @@ class DeviceServiceImplTest {
                 userDeviceRepository,
                 userRepository,
                 commandPublisher,
-                acknowledgmentService);
+                acknowledgmentService,
+                emqxManagementService);
     }
 
     @Test
@@ -101,6 +107,7 @@ class DeviceServiceImplTest {
         assertEquals(savedDevice.getBlePassKey(), response.bleSecretKey());
         assertEquals(savedDevice.getMqttUsername(), response.mqttUsername());
         assertEquals(savedDevice.getMqttPassword(), response.mqttPassword());
+        verify(emqxManagementService).createDeviceUser(savedDevice.getMqttUsername(), savedDevice.getMqttPassword());
     }
 
     @Test
@@ -133,5 +140,65 @@ class DeviceServiceImplTest {
                 eq(deviceId),
                 eq("owner"),
                 any(LocalDateTime.class));
+    }
+
+    @Test
+    void ownerCanGrantDeviceAccessToAnotherUserAsViewer() {
+        String deviceId = "AA:BB:CC:DD:EE:FF";
+        Device device = new Device();
+        device.setId(deviceId);
+        device.setStatus("active");
+        UserDevice ownerLink = new UserDevice();
+        ownerLink.setPermission("owner");
+        User viewer = new User();
+        viewer.setRole(Role.USER);
+
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+        when(userDeviceRepository.findByUser_IdAndDevice_Id(1, deviceId))
+                .thenReturn(Optional.of(ownerLink));
+        when(userRepository.findById(12)).thenReturn(Optional.of(viewer));
+        when(userDeviceRepository.existsByUser_IdAndDevice_Id(12, deviceId)).thenReturn(false);
+
+        deviceService.addViewer(deviceId, 1, 12);
+
+        verify(userDeviceRepository).save(argThat(link ->
+                link.getUser() == viewer
+                        && link.getDevice() == device
+                        && "viewer".equals(link.getPermission())));
+    }
+
+    @Test
+    void onlyOwnerCanRemoveViewerLink() {
+        String deviceId = "AA:BB:CC:DD:EE:FF";
+        Device device = new Device();
+        device.setId(deviceId);
+        device.setStatus("active");
+        UserDevice ownerLink = new UserDevice();
+        ownerLink.setPermission("owner");
+
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+        when(userDeviceRepository.findByUser_IdAndDevice_Id(1, deviceId))
+                .thenReturn(Optional.of(ownerLink));
+        when(userDeviceRepository.deleteViewerLink(12, deviceId)).thenReturn(1);
+
+        deviceService.removeViewer(deviceId, 1, 12);
+
+        verify(userDeviceRepository).deleteViewerLink(12, deviceId);
+    }
+
+    @Test
+    void userRoleCannotBePromotedToOwnerAccountRoleWhenAssignedDevice() {
+        String deviceId = "AA:BB:CC:DD:EE:FF";
+        Device device = new Device();
+        device.setId(deviceId);
+        device.setStatus("registered");
+        User user = new User();
+        user.setRole(Role.USER);
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+        when(userRepository.findById(12)).thenReturn(Optional.of(user));
+
+        deviceService.registerDevice(deviceId, 12, 1);
+
+        assertEquals(Role.USER, user.getRole());
     }
 }

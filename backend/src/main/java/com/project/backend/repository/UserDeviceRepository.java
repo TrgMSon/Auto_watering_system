@@ -32,6 +32,16 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Integer>
             @Param("deviceId") String deviceId,
             @Param("permission") String permission);
 
+    @Modifying
+    @Transactional
+    @Query(value = """
+            DELETE FROM user_device
+            WHERE user_id = :userId
+              AND device_id = :deviceId
+              AND LOWER(permission) IN ('viewer', 'viewer_locked')
+            """, nativeQuery = true)
+    int deleteViewerLink(@Param("userId") int userId, @Param("deviceId") String deviceId);
+
     @Transactional
     void deleteAllByDevice_Id(String deviceId);
 

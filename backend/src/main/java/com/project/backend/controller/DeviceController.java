@@ -46,7 +46,7 @@ public class DeviceController {
         }
 
         @PostMapping("/ble-status")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> reportBleStatus(
                         @PathVariable("id") String deviceId,
                         @Valid @RequestBody BleStatusRequest request,
@@ -57,7 +57,7 @@ public class DeviceController {
         }
 
         @PostMapping("/viewers/{viewerId}/lock")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> lockViewer(
                         @PathVariable("id") String deviceId,
                         @PathVariable int viewerId,
@@ -68,7 +68,7 @@ public class DeviceController {
         }
 
         @DeleteMapping("/viewers/{viewerId}/lock")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> unlockViewer(
                         @PathVariable("id") String deviceId,
                         @PathVariable int viewerId,
@@ -78,8 +78,29 @@ public class DeviceController {
                 return ResponseEntity.ok(ApiResponse.success("Đã mở khóa quyền xem thiết bị", null));
         }
 
+        @PostMapping("/viewers/{viewerId}")
+        @PreAuthorize("hasRole('USER')")
+        public ResponseEntity<ApiResponse<Void>> addViewer(
+                        @PathVariable("id") String deviceId,
+                        @PathVariable int viewerId,
+                        Authentication authentication) {
+                deviceService.addViewer(deviceId, userId(authentication), viewerId);
+                return ResponseEntity.status(HttpStatus.CREATED)
+                                .body(ApiResponse.success("Đã chia sẻ quyền điều khiển thiết bị", null));
+        }
+
+        @DeleteMapping("/viewers/{viewerId}")
+        @PreAuthorize("hasRole('USER')")
+        public ResponseEntity<ApiResponse<Void>> removeViewer(
+                        @PathVariable("id") String deviceId,
+                        @PathVariable int viewerId,
+                        Authentication authentication) {
+                deviceService.removeViewer(deviceId, userId(authentication), viewerId);
+                return ResponseEntity.ok(ApiResponse.success("Đã xóa quyền truy cập của người xem", null));
+        }
+
         @PostMapping("/maintenance")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> startOwnerMaintenance(
                         @PathVariable("id") String deviceId,
                         Authentication authentication) {
@@ -89,7 +110,7 @@ public class DeviceController {
         }
 
         @PostMapping("/maintenance/complete")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> completeOwnerMaintenance(
                         @PathVariable("id") String deviceId,
                         Authentication authentication) {
@@ -99,7 +120,7 @@ public class DeviceController {
         }
 
         @GetMapping("/config")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<DeviceConfigResponse>> getDeviceConfig(
                         @PathVariable String id, Authentication authentication) {
                 return ResponseEntity.ok(ApiResponse.success(
@@ -107,7 +128,7 @@ public class DeviceController {
         }
 
         @PostMapping("/control")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<DeviceCommandResponse>> controlPump(
                         @PathVariable("id") String id,
                         @Valid @RequestBody DeviceCommandRequest request,
@@ -118,7 +139,7 @@ public class DeviceController {
         }
 
         @GetMapping("/commands/{commandId}/ack")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<CommandAcknowledgmentResponse>> getCommandAcknowledgment(
                         @PathVariable("id") String id,
                         @PathVariable String commandId,
@@ -129,7 +150,7 @@ public class DeviceController {
         }
 
         @PostMapping("/mode")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<DeviceConfigResponse>> setModeWatering(
                         @PathVariable String id,
                         @Valid @RequestBody DeviceModeRequest request,
@@ -140,7 +161,7 @@ public class DeviceController {
         }
 
         @GetMapping("/schedules")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<List<ScheduleResponse>>> getSchedules(
                         @PathVariable String id, Authentication authentication) {
                 return ResponseEntity.ok(ApiResponse.success(
@@ -148,7 +169,7 @@ public class DeviceController {
         }
 
         @PostMapping("/schedules")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<ScheduleResponse>> createSchedule(
                         @PathVariable String id,
                         @Valid @RequestBody ScheduleRequest request,
@@ -164,7 +185,7 @@ public class DeviceController {
         }
 
         @PutMapping("/schedules/{scheduleId}")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<ScheduleResponse>> updateSchedule(
                         @PathVariable String id,
                         @PathVariable int scheduleId,
@@ -176,7 +197,7 @@ public class DeviceController {
         }
 
         @DeleteMapping("/schedules/{scheduleId}")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> deleteSchedule(
                         @PathVariable String id,
                         @PathVariable int scheduleId,
@@ -196,7 +217,7 @@ public class DeviceController {
 
         // API điều khiển máy bơm (Mobile App gọi khi người dùng bấm nút Bật/Tắt bơm)
         @PostMapping("/pump")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<DeviceCommandResponse>> controlPump(
                         @PathVariable("id") String deviceId,
                         @Valid @RequestBody PumpControlRequest request,
@@ -212,7 +233,7 @@ public class DeviceController {
 
         // API cấu hình thông số cho thiết bị (Ngưỡng độ ẩm, thời gian tưới tự động,...)
         @PostMapping("/config")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<DeviceConfigResponse>> updateConfiguration(
                         @PathVariable("id") String deviceId,
                         @Valid @RequestBody DeviceConfigRequest request,
@@ -224,7 +245,7 @@ public class DeviceController {
         }
 
         @PutMapping("/config")
-        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<DeviceConfigResponse>> updateDeviceConfig(
                         @PathVariable("id") String deviceId,
                         @Valid @RequestBody DeviceConfigRequest request,

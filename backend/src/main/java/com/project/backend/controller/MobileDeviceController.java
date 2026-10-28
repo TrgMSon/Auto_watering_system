@@ -28,7 +28,7 @@ public class MobileDeviceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<List<DeviceSummaryResponse>>> getDevices(
             Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -36,7 +36,7 @@ public class MobileDeviceController {
     }
 
     @GetMapping("/{id}/telemetry")
-    @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<List<SensorReadingResponse>>> getSensorReadings(
             @PathVariable String id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
@@ -47,7 +47,7 @@ public class MobileDeviceController {
     }
 
     @GetMapping("/{id}/telemetry/latest")
-    @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<SensorReadingResponse>> getLatestSensorReading(
             @PathVariable String id, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success(

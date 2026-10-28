@@ -91,6 +91,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse refreshToken(String refreshToken) {
         RefreshToken oldToken = refreshTokenService.validateAndGet(refreshToken);
+        if (oldToken.getUser().getStatus() == AccountStatus.LOCKED) {
+            throw new UnauthorizedException("Tài khoản đã bị khóa hoặc không tồn tại.");
+        }
         String newAccessToken = jwtService.generateToken(oldToken.getUser());
         String newRefreshToken = refreshTokenService.rotate(oldToken);
 
