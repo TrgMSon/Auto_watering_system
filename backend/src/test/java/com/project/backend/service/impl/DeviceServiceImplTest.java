@@ -88,7 +88,7 @@ class DeviceServiceImplTest {
         assertEquals("Garden pump", savedDevice.getDeviceName());
         assertEquals("ESP32", savedDevice.getHardwareVersion());
         assertEquals("1.0.0", savedDevice.getFirmwareVersion());
-        assertEquals("inactive", savedDevice.getStatus());
+        assertEquals("registered", savedDevice.getStatus());
         assertNotNull(savedDevice.getBlePassKey());
         assertTrue(savedDevice.getBlePassKey().length() >= 40);
         assertEquals("dev_AABBCCDDEEFF", savedDevice.getMqttUsername());
@@ -96,7 +96,7 @@ class DeviceServiceImplTest {
         assertTrue(savedDevice.getMqttPassword().length() <= 55);
         assertNotNull(savedDevice.getCreatedAt());
         assertEquals(savedDevice.getCreatedAt(), savedDevice.getUpdatedAt());
-        assertEquals("inactive", response.status());
+        assertEquals("registered", response.status());
         assertEquals(savedDevice.getId(), response.id());
         assertEquals(savedDevice.getBlePassKey(), response.bleSecretKey());
         assertEquals(savedDevice.getMqttUsername(), response.mqttUsername());
@@ -114,21 +114,20 @@ class DeviceServiceImplTest {
     }
 
     @Test
-    void assigningInactiveDeviceActivatesItAndGrantsOwnerPermission() {
+    void assigningRegisteredDeviceProvisionedAndGrantsOwnerPermission() {
         String deviceId = "AA:BB:CC:DD:EE:FF";
         Device device = new Device();
         device.setId(deviceId);
-        device.setStatus("inactive");
+        device.setStatus("registered");
         User owner = new User();
         owner.setRole(Role.USER);
 
         when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
         when(userRepository.findById(12)).thenReturn(Optional.of(owner));
-        when(deviceRepository.updateDeviceStatus("active", deviceId)).thenReturn(1);
-
         deviceService.registerDevice(deviceId, 12, 1);
 
-        verify(deviceRepository).updateDeviceStatus("active", deviceId);
+        assertEquals("provisioned", device.getStatus());
+        verify(deviceRepository).save(device);
         verify(deviceRepository).addUserDevice(
                 eq(12),
                 eq(deviceId),

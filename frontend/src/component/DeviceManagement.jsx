@@ -423,16 +423,20 @@ function DeviceManagement({ accessToken }) {
 function DeviceStatus({ status }) {
   const normalizedStatus = status?.toLowerCase();
   const statusLabels = {
-    active: 'Đã đăng ký',
-    inactive: 'Chưa đăng ký',
-    online: 'Đang trực tuyến',
+    registered: 'Đã đăng ký phần cứng',
+    provisioned: 'Đã gán chủ sở hữu',
+    active: 'Đang hoạt động',
     offline: 'Ngoại tuyến',
+    fault: 'Lỗi thiết bị',
+    maintenance: 'Đang bảo trì',
+    decommissioned: 'Đã ngừng hoạt động',
+    inactive: 'Chưa đăng ký',
   };
   const label = statusLabels[normalizedStatus] || status || 'Chưa xác định';
-  const isActive = normalizedStatus === 'active' || normalizedStatus === 'online';
+  const isActive = normalizedStatus === 'active';
 
   return (
-    <span className={`device-management__status ${isActive ? 'device-management__status--active' : ''}`}>
+    <span className={`device-management__status device-management__status--${normalizedStatus || 'unknown'} ${isActive ? 'device-management__status--active' : ''}`}>
       <i />
       {label}
     </span>

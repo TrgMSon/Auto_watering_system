@@ -32,6 +32,8 @@ import com.project.backend.model.Device;
 import com.project.backend.model.DeviceConfig;
 import com.project.backend.model.Schedule;
 import com.project.backend.model.User;
+import com.project.backend.model.UserDevice;
+import com.project.backend.model.enums.DeviceStatus;
 import com.project.backend.model.enums.Role;
 import com.project.backend.repository.DeviceConfigRepository;
 import com.project.backend.repository.DeviceRepository;
@@ -106,7 +108,7 @@ public class DeviceServiceImpl implements DeviceService {
         device.setDeviceName(trimToNull(request.getDeviceName()));
         device.setHardwareVersion(trimToNull(request.getHardwareVersion()));
         device.setFirmwareVersion(trimToNull(request.getFirmwareVersion()));
-        device.setStatus("inactive");
+        device.setStatus(DeviceStatus.REGISTERED.value());
         device.setBlePassKey(bleSecret);
         device.setMqttUsername(mqttUsername);
         device.setMqttPassword(mqttPassword);
@@ -130,6 +132,9 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional(readOnly = true)
     public List<DeviceSummaryResponse> getUserDevices(int userId) {
         return userDeviceRepository.findDevicesByUserId(userId).stream()
+                .filter(userDevice -> !"viewer_locked".equalsIgnoreCase(userDevice.getPermission()))
+                .filter(userDevice -> !DeviceStatus.DECOMMISSIONED.value()
+                        .equalsIgnoreCase(userDevice.getDevice().getStatus()))
                 .map(userDevice -> {
                     Device device = userDevice.getDevice();
                     return new DeviceSummaryResponse(
@@ -196,18 +201,16 @@ public class DeviceServiceImpl implements DeviceService {
         if (userDeviceRepository.existsByUser_IdAndDevice_Id(userId, deviceId)) {
             throw new ConflictException("Thiết bị đã được đăng ký với tài khoản này");
         }
-        if (device.getStatus() != null && device.getStatus().equalsIgnoreCase("active")) {
-            throw new ConflictException("Thiết bị đã được đăng ký");
+        DeviceStatus status = DeviceStatus.from(device.getStatus())
+                .orElse("inactive".equalsIgnoreCase(device.getStatus())
+                        ? DeviceStatus.REGISTERED
+                        : null);
+        if (status != DeviceStatus.REGISTERED) {
+            throw new ConflictException("Thiết bị không ở trạng thái có thể gán chủ sở hữu");
         }
-
-        User userCreate = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Người dùng đăng ký thiết bị không tồn tại"));
-        if (userCreate.getRole() == Role.ADMIN)
-            userRepository.assignOwner("owner", userId);
-
-        if (deviceRepository.updateDeviceStatus("active", deviceId) != 1) {
-            throw new ConflictException("Không thể cập nhật trạng thái thiết bị");
-        }
+        device.setStatus(DeviceStatus.PROVISIONED.value());
+        device.setUpdatedAt(LocalDateTime.now());
+        deviceRepository.save(device);
         deviceRepository.addUserDevice(userId, deviceId, "owner", LocalDateTime.now());
     }
 
@@ -230,7 +233,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (deviceId == null || deviceId.isEmpty())
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         validateThresholds(
                 request.getSoilMoistureMin(), request.getSoilMoistureMax(),
                 "Độ ẩm đất tối thiểu phải nhỏ hơn hoặc bằng tối đa");
@@ -267,7 +270,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (deviceId == null || deviceId.isEmpty())
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         String action = request.getAction().trim().toUpperCase(Locale.ROOT);
         if (!action.equals("ON") && !action.equals("OFF")) {
             throw new IllegalArgumentException("action chỉ nhận giá trị ON hoặc OFF");
@@ -297,7 +300,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (deviceId == null || deviceId.isEmpty())
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         String mode = request.getMode().trim().toLowerCase(Locale.ROOT);
         if (!mode.equals("auto") && !mode.equals("manual")) {
             throw new IllegalArgumentException("mode chỉ nhận giá trị auto hoặc manual");
@@ -327,7 +330,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public ScheduleResponse createSchedule(
             String deviceId, int userId, ScheduleRequest request) {
-        Device device = requireOwnedDevice(deviceId, userId);
+        Device device = requireOwnerOperableDevice(deviceId, userId);
         Schedule schedule = new Schedule(
                 0,
                 device,
@@ -345,7 +348,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public ScheduleResponse updateSchedule(
             String deviceId, int scheduleId, int userId, ScheduleRequest request) {
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         Schedule schedule = scheduleRepository.findByIdAndDevice_Id(scheduleId, deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy lịch tưới"));
         schedule.setStartTime(request.getStartTime());
@@ -360,7 +363,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     @Transactional
     public void deleteSchedule(String deviceId, int scheduleId, int userId) {
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         Schedule schedule = scheduleRepository.findByIdAndDevice_Id(scheduleId, deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy lịch tưới"));
 
@@ -373,8 +376,24 @@ public class DeviceServiceImpl implements DeviceService {
 
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
-        if (!userDeviceRepository.existsByUser_IdAndDevice_Id(userId, deviceId)) {
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(userId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        if ("viewer_locked".equalsIgnoreCase(association.getPermission())
+                || DeviceStatus.DECOMMISSIONED.value().equalsIgnoreCase(device.getStatus())) {
             throw new NotFoundException("Không tìm thấy thiết bị");
+        }
+        return device;
+    }
+
+    private Device requireOwnerOperableDevice(String deviceId, int userId) {
+        Device device = requireOwnedDevice(deviceId, userId);
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(userId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        if (!"owner".equalsIgnoreCase(association.getPermission())) {
+            throw new ConflictException("Chỉ chủ sở hữu mới có quyền điều khiển thiết bị");
+        }
+        if (!DeviceStatus.ACTIVE.value().equalsIgnoreCase(device.getStatus())) {
+            throw new ConflictException("Thiết bị chưa ở trạng thái hoạt động");
         }
         return device;
     }

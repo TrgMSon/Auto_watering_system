@@ -306,6 +306,32 @@
   background: #58a874;
 }
 
+.device-management__status--offline {
+  color: #647d92;
+}
+
+.device-management__status--offline i {
+  background: #7d9bb4;
+}
+
+.device-management__status--fault,
+.device-management__status--decommissioned {
+  color: #a25447;
+}
+
+.device-management__status--fault i,
+.device-management__status--decommissioned i {
+  background: #c76c5c;
+}
+
+.device-management__status--maintenance {
+  color: #8a6c38;
+}
+
+.device-management__status--maintenance i {
+  background: #c89b58;
+}
+
 .device-management__list-state {
   margin: 0;
   padding: 22px 12px;
