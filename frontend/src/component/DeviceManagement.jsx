@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import './DeviceManagement.css';
+import { authenticatedFetch } from '../authenticatedFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
@@ -22,16 +23,19 @@ function DeviceManagement({ accessToken }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [lifecycleBusyDeviceId, setLifecycleBusyDeviceId] = useState('');
+  const [lifecycleError, setLifecycleError] = useState('');
+  const [lifecycleSuccess, setLifecycleSuccess] = useState('');
 
   const loadDevices = useCallback(async (signal) => {
     setIsLoadingDevices(true);
     setDevicesError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/devices`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/admin/devices`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         signal,
-      });
+      }, accessToken);
       const body = await response.json().catch(() => null);
 
       if (response.status === 401 || response.status === 403) {
@@ -76,14 +80,14 @@ function DeviceManagement({ accessToken }) {
     };
     setIsCreating(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/devices`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/admin/devices`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-      });
+      }, accessToken);
       const body = await response.json().catch(() => null);
 
       if (response.status === 401 || response.status === 403) {
@@ -130,7 +134,7 @@ function DeviceManagement({ accessToken }) {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/api/devices/${encodeURIComponent(normalizedDeviceId)}/register`,
         {
           method: 'POST',
@@ -140,6 +144,7 @@ function DeviceManagement({ accessToken }) {
           },
           body: JSON.stringify({ userId: normalizedUserId }),
         },
+        accessToken,
       );
       const body = await response.json().catch(() => null);
 
@@ -163,6 +168,60 @@ function DeviceManagement({ accessToken }) {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleLifecycleAction(device, action) {
+    if (action === 'decommission') {
+      const confirmed = window.confirm(
+        `Thu hồi thiết bị "${device.id}"? Thao tác này sẽ xóa tài khoản MQTT trên EMQX và gỡ mọi liên kết người dùng.`,
+      );
+      if (!confirmed) return;
+    }
+
+    const actionPaths = {
+      startMaintenance: 'maintenance',
+      completeMaintenance: 'maintenance/complete',
+      decommission: 'decommission',
+    };
+    const actionMessages = {
+      startMaintenance: 'Đã chuyển thiết bị sang trạng thái bảo trì.',
+      completeMaintenance: 'Đã hoàn tất bảo trì thiết bị.',
+      decommission: 'Đã thu hồi và ngừng hoạt động thiết bị.',
+    };
+
+    setLifecycleError('');
+    setLifecycleSuccess('');
+    setLifecycleBusyDeviceId(device.id);
+
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/api/admin/devices/${encodeURIComponent(device.id)}/${actionPaths[action]}`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+        accessToken,
+      );
+      const body = await response.json().catch(() => null);
+
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Phiên đăng nhập hết hạn hoặc tài khoản không có quyền quản trị.');
+      }
+      if (!response.ok || body?.success === false) {
+        throw new Error(body?.message || `Không thể cập nhật vòng đời thiết bị (HTTP ${response.status}).`);
+      }
+
+      setLifecycleSuccess(body?.message || actionMessages[action]);
+      await loadDevices();
+    } catch (actionError) {
+      setLifecycleError(
+        actionError instanceof TypeError
+          ? 'Không thể kết nối máy chủ. Kiểm tra backend và cấu hình API.'
+          : actionError.message || 'Không thể cập nhật vòng đời thiết bị.',
+      );
+    } finally {
+      setLifecycleBusyDeviceId('');
     }
   }
 
@@ -290,7 +349,7 @@ function DeviceManagement({ accessToken }) {
         <div className="device-management__list-heading">
           <div>
             <h2 id="device-list-title">Danh sách thiết bị</h2>
-            <p>Chọn một thiết bị để điền mã vào biểu mẫu đăng ký.</p>
+            <p>Theo dõi trạng thái, bảo trì, thu hồi và gán thiết bị cho người dùng.</p>
           </div>
           <button
             className="device-management__refresh"
@@ -305,6 +364,16 @@ function DeviceManagement({ accessToken }) {
         {devicesError && (
           <div className="device-management__message device-management__message--error" role="alert">
             {devicesError}
+          </div>
+        )}
+        {lifecycleError && (
+          <div className="device-management__message device-management__message--error" role="alert">
+            {lifecycleError}
+          </div>
+        )}
+        {lifecycleSuccess && (
+          <div className="device-management__message device-management__message--success" role="status">
+            {lifecycleSuccess}
           </div>
         )}
 
@@ -324,7 +393,8 @@ function DeviceManagement({ accessToken }) {
                   <th>Trạng thái</th>
                   <th>Phiên bản</th>
                   <th>Hoạt động gần nhất</th>
-                  <th><span className="sr-only">Thao tác</span></th>
+                  <th>Thao tác vòng đời</th>
+                  <th><span className="sr-only">Gán thiết bị</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -339,6 +409,40 @@ function DeviceManagement({ accessToken }) {
                       </span>
                     </td>
                     <td>{formatLastActive(device.last_active_at)}</td>
+                    <td>
+                      <div className="device-management__lifecycle-actions">
+                        {device.status?.toLowerCase() === 'maintenance' ? (
+                          <button
+                            className="device-management__lifecycle-action"
+                            type="button"
+                            onClick={() => handleLifecycleAction(device, 'completeMaintenance')}
+                            disabled={Boolean(lifecycleBusyDeviceId)}
+                          >
+                            {lifecycleBusyDeviceId === device.id ? 'Đang xử lý…' : 'Hoàn tất bảo trì'}
+                          </button>
+                        ) : device.status?.toLowerCase() !== 'decommissioned'
+                          && device.status?.toLowerCase() !== 'registered' ? (
+                          <button
+                            className="device-management__lifecycle-action"
+                            type="button"
+                            onClick={() => handleLifecycleAction(device, 'startMaintenance')}
+                            disabled={Boolean(lifecycleBusyDeviceId)}
+                          >
+                            {lifecycleBusyDeviceId === device.id ? 'Đang xử lý…' : 'Bắt đầu bảo trì'}
+                          </button>
+                        ) : null}
+                        {device.status?.toLowerCase() !== 'decommissioned' && (
+                          <button
+                            className="device-management__lifecycle-action device-management__lifecycle-action--danger"
+                            type="button"
+                            onClick={() => handleLifecycleAction(device, 'decommission')}
+                            disabled={Boolean(lifecycleBusyDeviceId)}
+                          >
+                            Thu hồi
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <button
                         className="device-management__select"

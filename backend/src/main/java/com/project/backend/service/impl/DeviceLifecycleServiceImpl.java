@@ -21,6 +21,7 @@ import com.project.backend.model.enums.DeviceStatus;
 import com.project.backend.repository.DeviceRepository;
 import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.service.DeviceLifecycleService;
+import com.project.backend.service.EmqxManagementService;
 
 @Service
 public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
@@ -30,14 +31,17 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
     private final DeviceRepository deviceRepository;
     private final UserDeviceRepository userDeviceRepository;
     private final ObjectMapper objectMapper;
+    private final EmqxManagementService emqxManagementService;
 
     public DeviceLifecycleServiceImpl(
             DeviceRepository deviceRepository,
             UserDeviceRepository userDeviceRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            EmqxManagementService emqxManagementService) {
         this.deviceRepository = deviceRepository;
         this.userDeviceRepository = userDeviceRepository;
         this.objectMapper = objectMapper;
+        this.emqxManagementService = emqxManagementService;
     }
 
     @Override
@@ -137,7 +141,7 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
     @Transactional
     public void reportBleStatus(String deviceId, int userId, boolean reachable) {
         Device device = requireDevice(deviceId);
-        requireOwnerPermission(device.getId(), userId);
+        requireDevicePermission(device.getId(), userId);
         DeviceStatus current = requireLifecycleStatus(device);
         if (current == DeviceStatus.DECOMMISSIONED) {
             throw new ConflictException("Thiết bị đã ngừng hoạt động");
@@ -183,7 +187,7 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
     private void startMaintenance(String deviceId, Integer ownerId) {
         Device device = requireDevice(deviceId);
         if (ownerId != null) {
-            requireOwnerPermission(device.getId(), ownerId);
+            requireDevicePermission(device.getId(), ownerId);
         }
         DeviceStatus current = requireLifecycleStatus(device);
         if (current == DeviceStatus.DECOMMISSIONED) {
@@ -213,7 +217,7 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
     private void completeMaintenance(String deviceId, Integer ownerId) {
         Device device = requireDevice(deviceId);
         if (ownerId != null) {
-            requireOwnerPermission(device.getId(), ownerId);
+            requireDevicePermission(device.getId(), ownerId);
         }
         if (requireLifecycleStatus(device) != DeviceStatus.MAINTENANCE) {
             throw new ConflictException("Thiết bị không ở trạng thái bảo trì");
@@ -238,6 +242,7 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
             throw new ConflictException("Thiết bị đã ngừng hoạt động");
         }
 
+        emqxManagementService.deleteDeviceUser(device.getMqttUsername());
         device.setStatus(DeviceStatus.DECOMMISSIONED.value());
         device.setBlePassKey(null);
         device.setMqttUsername(null);
@@ -285,6 +290,16 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
         if (!"owner".equalsIgnoreCase(association.getPermission())) {
             throw new ConflictException("Chỉ chủ sở hữu mới có quyền quản lý thiết bị");
+        }
+    }
+
+    private void requireDevicePermission(String deviceId, int userId) {
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(userId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        if ("viewer_locked".equalsIgnoreCase(association.getPermission())
+                || !("owner".equalsIgnoreCase(association.getPermission())
+                        || "viewer".equalsIgnoreCase(association.getPermission()))) {
+            throw new NotFoundException("Không tìm thấy thiết bị");
         }
     }
 

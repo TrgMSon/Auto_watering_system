@@ -237,6 +237,46 @@
   cursor: pointer;
 }
 
+.device-management__lifecycle-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.device-management__lifecycle-action {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #dce8de;
+  border-radius: 7px;
+  color: #34714c;
+  background: #f8fbf8;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.device-management__lifecycle-action:hover:not(:disabled) {
+  border-color: #b7d1bd;
+  background: #edf6ef;
+}
+
+.device-management__lifecycle-action--danger {
+  border-color: #f0d8cb;
+  color: #965b4b;
+  background: #fff9f5;
+}
+
+.device-management__lifecycle-action--danger:hover:not(:disabled) {
+  border-color: #e6b9a7;
+  background: #fff1e9;
+}
+
+.device-management__lifecycle-action:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
 .device-management__refresh:disabled {
   cursor: wait;
   opacity: .65;

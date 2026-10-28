@@ -95,4 +95,3 @@ public class SecurityConfig {
         objectMapper.writeValue(response.getWriter(), ApiResponse.error(statusCode, message));
     }
 }
-

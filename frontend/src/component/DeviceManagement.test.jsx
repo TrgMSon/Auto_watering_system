@@ -221,3 +221,100 @@ test('shows backend errors when device creation fails', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('Thiết bị đã tồn tại');
   expect(global.fetch).toHaveBeenCalledTimes(2);
 });
+
+test('moves a device into and out of maintenance using the admin lifecycle API', async () => {
+  const device = (status) => ({
+    id: 'GARDEN-001',
+    device_name: 'Vườn ban công',
+    status,
+    hardware_version: '1.0',
+    firmware_version: '2.0',
+    last_active_at: null,
+  });
+  const listResponse = (status) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, data: [device(status)] }),
+  });
+  const actionResponse = (message) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, message }),
+  });
+
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(listResponse('active'))
+    .mockResolvedValueOnce(actionResponse('Đã tạm ngưng điều khiển thiết bị để bảo trì'))
+    .mockResolvedValueOnce(listResponse('maintenance'))
+    .mockResolvedValueOnce(actionResponse('Đã kết thúc chế độ bảo trì'))
+    .mockResolvedValueOnce(listResponse('provisioned'));
+
+  render(<DeviceManagement accessToken="admin-token" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Bắt đầu bảo trì' }));
+
+  expect(await screen.findByText('Đã tạm ngưng điều khiển thiết bị để bảo trì')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Hoàn tất bảo trì' })).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenNthCalledWith(
+    2,
+    '/api/admin/devices/GARDEN-001/maintenance',
+    expect.objectContaining({ method: 'POST' }),
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Hoàn tất bảo trì' }));
+  expect(await screen.findByText('Đã kết thúc chế độ bảo trì')).toBeInTheDocument();
+  expect(await screen.findByText('Đã gán chủ sở hữu')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenNthCalledWith(
+    4,
+    '/api/admin/devices/GARDEN-001/maintenance/complete',
+    expect.objectContaining({ method: 'POST' }),
+  );
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(5));
+});
+
+test('requires confirmation before decommissioning and refreshes the device status', async () => {
+  const activeDevice = {
+    id: 'GARDEN-002',
+    device_name: 'Vườn sân thượng',
+    status: 'active',
+    hardware_version: '1.0',
+    firmware_version: '2.0',
+    last_active_at: null,
+  };
+  const decommissionedDevice = { ...activeDevice, status: 'decommissioned' };
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: [activeDevice] }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, message: 'Thiết bị đã được thu hồi' }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: [decommissionedDevice] }),
+    });
+  const confirm = jest.spyOn(window, 'confirm')
+    .mockReturnValueOnce(false)
+    .mockReturnValueOnce(true);
+
+  render(<DeviceManagement accessToken="admin-token" />);
+  const decommissionButton = await screen.findByRole('button', { name: 'Thu hồi' });
+  fireEvent.click(decommissionButton);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(decommissionButton);
+  expect(await screen.findByText('Thiết bị đã được thu hồi')).toBeInTheDocument();
+  expect(await screen.findByText('Đã ngừng hoạt động')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Thu hồi' })).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenNthCalledWith(
+    2,
+    '/api/admin/devices/GARDEN-002/decommission',
+    expect.objectContaining({ method: 'POST' }),
+  );
+  expect(confirm).toHaveBeenCalledTimes(2);
+  confirm.mockRestore();
+});
