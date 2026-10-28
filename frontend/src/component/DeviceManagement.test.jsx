@@ -17,7 +17,7 @@ test('registers a device for a user through the admin API', async () => {
         data: [{
           id: 'GARDEN-001',
           device_name: 'Vườn ban công',
-          status: 'inactive',
+          status: 'registered',
           hardware_version: '1.0',
           firmware_version: '2.0',
           last_active_at: null,
@@ -40,7 +40,7 @@ test('registers a device for a user through the admin API', async () => {
         data: [{
           id: 'GARDEN-001',
           device_name: 'Vườn ban công',
-          status: 'active',
+          status: 'provisioned',
           hardware_version: '1.0',
           firmware_version: '2.0',
           last_active_at: null,
@@ -76,7 +76,7 @@ test('registers a device for a user through the admin API', async () => {
       body: JSON.stringify({ userId: 12 }),
     }),
   );
-  expect(await screen.findByText('Đã đăng ký')).toBeInTheDocument();
+  expect(await screen.findByText('Đã gán chủ sở hữu')).toBeInTheDocument();
 });
 
 test('shows the backend error when the device or user cannot be registered', async () => {
@@ -136,7 +136,7 @@ test('creates a device and displays its one-time provisioning credentials', asyn
         data: {
           id: 'AA:BB:CC:DD:EE:FF',
           device_name: 'Máy tưới ban công',
-          status: 'inactive',
+          status: 'registered',
           ble_secret_key: 'ble-secret',
           mqtt_username: 'dev_AABBCCDDEEFF',
           mqtt_password: 'mqtt-secret',
@@ -151,7 +151,7 @@ test('creates a device and displays its one-time provisioning credentials', asyn
         data: [{
           id: 'AA:BB:CC:DD:EE:FF',
           device_name: 'Máy tưới ban công',
-          status: 'inactive',
+          status: 'registered',
           hardware_version: 'ESP32',
           firmware_version: '1.0.0',
           last_active_at: null,

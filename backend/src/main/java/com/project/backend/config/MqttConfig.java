@@ -24,6 +24,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
 import com.project.backend.service.MqttCommandAcknowledgmentService;
+import com.project.backend.service.DeviceLifecycleService;
 import com.project.backend.service.impl.SensorDataServiceImpl;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -33,9 +34,13 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 public class MqttConfig {
     private static final Logger logger = LoggerFactory.getLogger(MqttConfig.class);
     private SensorDataServiceImpl sensorDataServiceImpl;
+    private final DeviceLifecycleService deviceLifecycleService;
 
-    public MqttConfig(SensorDataServiceImpl sensorDataServiceImpl) {
+    public MqttConfig(
+            SensorDataServiceImpl sensorDataServiceImpl,
+            DeviceLifecycleService deviceLifecycleService) {
         this.sensorDataServiceImpl = sensorDataServiceImpl;
+        this.deviceLifecycleService = deviceLifecycleService;
     }
 
     @Value("${app.mqtt.broker-url:}")
@@ -112,6 +117,9 @@ public class MqttConfig {
             } 
             else if (topicName.endsWith("/telemetry")) {
                 sensorDataServiceImpl.recordSensorLog(topicName, payload);
+            }
+            else if (topicName.endsWith("/status")) {
+                deviceLifecycleService.handleMqttStatus(topicName, payload);
             }
             else {
                 logger.info("MQTT message received; topic={}, payload={}", topicName, payload);

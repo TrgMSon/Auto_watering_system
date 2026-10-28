@@ -19,6 +19,7 @@ import com.project.backend.common.ApiResponse;
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
 import com.project.backend.dto.device.CommandAcknowledgmentResponse;
+import com.project.backend.dto.device.BleStatusRequest;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
@@ -27,6 +28,7 @@ import com.project.backend.dto.device.RegisterDeviceRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
 import com.project.backend.service.DeviceService;
+import com.project.backend.service.DeviceLifecycleService;
 
 import jakarta.validation.Valid;
 
@@ -34,9 +36,66 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/devices/{id}")
 public class DeviceController {
         private final DeviceService deviceService;
+        private final DeviceLifecycleService deviceLifecycleService;
 
-        public DeviceController(DeviceService deviceService) {
+        public DeviceController(
+                        DeviceService deviceService,
+                        DeviceLifecycleService deviceLifecycleService) {
                 this.deviceService = deviceService;
+                this.deviceLifecycleService = deviceLifecycleService;
+        }
+
+        @PostMapping("/ble-status")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        public ResponseEntity<ApiResponse<Void>> reportBleStatus(
+                        @PathVariable("id") String deviceId,
+                        @Valid @RequestBody BleStatusRequest request,
+                        Authentication authentication) {
+                deviceLifecycleService.reportBleStatus(
+                                deviceId, userId(authentication), request.reachable());
+                return ResponseEntity.ok(ApiResponse.success("Đã cập nhật trạng thái kiểm tra BLE", null));
+        }
+
+        @PostMapping("/viewers/{viewerId}/lock")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        public ResponseEntity<ApiResponse<Void>> lockViewer(
+                        @PathVariable("id") String deviceId,
+                        @PathVariable int viewerId,
+                        Authentication authentication) {
+                deviceLifecycleService.setViewerLocked(
+                                deviceId, userId(authentication), viewerId, true);
+                return ResponseEntity.ok(ApiResponse.success("Đã tạm khóa quyền xem thiết bị", null));
+        }
+
+        @DeleteMapping("/viewers/{viewerId}/lock")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        public ResponseEntity<ApiResponse<Void>> unlockViewer(
+                        @PathVariable("id") String deviceId,
+                        @PathVariable int viewerId,
+                        Authentication authentication) {
+                deviceLifecycleService.setViewerLocked(
+                                deviceId, userId(authentication), viewerId, false);
+                return ResponseEntity.ok(ApiResponse.success("Đã mở khóa quyền xem thiết bị", null));
+        }
+
+        @PostMapping("/maintenance")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        public ResponseEntity<ApiResponse<Void>> startOwnerMaintenance(
+                        @PathVariable("id") String deviceId,
+                        Authentication authentication) {
+                deviceLifecycleService.startMaintenance(deviceId, userId(authentication));
+                return ResponseEntity.ok(ApiResponse.success(
+                                "Đã tạm ngưng điều khiển thiết bị để bảo trì", null));
+        }
+
+        @PostMapping("/maintenance/complete")
+        @PreAuthorize("hasAnyRole('USER', 'OWNER')")
+        public ResponseEntity<ApiResponse<Void>> completeOwnerMaintenance(
+                        @PathVariable("id") String deviceId,
+                        Authentication authentication) {
+                deviceLifecycleService.completeMaintenance(deviceId, userId(authentication));
+                return ResponseEntity.ok(ApiResponse.success(
+                                "Đã kết thúc chế độ bảo trì", null));
         }
 
         @GetMapping("/config")

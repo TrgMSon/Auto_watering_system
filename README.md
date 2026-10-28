@@ -146,6 +146,11 @@ Các API thiết bị yêu cầu bearer token. Thiết bị phải thuộc ngư�
 | `DELETE` | `/api/devices/{id}/schedules/{scheduleId}` | Xóa lịch tưới |
 | `POST` | `/api/devices/{id}/register` | Gán thiết bị cho người dùng (quyền admin) |
 | `GET` | `/api/devices/{id}/commands/{commandId}/ack` | Kiểm tra trạng thái xác nhận lệnh |
+| `POST` | `/api/devices/{id}/ble-status` | Chủ sở hữu báo kết quả kiểm tra BLE bằng `{"reachable":true\|false}` |
+| `POST` | `/api/devices/{id}/viewers/{viewerId}/lock` | Chủ sở hữu tạm khóa quyền xem |
+| `DELETE` | `/api/devices/{id}/viewers/{viewerId}/lock` | Chủ sở hữu mở khóa quyền xem |
+| `POST` | `/api/devices/{id}/maintenance` | Chủ sở hữu tạm ngưng điều khiển để bảo trì |
+| `POST` | `/api/devices/{id}/maintenance/complete` | Chủ sở hữu kết thúc bảo trì |
 
 API quản trị thiết bị (yêu cầu bearer token ADMIN):
 
@@ -153,8 +158,17 @@ API quản trị thiết bị (yêu cầu bearer token ADMIN):
 | --- | --- | --- |
 | `GET` | `/api/admin/devices` | Liệt kê thiết bị, trạng thái, phiên bản phần cứng/phần mềm và lần hoạt động gần nhất |
 | `POST` | `/api/admin/devices` | Thêm thiết bị mới bằng địa chỉ MAC |
+| `POST` | `/api/admin/devices/{id}/maintenance` | Chuyển thiết bị sang bảo trì |
+| `POST` | `/api/admin/devices/{id}/maintenance/complete` | Kết thúc bảo trì |
+| `POST` | `/api/admin/devices/{id}/decommission` | Admin quyết định thu hồi quyền sử dụng, ngừng thiết bị, xóa credential backend và gỡ liên kết người dùng |
 
-Yêu cầu thêm thiết bị nhận `id` (MAC theo dạng `AA:BB:CC:DD:EE:FF`, bắt buộc), cùng các trường tùy chọn `deviceName`, `hardwareVersion`, `firmwareVersion`. Thiết bị mới có trạng thái `inactive`; backend tạo khóa BLE và MQTT ngẫu nhiên, lưu lại và trả `ble_secret_key`, `mqtt_username`, `mqtt_password` một lần trong response `201 Created` để phục vụ provisioning. MQTT username có dạng `dev_AABBCCDDEEFF`; username/password không vượt quá 55 ký tự. API liệt kê thiết bị không trả các thông tin xác thực này. Gán chủ sở hữu bằng `POST /api/devices/{id}/register` sẽ chuyển trạng thái sang `active`.
+Yêu cầu thêm thiết bị nhận `id` (MAC theo dạng `AA:BB:CC:DD:EE:FF`, bắt buộc), cùng các trường tùy chọn `deviceName`, `hardwareVersion`, `firmwareVersion`. Thiết bị mới có trạng thái `registered`; backend tạo khóa BLE và MQTT ngẫu nhiên, lưu lại và trả `ble_secret_key`, `mqtt_username`, `mqtt_password` một lần trong response `201 Created` để phục vụ provisioning. MQTT username có dạng `dev_AABBCCDDEEFF`; username/password không vượt quá 55 ký tự. API liệt kê thiết bị không trả các thông tin xác thực này. Gán chủ sở hữu bằng `POST /api/devices/{id}/register` chuyển thiết bị sang `provisioned`, không tự đánh dấu đã kết nối.
+
+Vòng đời lưu trong cột `device.status`: `registered` → `provisioned` → `active` ↔ `offline`; các trạng thái ngoại lệ gồm `fault`, `maintenance`, `decommissioned`. Thiết bị chỉ được điều khiển/cập nhật cấu hình từ xa khi `active`; chủ sở hữu có thể đọc trạng thái khi offline và điều khiển BLE tại chỗ. Sau đăng ký, thiết bị cần publish JSON `{"status":"ACTIVE","firmware_version":"1.0.0"}` lên `iot/garden/{MAC}/status` khi kết nối MQTT và publish `{"status":"OFFLINE"}` trong Last Will. Heartbeat được tính từ bản tin ACTIVE hoặc telemetry; sau 30 giây không có heartbeat, backend tự chuyển `active` thành `offline` (scheduler kiểm tra mỗi 10 giây). Bản tin `{"status":"MAINTENANCE"}` hoặc API bảo trì chuyển trạng thái sang `maintenance`. Khi kết thúc bảo trì, backend khôi phục `active` nếu heartbeat còn mới, `provisioned` nếu đã gán chủ sở hữu nhưng chưa hoạt động, hoặc `registered` nếu chưa gán.
+
+Mobile gửi kết quả BLE qua `POST /api/devices/{id}/ble-status` với `{"reachable":false}` để đánh dấu `fault`; gửi `{"reachable":true}` sau đó sẽ phục hồi về `active`, `offline` hoặc `provisioned` dựa trên heartbeat. Chủ sở hữu có thể khóa/mở quyền `viewer` riêng; tài khoản bị khóa không thấy thiết bị và tài khoản viewer không được gửi lệnh điều khiển.
+
+Chỉ quản trị viên mới được quyết định ngừng sử dụng thiết bị thông qua `POST /api/admin/devices/{id}/decommission`; chủ sở hữu không có API tự chuyển trạng thái này. Khi admin thu hồi quyền sử dụng, backend đặt trạng thái `decommissioned`, xóa khóa BLE/MQTT trong database và gỡ tất cả liên kết người dùng; các API người dùng và telemetry tiếp theo bị từ chối/loại bỏ. Tuy nhiên, backend hiện kết nối broker bằng một tài khoản MQTT dùng chung và chưa đồng bộ ACL/xóa tài khoản trên broker. Vì vậy decommission chưa thể đảm bảo broker từ chối kết nối MQTT của thiết bị nếu broker vẫn chấp nhận credential đã cấp. Cần cấu hình broker xác thực/ủy quyền theo `mqtt_username`/`mqtt_password` và đồng bộ revoke để hoàn tất bước này. MQTT topic status cũng phải được broker ACL giới hạn theo từng thiết bị; nếu không, client dùng chung quyền publish có thể giả mạo status.
 
 Yêu cầu cấu hình dùng các trường `auto_mode`, `soil_moisture_min`, `soil_moisture_max`, `max_watering_duration`, `air_humidity_min`, `air_humidity_max`, `air_temperature_min`, `air_temperature_max` và `water_level_min`. Yêu cầu chế độ tưới có dạng `{"mode":"auto"}` hoặc `{"mode":"manual"}`. Lịch tưới dùng `start_time`, `end_time`, `duration_minutes`, `days_of_week` và tùy chọn `is_enabled`.
 
