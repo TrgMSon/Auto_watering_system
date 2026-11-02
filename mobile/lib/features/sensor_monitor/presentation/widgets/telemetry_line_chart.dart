@@ -23,11 +23,13 @@ class TelemetryLineChart extends StatelessWidget {
     if (readings.isEmpty) {
       return const SizedBox(
         height: 200,
-        child: Center(child: Text('Ch\u01b0a c\u00f3 d\u1eef li\u1ec7u')),
+        child: Center(child: Text('Chưa có dữ liệu')),
       );
     }
 
-    final spots = readings.asMap().entries
+    final spots = readings
+        .asMap()
+        .entries
         .map((e) => FlSpot(e.key.toDouble(), valueExtractor(e.value)))
         .toList();
 
@@ -37,10 +39,10 @@ class TelemetryLineChart extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Text(
-            '\$title (\$unit)',
+            '$title ($unit)',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
         SizedBox(
@@ -59,9 +61,12 @@ class TelemetryLineChart extends StatelessWidget {
                   ),
                 ),
                 titlesData: FlTitlesData(
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles:
+                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles:
+                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles:
+                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -69,7 +74,8 @@ class TelemetryLineChart extends StatelessWidget {
                       getTitlesWidget: (value, meta) {
                         return Text(
                           value.toStringAsFixed(0),
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 10, color: Colors.grey),
                         );
                       },
                     ),
@@ -80,8 +86,12 @@ class TelemetryLineChart extends StatelessWidget {
                   touchTooltipData: LineTouchTooltipData(
                     getTooltipItems: (spots) => spots.map((spot) {
                       return LineTooltipItem(
-                        '\${spot.y.toStringAsFixed(1)} \$unit',
-                        TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
+                        '${spot.y.toStringAsFixed(1)} $unit',
+                        TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       );
                     }).toList(),
                   ),

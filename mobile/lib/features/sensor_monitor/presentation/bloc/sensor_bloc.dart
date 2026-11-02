@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/sensor_reading.dart';
 import '../../domain/usecases/get_realtime_readings_usecase.dart';
 import '../../domain/usecases/get_sensor_history_usecase.dart';
 import 'sensor_event.dart';
@@ -20,9 +21,7 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     on<SensorRealtimeStarted>(_onRealtimeStarted);
     on<SensorRealtimeStopped>(_onRealtimeStopped);
     on<SensorRealtimeDataReceived>(_onRealtimeDataReceived);
-    on<SensorRealtimeFailed>(
-      (event, emit) => emit(SensorError(message: event.message)),
-    );
+    on<SensorRealtimeFailed>(_onRealtimeFailed);
   }
 
   Future<void> _onHistoryRequested(
@@ -65,26 +64,47 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     _realtimeSubscription = null;
   }
 
+  void _onRealtimeFailed(
+    SensorRealtimeFailed event,
+    Emitter<SensorState> emit,
+  ) {
+    final currentState = state;
+    if (currentState is SensorLoaded) {
+      emit(currentState.copyWith(errorMessage: event.message));
+    } else {
+      emit(SensorError(message: event.message));
+    }
+  }
+
   void _onRealtimeDataReceived(
     SensorRealtimeDataReceived event,
     Emitter<SensorState> emit,
   ) {
     final currentState = state;
-    if (currentState is SensorLoaded) {
-      final buffer = List.of(currentState.realtimeBuffer)..add(event.reading);
-      if (buffer.length > _maxBufferSize) {
-        buffer.removeAt(0);
-      }
-      emit(currentState.copyWith(
-        latestReading: event.reading,
-        realtimeBuffer: buffer,
-      ));
-    } else {
+    if (currentState is! SensorLoaded) {
       emit(SensorLoaded(
         latestReading: event.reading,
         realtimeBuffer: [event.reading],
       ));
+      return;
     }
+    if (currentState.latestReading?.id == event.reading.id) {
+      if (currentState.errorMessage != null) {
+        emit(currentState.copyWith(clearErrorMessage: true));
+      }
+      return;
+    }
+    emit(_appendReading(currentState, event.reading));
+  }
+
+  SensorLoaded _appendReading(SensorLoaded current, SensorReading reading) {
+    final buffer = List.of(current.realtimeBuffer)..add(reading);
+    if (buffer.length > _maxBufferSize) buffer.removeAt(0);
+    return current.copyWith(
+      latestReading: reading,
+      realtimeBuffer: buffer,
+      clearErrorMessage: true,
+    );
   }
 
   @override

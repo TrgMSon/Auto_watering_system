@@ -79,18 +79,23 @@ class _SensorMonitorPageState extends State<SensorMonitorPage> {
   }
 
   Widget _buildLoadedBody(BuildContext context, SensorLoaded state) {
-    final chartData = state.realtimeBuffer.isNotEmpty
-        ? state.realtimeBuffer
-        : state.historyReadings;
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (state.errorMessage != null) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              state.errorMessage!,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+        ],
         if (state.latestReading != null) ...[
           _buildLatestCards(context, state.latestReading!),
           const SizedBox(height: 24),
         ],
-        _buildCharts(context, chartData),
+        _buildCharts(context, state.chartReadings),
       ],
     );
   }

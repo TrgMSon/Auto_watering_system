@@ -37,9 +37,34 @@ void main() {
     timestamp: DateTime(2026, 11, 2, 10, 5),
   );
 
+  final testReading3 = SensorReading(
+    id: 3,
+    soilMoisture: 47.0,
+    temperature: 27.0,
+    humidity: 62.0,
+    lightIntensity: 0,
+    timestamp: DateTime(2026, 11, 2, 10, 10),
+  );
+
   setUp(() {
     mockGetSensorHistory = MockGetSensorHistoryUseCase();
     mockGetRealtimeReadings = MockGetRealtimeReadingsUseCase();
+  });
+
+  group('SensorLoaded.chartReadings', () {
+    test('merges history and realtime readings without duplicates and sorted by timestamp', () {
+      final state = SensorLoaded(
+        historyReadings: [testReading1, testReading2],
+        latestReading: testReading3,
+        realtimeBuffer: [testReading2, testReading3], // testReading2 duplicated
+      );
+
+      final chart = state.chartReadings;
+      expect(chart, hasLength(3));
+      expect(chart.map((r) => r.id).toList(), equals([1, 2, 3]));
+      expect(chart[0].timestamp.isBefore(chart[1].timestamp), isTrue);
+      expect(chart[1].timestamp.isBefore(chart[2].timestamp), isTrue);
+    });
   });
 
   group('SensorBloc - SensorHistoryRequested', () {
@@ -165,6 +190,80 @@ void main() {
           latestReading: testReading2,
           realtimeBuffer: [testReading1, testReading2],
         ),
+      ],
+    );
+
+    blocTest<SensorBloc, SensorState>(
+      'ignores realtime reading when id is identical to latestReading',
+      seed: () => SensorLoaded(
+        historyReadings: [testReading1],
+        latestReading: testReading1,
+        realtimeBuffer: [testReading1],
+      ),
+      build: () => SensorBloc(
+        getSensorHistory: mockGetSensorHistory,
+        getRealtimeReadings: mockGetRealtimeReadings,
+      ),
+      act: (bloc) => bloc.add(SensorRealtimeDataReceived(reading: testReading1)),
+      expect: () => [], // No new state emitted, buffer does not grow
+    );
+  });
+
+  group('SensorBloc - SensorRealtimeFailed', () {
+    blocTest<SensorBloc, SensorState>(
+      'preserves loaded data and sets errorMessage on SensorLoaded',
+      seed: () => SensorLoaded(
+        historyReadings: [testReading1],
+        latestReading: testReading1,
+        realtimeBuffer: [testReading1],
+      ),
+      build: () => SensorBloc(
+        getSensorHistory: mockGetSensorHistory,
+        getRealtimeReadings: mockGetRealtimeReadings,
+      ),
+      act: (bloc) => bloc.add(const SensorRealtimeFailed(message: 'Timeout')),
+      expect: () => [
+        SensorLoaded(
+          historyReadings: [testReading1],
+          latestReading: testReading1,
+          realtimeBuffer: [testReading1],
+          errorMessage: 'Timeout',
+        ),
+      ],
+    );
+
+    blocTest<SensorBloc, SensorState>(
+      'clears errorMessage when new realtime data is received',
+      seed: () => SensorLoaded(
+        historyReadings: [testReading1],
+        latestReading: testReading1,
+        realtimeBuffer: [testReading1],
+        errorMessage: 'Timeout',
+      ),
+      build: () => SensorBloc(
+        getSensorHistory: mockGetSensorHistory,
+        getRealtimeReadings: mockGetRealtimeReadings,
+      ),
+      act: (bloc) => bloc.add(SensorRealtimeDataReceived(reading: testReading2)),
+      expect: () => [
+        SensorLoaded(
+          historyReadings: [testReading1],
+          latestReading: testReading2,
+          realtimeBuffer: [testReading1, testReading2],
+          errorMessage: null,
+        ),
+      ],
+    );
+
+    blocTest<SensorBloc, SensorState>(
+      'emits SensorError when realtime fails while not loaded yet',
+      build: () => SensorBloc(
+        getSensorHistory: mockGetSensorHistory,
+        getRealtimeReadings: mockGetRealtimeReadings,
+      ),
+      act: (bloc) => bloc.add(const SensorRealtimeFailed(message: 'No connection')),
+      expect: () => [
+        const SensorError(message: 'No connection'),
       ],
     );
   });
