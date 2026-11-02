@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
 import '../../../../core/widgets/app_error_widget.dart';
 import '../bloc/dashboard_bloc.dart';
@@ -52,6 +53,7 @@ class _DashboardPageState extends State<DashboardPage> {
           final selectedDevice = state.selectedDevice ?? state.devices.first;
           final telemetry = state.telemetry;
           final pumpStatus = state.pumpStatus ?? telemetry?.isPumpOn;
+          final isOnline = selectedDevice.isOnline;
 
           return Scaffold(
             appBar: AppBar(
@@ -88,13 +90,17 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Row(
                     children: [
                       Icon(
-                        state.isBleConnected ? Icons.bluetooth_connected : Icons.wifi,
-                        color: state.isBleConnected ? Colors.blueAccent : Colors.greenAccent,
+                        state.isBleConnected
+                            ? Icons.bluetooth_connected
+                            : (isOnline ? Icons.wifi : Icons.wifi_off),
+                        color: state.isBleConnected
+                            ? Colors.blueAccent
+                            : (isOnline ? Colors.greenAccent : Colors.grey),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        selectedDevice.status,
+                        isOnline ? 'Online' : 'Offline',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -152,15 +158,19 @@ class _DashboardPageState extends State<DashboardPage> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
-                                        pumpStatus == null
-                                            ? 'Chưa có trạng thái từ thiết bị'
-                                            : pumpStatus
-                                                ? 'Đang tưới nước'
-                                                : 'Đang tắt',
+                                        !isOnline
+                                            ? 'Thiết bị đang offline'
+                                            : (pumpStatus == null
+                                                ? 'Chưa có trạng thái từ thiết bị'
+                                                : (pumpStatus
+                                                    ? 'Đang tưới nước'
+                                                    : 'Đang tắt')),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: pumpStatus == true ? AppColors.primary : AppColors.textSecondary,
+                                          color: isOnline && pumpStatus == true
+                                              ? AppColors.primary
+                                              : AppColors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -181,9 +191,13 @@ class _DashboardPageState extends State<DashboardPage> {
                                 )
                               : Switch(
                                   value: pumpStatus ?? false,
-                                  onChanged: (value) {
-                                    context.read<DashboardBloc>().add(DashboardPumpToggled(value));
-                                  },
+                                  onChanged: isOnline
+                                      ? (value) {
+                                          context
+                                              .read<DashboardBloc>()
+                                              .add(DashboardPumpToggled(value));
+                                        }
+                                      : null,
                                 ),
                         ],
                       ),
@@ -193,6 +207,15 @@ class _DashboardPageState extends State<DashboardPage> {
                   
                   // Sensor Grid
                   Text('Thông số hiện tại', style: Theme.of(context).textTheme.titleMedium),
+                  if (telemetry != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Cập nhật lần cuối: ${Formatters.formatDateTime(telemetry.recordedAt)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   
                   if (state.isTelemetryEmpty)

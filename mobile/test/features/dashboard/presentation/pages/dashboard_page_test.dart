@@ -146,7 +146,7 @@ void main() {
 
       // Connection status indicator (WiFi for cloud connection)
       expect(find.byIcon(Icons.wifi), findsOneWidget);
-      expect(find.text('ONLINE'), findsOneWidget);
+      expect(find.text('Online'), findsOneWidget);
 
       // RefreshIndicator
       expect(find.byType(RefreshIndicator), findsOneWidget);
@@ -157,9 +157,11 @@ void main() {
       expect(find.byType(Switch), findsOneWidget);
       final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
       expect(pumpSwitch.value, isFalse);
+      expect(pumpSwitch.onChanged, isNotNull);
 
-      // Telemetry Section Title
+      // Telemetry Section Title & Last Updated
       expect(find.text('Thông số hiện tại'), findsOneWidget);
+      expect(find.text('Cập nhật lần cuối: 07/10/2026 10:00'), findsOneWidget);
 
       // Sensor cards titles
       expect(find.text('Độ ẩm đất'), findsOneWidget);
@@ -192,6 +194,24 @@ void main() {
 
       expect(find.byIcon(Icons.bluetooth_connected), findsOneWidget);
       expect(find.byIcon(Icons.wifi), findsNothing);
+    });
+
+    testWidgets('renders wifi_off icon, disabled switch, and offline text when device is offline', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+        telemetry: testTelemetryOff,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.byIcon(Icons.wifi_off), findsOneWidget);
+      expect(find.byIcon(Icons.wifi), findsNothing);
+      expect(find.text('Offline'), findsOneWidget);
+      expect(find.text('Thiết bị đang offline'), findsOneWidget);
+
+      final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
+      expect(pumpSwitch.onChanged, isNull);
     });
 
     testWidgets('renders loading spinner in sensor section when telemetry is null and not empty', (tester) async {
@@ -292,6 +312,25 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => mockDashboardBloc.add(const DashboardPumpToggled(false))).called(1);
+    });
+
+    testWidgets('tapping switch when device is offline does not dispatch DashboardPumpToggled', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+        telemetry: testTelemetryOff,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      final switchFinder = find.byType(Switch);
+      expect(switchFinder, findsOneWidget);
+
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mockDashboardBloc.add(any()));
     });
 
     testWidgets('selecting device from dropdown dispatches DashboardDeviceSelected', (tester) async {

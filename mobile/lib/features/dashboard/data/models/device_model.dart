@@ -35,6 +35,8 @@ class DeviceModel extends Equatable {
     };
   }
 
+  bool get isOnline => status.toUpperCase() == 'ONLINE';
+
   @override
   List<Object?> get props => [id, deviceName, status, permission, blePassKey];
 }
