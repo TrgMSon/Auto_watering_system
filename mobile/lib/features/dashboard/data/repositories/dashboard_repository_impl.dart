@@ -8,9 +8,13 @@ import '../../domain/repositories/dashboard_repository.dart';
 import '../../domain/entities/dashboard_summary.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
-  DashboardRepositoryImpl(this._apiClient);
+  DashboardRepositoryImpl(
+    this._apiClient, {
+    Duration pollInterval = const Duration(seconds: 5),
+  }) : _pollInterval = pollInterval;
 
   final ApiClient _apiClient;
+  final Duration _pollInterval;
   final Map<String, bool> _pumpStatus = {};
 
   @override
@@ -62,17 +66,23 @@ class DashboardRepositoryImpl implements DashboardRepository {
   }
 
   @override
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey) async* {
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey) async* {
     while (true) {
-      final response = await _apiClient.get(
-        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
-      );
-      if (response.isNotEmpty) {
-        yield TelemetryModel.fromJson(response).copyWith(
-          isPumpOn: _pumpStatus[deviceId],
+      try {
+        final response = await _apiClient.get(
+          '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
         );
+        if (response.isNotEmpty) {
+          yield TelemetryModel.fromJson(response).copyWith(
+            isPumpOn: _pumpStatus[deviceId],
+          );
+        } else {
+          yield null;
+        }
+      } catch (e, stackTrace) {
+        yield* Stream<TelemetryModel?>.error(e, stackTrace);
       }
-      await Future<void>.delayed(const Duration(seconds: 5));
+      await Future<void>.delayed(_pollInterval);
     }
   }
 

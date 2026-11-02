@@ -5,9 +5,13 @@ import '../../domain/entities/sensor_reading.dart';
 import '../../domain/repositories/sensor_repository.dart';
 
 class ApiSensorRepository implements SensorRepository {
-  ApiSensorRepository(this._apiClient);
+  ApiSensorRepository(
+    this._apiClient, {
+    Duration pollInterval = const Duration(seconds: 5),
+  }) : _pollInterval = pollInterval;
 
   final ApiClient _apiClient;
+  final Duration _pollInterval;
 
   Future<String?> _getDeviceId() async {
     final response = await _apiClient.get(ApiEndpoints.devices);
@@ -42,14 +46,20 @@ class ApiSensorRepository implements SensorRepository {
 
   @override
   Stream<SensorReading> getRealtimeReadings() async* {
-    final deviceId = await _getDeviceId();
-    if (deviceId == null) return;
+    String? cachedDeviceId;
     while (true) {
-      final response = await _apiClient.get(
-        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
-      );
-      if (response.isNotEmpty) yield _readingFromJson(response);
-      await Future<void>.delayed(const Duration(seconds: 5));
+      try {
+        cachedDeviceId ??= await _getDeviceId();
+        if (cachedDeviceId != null) {
+          final response = await _apiClient.get(
+            '${ApiEndpoints.devices}/${Uri.encodeComponent(cachedDeviceId)}/telemetry/latest',
+          );
+          if (response.isNotEmpty) yield _readingFromJson(response);
+        }
+      } catch (e, stackTrace) {
+        yield* Stream<SensorReading>.error(e, stackTrace);
+      }
+      await Future<void>.delayed(_pollInterval);
     }
   }
 

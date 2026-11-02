@@ -8,12 +8,13 @@ import '../../data/models/telemetry_model.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final DashboardRepository repository;
-  StreamSubscription<TelemetryModel>? _telemetrySubscription;
+  StreamSubscription<TelemetryModel?>? _telemetrySubscription;
 
   DashboardBloc({required this.repository}) : super(const DashboardInitial()) {
     on<DashboardLoadRequested>(_onLoadRequested);
     on<DashboardDeviceSelected>(_onDeviceSelected);
     on<DashboardTelemetryUpdated>(_onTelemetryUpdated);
+    on<DashboardTelemetryEmpty>(_onTelemetryEmpty);
     on<DashboardTelemetryFailed>(_onTelemetryFailed);
     on<DashboardPumpToggled>(_onPumpToggled);
   }
@@ -45,6 +46,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       emit(currentState.copyWith(
         selectedDevice: event.device,
         clearTelemetry: true,
+        isTelemetryEmpty: false,
         clearPumpStatus: true,
       ));
       _listenToTelemetry(event.device);
@@ -59,7 +61,22 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final currentState = state as DashboardLoaded;
       emit(currentState.copyWith(
         telemetry: event.telemetry,
+        isTelemetryEmpty: false,
         pumpStatus: event.telemetry.isPumpOn,
+        clearError: true,
+      ));
+    }
+  }
+
+  void _onTelemetryEmpty(
+    DashboardTelemetryEmpty event,
+    Emitter<DashboardState> emit,
+  ) {
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      emit(currentState.copyWith(
+        clearTelemetry: true,
+        isTelemetryEmpty: true,
         clearError: true,
       ));
     }
@@ -85,7 +102,6 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       emit(currentState.copyWith(isTogglingPump: true, clearError: true));
       try {
         await repository.togglePump(currentState.selectedDevice!.id, event.turnOn);
-        // We don't artificially flip the pump status here, we wait for the stream to update it
         emit(currentState.copyWith(
           isTogglingPump: false,
           pumpStatus: event.turnOn,
@@ -104,7 +120,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     _telemetrySubscription = repository
         .watchTelemetry(device.id, device.blePassKey)
         .listen((telemetry) {
-      add(DashboardTelemetryUpdated(telemetry));
+      if (telemetry == null) {
+        add(const DashboardTelemetryEmpty());
+      } else {
+        add(DashboardTelemetryUpdated(telemetry));
+      }
     }, onError: (Object error) {
       add(DashboardTelemetryFailed(error.toString()));
     });

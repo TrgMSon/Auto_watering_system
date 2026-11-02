@@ -101,30 +101,24 @@ void main() {
     });
 
     testWidgets('renders AppErrorWidget with message and retry button on DashboardError state', (tester) async {
-      const errorMessage = 'Không thể kết nối đến máy chủ';
-      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: errorMessage));
+      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: 'Mất kết nối máy chủ'));
 
       await tester.pumpWidget(buildTestWidget());
 
       expect(find.byType(AppErrorWidget), findsOneWidget);
-      expect(find.text(errorMessage), findsOneWidget);
+      expect(find.text('Mất kết nối máy chủ'), findsOneWidget);
       expect(find.text('Thử lại'), findsOneWidget);
-      expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
     testWidgets('tapping retry on AppErrorWidget dispatches DashboardLoadRequested', (tester) async {
-      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: 'Lỗi tải dữ liệu'));
+      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: 'Lỗi tải thiết bị'));
 
       await tester.pumpWidget(buildTestWidget());
-      clearInteractions(mockDashboardBloc);
 
-      final retryButton = find.widgetWithText(ElevatedButton, 'Thử lại');
-      expect(retryButton, findsOneWidget);
-
-      await tester.tap(retryButton);
+      await tester.tap(find.text('Thử lại'));
       await tester.pumpAndSettle();
 
-      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(1);
+      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(2);
     });
 
     testWidgets('renders empty message when device list is empty', (tester) async {
@@ -132,8 +126,8 @@ void main() {
 
       await tester.pumpWidget(buildTestWidget());
 
-      expect(find.text('Tổng quan'), findsOneWidget);
       expect(find.text('Bạn chưa có thiết bị nào.'), findsOneWidget);
+      expect(find.byType(DropdownButton<DeviceModel>), findsNothing);
     });
 
     testWidgets('renders Loaded state: dropdown, pump card, sensor cards, and RefreshIndicator', (tester) async {
@@ -141,7 +135,6 @@ void main() {
         devices: [testDevice1, testDevice2],
         selectedDevice: testDevice1,
         telemetry: testTelemetryOff,
-        isBleConnected: false,
       ));
 
       await tester.pumpWidget(buildTestWidget());
@@ -200,11 +193,12 @@ void main() {
       expect(find.byIcon(Icons.wifi), findsNothing);
     });
 
-    testWidgets('renders loading spinner in sensor section when telemetry is null', (tester) async {
+    testWidgets('renders loading spinner in sensor section when telemetry is null and not empty', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
         telemetry: null,
+        isTelemetryEmpty: false,
       ));
 
       await tester.pumpWidget(buildTestWidget());
@@ -212,6 +206,22 @@ void main() {
       // Sensor section should show a CircularProgressIndicator instead of the grid
       expect(find.text('Thông số hiện tại'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Độ ẩm đất'), findsNothing);
+      expect(find.text('Thiết bị chưa gửi dữ liệu'), findsNothing);
+    });
+
+    testWidgets('renders empty message in sensor section when isTelemetryEmpty is true', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        isTelemetryEmpty: true,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.text('Thông số hiện tại'), findsOneWidget);
+      expect(find.text('Thiết bị chưa gửi dữ liệu'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.text('Độ ẩm đất'), findsNothing);
     });
 

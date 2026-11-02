@@ -102,7 +102,7 @@ class MockDashboardRepository implements DashboardRepository {
   }
 
   @override
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey) async* {
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey) async* {
     final random = Random();
     while (true) {
       await Future.delayed(const Duration(seconds: 5));

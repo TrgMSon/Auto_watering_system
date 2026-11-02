@@ -134,7 +134,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.water_drop, color: AppColors.primary),
-                                ),
+                                								),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
@@ -190,11 +190,20 @@ class _DashboardPageState extends State<DashboardPage> {
                   Text('Thông số hiện tại', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 16),
                   
-                  if (telemetry == null)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: CircularProgressIndicator(),
-                    ))
+                  if (state.isTelemetryEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text('Thiết bị chưa gửi dữ liệu'),
+                      ),
+                    )
+                  else if (telemetry == null)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   else
                     GridView.count(
                       crossAxisCount: 2,

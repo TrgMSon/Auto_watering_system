@@ -1,4 +1,4 @@
-﻿import 'package:equatable/equatable.dart';
+import 'package:equatable/equatable.dart';
 import '../../data/models/device_model.dart';
 import '../../data/models/telemetry_model.dart';
 
@@ -27,6 +27,10 @@ class DashboardTelemetryUpdated extends DashboardEvent {
 
   @override
   List<Object?> get props => [telemetry];
+}
+
+class DashboardTelemetryEmpty extends DashboardEvent {
+  const DashboardTelemetryEmpty();
 }
 
 class DashboardTelemetryFailed extends DashboardEvent {

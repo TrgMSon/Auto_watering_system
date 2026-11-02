@@ -13,7 +13,7 @@ class MockDashboardRepository extends Mock implements DashboardRepository {}
 
 void main() {
   late MockDashboardRepository mockRepository;
-  late StreamController<TelemetryModel> telemetryController;
+  late StreamController<TelemetryModel?> telemetryController;
 
   final testDevice1 = DeviceModel(
     id: 'ESP_001',
@@ -52,7 +52,7 @@ void main() {
 
   setUp(() {
     mockRepository = MockDashboardRepository();
-    telemetryController = StreamController<TelemetryModel>.broadcast();
+    telemetryController = StreamController<TelemetryModel?>.broadcast();
     when(() => mockRepository.watchTelemetry(any(), any()))
         .thenAnswer((_) => telemetryController.stream);
   });
@@ -72,6 +72,8 @@ void main() {
       expect(const DashboardLoadRequested().props, isEmpty);
       expect(DashboardDeviceSelected(testDevice1).props, [testDevice1]);
       expect(DashboardTelemetryUpdated(testTelemetry1).props, [testTelemetry1]);
+      expect(const DashboardTelemetryEmpty().props, isEmpty);
+      expect(const DashboardTelemetryFailed('error').props, ['error']);
       expect(const DashboardPumpToggled(true).props, [true]);
     });
 
@@ -173,6 +175,66 @@ void main() {
             selectedDevice: testDevice1,
             telemetry: testTelemetry2,
             pumpStatus: testTelemetry2.isPumpOn,
+          ),
+        ],
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'resets isTelemetryEmpty to false when telemetry is updated',
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          isTelemetryEmpty: true,
+        ),
+        act: (bloc) => bloc.add(DashboardTelemetryUpdated(testTelemetry1)),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry1,
+            isTelemetryEmpty: false,
+            pumpStatus: testTelemetry1.isPumpOn,
+          ),
+        ],
+      );
+    });
+
+    group('DashboardTelemetryEmpty', () {
+      blocTest<DashboardBloc, DashboardState>(
+        'emits DashboardLoaded with isTelemetryEmpty: true and telemetry: null',
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+        ),
+        act: (bloc) => bloc.add(const DashboardTelemetryEmpty()),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice1,
+            telemetry: null,
+            isTelemetryEmpty: true,
+          ),
+        ],
+      );
+    });
+
+    group('DashboardTelemetryFailed', () {
+      blocTest<DashboardBloc, DashboardState>(
+        'emits DashboardLoaded with errorMessage when telemetry fails',
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+        ),
+        act: (bloc) => bloc.add(const DashboardTelemetryFailed('Network error')),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            errorMessage: 'Network error',
           ),
         ],
       );

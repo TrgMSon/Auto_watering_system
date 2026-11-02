@@ -21,6 +21,7 @@ class DashboardLoaded extends DashboardState {
   final List<DeviceModel> devices;
   final DeviceModel? selectedDevice;
   final TelemetryModel? telemetry;
+  final bool isTelemetryEmpty;
   final bool isTogglingPump;
   final bool isBleConnected;
   final bool? pumpStatus;
@@ -30,6 +31,7 @@ class DashboardLoaded extends DashboardState {
     required this.devices,
     this.selectedDevice,
     this.telemetry,
+    this.isTelemetryEmpty = false,
     this.isTogglingPump = false,
     this.isBleConnected = false,
     this.pumpStatus,
@@ -41,6 +43,7 @@ class DashboardLoaded extends DashboardState {
     DeviceModel? selectedDevice,
     TelemetryModel? telemetry,
     bool clearTelemetry = false,
+    bool? isTelemetryEmpty,
     bool? isTogglingPump,
     bool? isBleConnected,
     bool? pumpStatus,
@@ -52,6 +55,7 @@ class DashboardLoaded extends DashboardState {
       devices: devices ?? this.devices,
       selectedDevice: selectedDevice ?? this.selectedDevice,
       telemetry: clearTelemetry ? null : (telemetry ?? this.telemetry),
+      isTelemetryEmpty: isTelemetryEmpty ?? (clearTelemetry ? false : this.isTelemetryEmpty),
       isTogglingPump: isTogglingPump ?? this.isTogglingPump,
       isBleConnected: isBleConnected ?? this.isBleConnected,
       pumpStatus: clearPumpStatus ? null : (pumpStatus ?? this.pumpStatus),
@@ -64,6 +68,7 @@ class DashboardLoaded extends DashboardState {
         devices,
         selectedDevice,
         telemetry,
+        isTelemetryEmpty,
         isTogglingPump,
         isBleConnected,
         pumpStatus,
