@@ -287,5 +287,61 @@ void main() {
       final readUser = await apiClient.readUser();
       expect(readUser, equals(userMap));
     });
+
+    test('refresh failure due to network error retains tokens and does not emit sessionExpired', () async {
+      when(() => mockSecureStorage.read(key: 'refresh_token'))
+          .thenAnswer((_) async => 'existing_refresh_token');
+
+      when(() => mockHttpClient.send(any())).thenThrow(
+        const SocketException('No route to host'),
+      );
+
+      var sessionExpiredFired = false;
+      final sub = apiClient.sessionExpired.listen((_) {
+        sessionExpiredFired = true;
+      });
+
+      final refreshed = await apiClient.refreshSession();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(refreshed, isFalse);
+      expect(sessionExpiredFired, isFalse);
+      verifyNever(() => mockSecureStorage.delete(key: any(named: 'key')));
+
+      await sub.cancel();
+    });
+
+    test('refresh failure with 401/403 clears tokens and emits sessionExpired', () async {
+      when(() => mockSecureStorage.read(key: 'access_token'))
+          .thenAnswer((_) async => null);
+      when(() => mockSecureStorage.read(key: 'refresh_token'))
+          .thenAnswer((_) async => 'expired_refresh_token');
+      when(() => mockSecureStorage.delete(key: any(named: 'key')))
+          .thenAnswer((_) async {});
+
+      when(() => mockHttpClient.send(any())).thenAnswer((_) async {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(jsonEncode({'success': false, 'message': 'Refresh token expired'}))),
+          401,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      var sessionExpiredFired = false;
+      final sub = apiClient.sessionExpired.listen((_) {
+        sessionExpiredFired = true;
+      });
+
+      final refreshed = await apiClient.refreshSession();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(refreshed, isFalse);
+      expect(sessionExpiredFired, isTrue);
+      verify(() => mockSecureStorage.delete(key: 'access_token')).called(1);
+      verify(() => mockSecureStorage.delete(key: 'refresh_token')).called(1);
+      verify(() => mockSecureStorage.delete(key: 'current_user')).called(1);
+
+      await sub.cancel();
+    });
   });
 }

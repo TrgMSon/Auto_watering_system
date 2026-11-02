@@ -23,6 +23,7 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     on<SensorRealtimeStopped>(_onRealtimeStopped);
     on<SensorRealtimeDataReceived>(_onRealtimeDataReceived);
     on<SensorRealtimeFailed>(_onRealtimeFailed);
+    on<SensorResetRequested>(_onResetRequested);
   }
 
   Future<void> _onHistoryRequested(
@@ -110,6 +111,16 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
       realtimeBuffer: buffer,
       clearErrorMessage: true,
     );
+  }
+
+  void _onResetRequested(
+    SensorResetRequested event,
+    Emitter<SensorState> emit,
+  ) {
+    _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
+    _activeHistoryRequestId++;
+    emit(const SensorInitial());
   }
 
   @override

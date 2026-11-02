@@ -50,3 +50,7 @@ class DashboardPumpToggled extends DashboardEvent {
   @override
   List<Object?> get props => [turnOn, durationSeconds];
 }
+
+class DashboardResetRequested extends DashboardEvent {
+  const DashboardResetRequested();
+}

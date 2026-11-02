@@ -73,6 +73,7 @@ Future<void> configureDependencies() async {
     loginUseCase: getIt<LoginUseCase>(),
     logoutUseCase: getIt<LogoutUseCase>(),
     getCurrentUserUseCase: getIt<GetCurrentUserUseCase>(),
+    sessionExpiredStream: getIt<ApiClient>().sessionExpired,
   ));
 
   getIt.registerFactory(() => DashboardBloc(

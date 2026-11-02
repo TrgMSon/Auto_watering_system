@@ -41,6 +41,11 @@ class ApiClient {
   /// Completer đóng vai trò khóa đồng bộ tránh Race Condition khi nhiều request 401 đồng thời
   Completer<bool>? _refreshCompleter;
 
+  final StreamController<void> _sessionExpiredController =
+      StreamController<void>.broadcast();
+
+  Stream<void> get sessionExpired => _sessionExpiredController.stream;
+
   // --- Public HTTP Methods ---
 
   Future<Map<String, dynamic>> get(
@@ -175,9 +180,13 @@ class ApiClient {
     final refreshToken = await _storage.read(key: _refreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) {
       await clearTokens();
+      _sessionExpiredController.add(null);
       return false;
     }
+    return _sendRefreshRequest(refreshToken);
+  }
 
+  Future<bool> _sendRefreshRequest(String refreshToken) async {
     try {
       final response = await _send(
         'POST',
@@ -185,20 +194,26 @@ class ApiClient {
         body: {'refreshToken': refreshToken},
         retryUnauthorized: false,
       );
-
-      final accessToken = response['accessToken']?.toString();
-      final rotatedRefreshToken = response['refreshToken']?.toString();
-      if (accessToken == null || rotatedRefreshToken == null) {
+      return await _saveRefreshedTokens(response);
+    } on ApiException catch (e) {
+      if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
         await clearTokens();
-        return false;
+        _sessionExpiredController.add(null);
       }
-
-      await saveTokens(accessToken, rotatedRefreshToken);
-      return true;
-    } on ApiException {
-      await clearTokens();
       return false;
     }
+  }
+
+  Future<bool> _saveRefreshedTokens(Map<String, dynamic> response) async {
+    final accessToken = response['accessToken']?.toString();
+    final rotatedRefreshToken = response['refreshToken']?.toString();
+    if (accessToken == null || rotatedRefreshToken == null) {
+      await clearTokens();
+      _sessionExpiredController.add(null);
+      return false;
+    }
+    await saveTokens(accessToken, rotatedRefreshToken);
+    return true;
   }
 
   Map<String, dynamic> _processResponse(http.Response response) {
@@ -267,5 +282,9 @@ class ApiClient {
     } on FormatException {
       return null;
     }
+  }
+
+  void dispose() {
+    _sessionExpiredController.close();
   }
 }

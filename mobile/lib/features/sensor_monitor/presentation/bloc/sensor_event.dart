@@ -50,3 +50,7 @@ class SensorRealtimeFailed extends SensorEvent {
   @override
   List<Object?> get props => [message];
 }
+
+class SensorResetRequested extends SensorEvent {
+  const SensorResetRequested();
+}

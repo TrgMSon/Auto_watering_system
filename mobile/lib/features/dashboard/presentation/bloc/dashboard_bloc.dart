@@ -22,6 +22,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     on<DashboardTelemetryEmpty>(_onTelemetryEmpty);
     on<DashboardTelemetryFailed>(_onTelemetryFailed);
     on<DashboardPumpToggled>(_onPumpToggled);
+    on<DashboardResetRequested>(_onResetRequested);
   }
 
   Future<void> _onLoadRequested(
@@ -234,6 +235,15 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     }, onError: (Object error) {
       add(DashboardTelemetryFailed(error.toString()));
     });
+  }
+
+  void _onResetRequested(
+    DashboardResetRequested event,
+    Emitter<DashboardState> emit,
+  ) {
+    _telemetrySubscription?.cancel();
+    _telemetrySubscription = null;
+    emit(const DashboardInitial());
   }
 
   @override

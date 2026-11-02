@@ -689,5 +689,27 @@ void main() {
         },
       );
     });
+
+    group('DashboardResetRequested', () {
+      test('cancels active telemetry polling and resets state to DashboardInitial', () async {
+        when(() => mockRepository.getDevices())
+            .thenAnswer((_) async => [testDevice1]);
+
+        final bloc = DashboardBloc(repository: mockRepository);
+        bloc.add(const DashboardLoadRequested());
+        await pumpEventQueue();
+
+        expect(bloc.state, isA<DashboardLoaded>());
+        expect(telemetryController.hasListener, isTrue);
+
+        bloc.add(const DashboardResetRequested());
+        await pumpEventQueue();
+
+        expect(bloc.state, equals(const DashboardInitial()));
+        expect(telemetryController.hasListener, isFalse);
+
+        await bloc.close();
+      });
+    });
   });
 }

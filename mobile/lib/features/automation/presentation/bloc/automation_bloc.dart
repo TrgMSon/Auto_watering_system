@@ -12,6 +12,14 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
     on<AutomationScheduleAdded>(_onScheduleAdded);
     on<AutomationScheduleUpdated>(_onScheduleUpdated);
     on<AutomationScheduleDeleted>(_onScheduleDeleted);
+    on<AutomationResetRequested>(_onResetRequested);
+  }
+
+  void _onResetRequested(
+    AutomationResetRequested event,
+    Emitter<AutomationState> emit,
+  ) {
+    emit(const AutomationInitial());
   }
 
   Future<void> _onLoadRequested(

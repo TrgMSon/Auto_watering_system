@@ -321,4 +321,31 @@ void main() {
       ],
     );
   });
+
+  group('SensorBloc - SensorResetRequested', () {
+    test('cancels active realtime polling and resets state to SensorInitial', () async {
+      final controller = StreamController<SensorReading>();
+      when(() => mockGetRealtimeReadings('ESP_001'))
+          .thenAnswer((_) => controller.stream);
+
+      final bloc = SensorBloc(
+        getSensorHistory: mockGetSensorHistory,
+        getRealtimeReadings: mockGetRealtimeReadings,
+      );
+
+      bloc.add(const SensorRealtimeStarted(deviceId: 'ESP_001'));
+      await pumpEventQueue();
+
+      expect(controller.hasListener, isTrue);
+
+      bloc.add(const SensorResetRequested());
+      await pumpEventQueue();
+
+      expect(bloc.state, equals(const SensorInitial()));
+      expect(controller.hasListener, isFalse);
+
+      await bloc.close();
+      await controller.close();
+    });
+  });
 }
