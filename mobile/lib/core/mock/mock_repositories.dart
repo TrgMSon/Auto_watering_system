@@ -135,7 +135,11 @@ class MockSensorRepository implements SensorRepository {
   Timer? _timer;
 
   @override
-  Future<List<SensorReading>> getSensorHistory({required DateTime from, required DateTime to}) async {
+  Future<List<SensorReading>> getSensorHistory({
+    required String deviceId,
+    required DateTime from,
+    required DateTime to,
+  }) async {
     await Future.delayed(const Duration(seconds: 1));
     final list = <SensorReading>[];
     var current = from;
@@ -154,7 +158,7 @@ class MockSensorRepository implements SensorRepository {
   }
 
   @override
-  Stream<SensorReading> getRealtimeReadings() {
+  Stream<SensorReading> getRealtimeReadings(String deviceId) {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!_controller.isClosed) {

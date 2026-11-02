@@ -1,6 +1,5 @@
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/api_client.dart';
-import '../../../dashboard/data/models/device_model.dart';
 import '../../domain/entities/sensor_reading.dart';
 import '../../domain/repositories/sensor_repository.dart';
 
@@ -13,22 +12,13 @@ class ApiSensorRepository implements SensorRepository {
   final ApiClient _apiClient;
   final Duration _pollInterval;
 
-  Future<String?> _getDeviceId() async {
-    final response = await _apiClient.get(ApiEndpoints.devices);
-    final rows = response['data'];
-    if (rows is! List || rows.isEmpty) return null;
-    final first = rows.first;
-    if (first is! Map<String, dynamic>) return null;
-    return DeviceModel.fromJson(first).id;
-  }
-
   @override
   Future<List<SensorReading>> getSensorHistory({
+    required String deviceId,
     required DateTime from,
     required DateTime to,
   }) async {
-    final deviceId = await _getDeviceId();
-    if (deviceId == null) return const [];
+    if (deviceId.isEmpty) return const [];
     final response = await _apiClient.get(
       '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry',
       queryParameters: {
@@ -45,17 +35,14 @@ class ApiSensorRepository implements SensorRepository {
   }
 
   @override
-  Stream<SensorReading> getRealtimeReadings() async* {
-    String? cachedDeviceId;
+  Stream<SensorReading> getRealtimeReadings(String deviceId) async* {
+    if (deviceId.isEmpty) return;
     while (true) {
       try {
-        cachedDeviceId ??= await _getDeviceId();
-        if (cachedDeviceId != null) {
-          final response = await _apiClient.get(
-            '${ApiEndpoints.devices}/${Uri.encodeComponent(cachedDeviceId)}/telemetry/latest',
-          );
-          if (response.isNotEmpty) yield _readingFromJson(response);
-        }
+        final response = await _apiClient.get(
+          '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
+        );
+        if (response.isNotEmpty) yield _readingFromJson(response);
       } catch (e, stackTrace) {
         yield* Stream<SensorReading>.error(e, stackTrace);
       }

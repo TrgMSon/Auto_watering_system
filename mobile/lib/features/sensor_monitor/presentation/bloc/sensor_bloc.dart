@@ -31,7 +31,11 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
   ) async {
     emit(const SensorLoading());
     try {
-      final readings = await getSensorHistory(from: event.from, to: event.to);
+      final readings = await getSensorHistory(
+        deviceId: event.deviceId,
+        from: event.from,
+        to: event.to,
+      );
       emit(SensorLoaded(
         historyReadings: readings,
         latestReading: readings.isNotEmpty ? readings.last : null,
@@ -46,7 +50,7 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     Emitter<SensorState> emit,
   ) {
     _realtimeSubscription?.cancel();
-    _realtimeSubscription = getRealtimeReadings().listen(
+    _realtimeSubscription = getRealtimeReadings(event.deviceId).listen(
       (reading) => add(SensorRealtimeDataReceived(reading: reading)),
       onError: (Object error) =>
           add(SensorRealtimeFailed(message: error.toString())),

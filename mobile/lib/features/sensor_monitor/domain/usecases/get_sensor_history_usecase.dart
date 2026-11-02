@@ -6,7 +6,13 @@ class GetSensorHistoryUseCase {
   const GetSensorHistoryUseCase(this.repository);
 
   Future<List<SensorReading>> call({
+    required String deviceId,
     required DateTime from,
     required DateTime to,
-  }) => repository.getSensorHistory(from: from, to: to);
+  }) =>
+      repository.getSensorHistory(
+        deviceId: deviceId,
+        from: from,
+        to: to,
+      );
 }
