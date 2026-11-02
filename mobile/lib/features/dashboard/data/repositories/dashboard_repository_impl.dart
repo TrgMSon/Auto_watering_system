@@ -15,7 +15,13 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
   final ApiClient _apiClient;
   final Duration _pollInterval;
-  final Map<String, bool> _pumpStatus = {};
+  final Map<String, DateTime> _pumpOffAt = {};
+
+  bool? _isPumpOn(String deviceId) {
+    final offAt = _pumpOffAt[deviceId];
+    if (offAt == null) return null;
+    return DateTime.now().isBefore(offAt);
+  }
 
   @override
   Future<List<DeviceModel>> getDevices() async {
@@ -49,7 +55,11 @@ class DashboardRepositoryImpl implements DashboardRepository {
       );
       final status = acknowledgment['status']?.toString().toUpperCase();
       if (status == 'SUCCEEDED') {
-        _pumpStatus[deviceId] = turnOn;
+        if (turnOn) {
+          _pumpOffAt[deviceId] = DateTime.now().add(Duration(seconds: duration));
+        } else {
+          _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+        }
         return;
       }
       if (status == 'FAILED' || status == 'PUBLISH_FAILED') {
@@ -73,8 +83,15 @@ class DashboardRepositoryImpl implements DashboardRepository {
           '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
         );
         if (response.isNotEmpty) {
-          yield TelemetryModel.fromJson(response).copyWith(
-            isPumpOn: _pumpStatus[deviceId],
+          final model = TelemetryModel.fromJson(response);
+          yield TelemetryModel(
+            deviceId: model.deviceId,
+            soilMoisture: model.soilMoisture,
+            temperature: model.temperature,
+            humidity: model.humidity,
+            waterLevel: model.waterLevel,
+            isPumpOn: _isPumpOn(deviceId),
+            recordedAt: model.recordedAt,
           );
         } else {
           yield null;

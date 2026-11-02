@@ -8,9 +8,14 @@ import '../../data/models/telemetry_model.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final DashboardRepository repository;
+  final DateTime Function() _now;
   StreamSubscription<TelemetryModel?>? _telemetrySubscription;
 
-  DashboardBloc({required this.repository}) : super(const DashboardInitial()) {
+  DashboardBloc({
+    required this.repository,
+    DateTime Function()? now,
+  })  : _now = now ?? DateTime.now,
+        super(const DashboardInitial()) {
     on<DashboardLoadRequested>(_onLoadRequested);
     on<DashboardDeviceSelected>(_onDeviceSelected);
     on<DashboardTelemetryUpdated>(_onTelemetryUpdated);
@@ -99,6 +104,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       clearTelemetry: true,
       isTelemetryEmpty: false,
       clearPumpStatus: true,
+      clearPumpOffAt: true,
       isRefreshing: false,
     ));
     _listenToTelemetry(newSelectedDevice);
@@ -115,6 +121,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         clearTelemetry: true,
         isTelemetryEmpty: false,
         clearPumpStatus: true,
+        clearPumpOffAt: true,
       ));
       _listenToTelemetry(event.device);
     }
@@ -126,10 +133,12 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   ) {
     if (state is DashboardLoaded) {
       final currentState = state as DashboardLoaded;
+      final isPumpTurnedOff = event.telemetry.isPumpOn == false;
       emit(currentState.copyWith(
         telemetry: event.telemetry,
         isTelemetryEmpty: false,
         pumpStatus: event.telemetry.isPumpOn,
+        clearPumpOffAt: isPumpTurnedOff,
         clearError: true,
       ));
     }
@@ -162,24 +171,54 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     DashboardPumpToggled event,
     Emitter<DashboardState> emit,
   ) async {
-    if (state is DashboardLoaded) {
-      final currentState = state as DashboardLoaded;
-      if (currentState.selectedDevice == null) return;
-      
-      emit(currentState.copyWith(isTogglingPump: true, clearError: true));
-      try {
-        await repository.togglePump(currentState.selectedDevice!.id, event.turnOn);
-        emit(currentState.copyWith(
-          isTogglingPump: false,
-          pumpStatus: event.turnOn,
-        ));
-      } catch (e) {
-        emit(currentState.copyWith(
-          isTogglingPump: false,
-          errorMessage: e.toString(),
-        ));
-      }
+    if (state is! DashboardLoaded) return;
+    final currentState = state as DashboardLoaded;
+    final targetDevice = currentState.selectedDevice;
+    if (targetDevice == null) return;
+
+    final duration = event.turnOn ? (event.durationSeconds ?? 120) : 0;
+    emit(currentState.copyWith(isTogglingPump: true, clearPumpError: true));
+    try {
+      await repository.togglePump(targetDevice.id, event.turnOn, duration: duration);
+      _handlePumpSuccess(targetDevice, event.turnOn, duration, currentState, emit);
+    } catch (e) {
+      _handlePumpFailure(e, currentState, emit);
     }
+  }
+
+  void _handlePumpSuccess(
+    DeviceModel targetDevice,
+    bool turnOn,
+    int duration,
+    DashboardLoaded fallbackState,
+    Emitter<DashboardState> emit,
+  ) {
+    final latestState = _currentLoadedState(fallbackState);
+    if (latestState.selectedDevice?.id != targetDevice.id) {
+      emit(latestState.copyWith(isTogglingPump: false));
+      return;
+    }
+    final calculatedPumpOffAt = turnOn
+        ? _now().add(Duration(seconds: duration))
+        : null;
+    emit(latestState.copyWith(
+      isTogglingPump: false,
+      pumpStatus: turnOn,
+      pumpOffAt: calculatedPumpOffAt,
+      clearPumpOffAt: !turnOn,
+    ));
+  }
+
+  void _handlePumpFailure(
+    Object error,
+    DashboardLoaded fallbackState,
+    Emitter<DashboardState> emit,
+  ) {
+    final latestState = _currentLoadedState(fallbackState);
+    emit(latestState.copyWith(
+      isTogglingPump: false,
+      pumpErrorMessage: error.toString(),
+    ));
   }
 
   void _listenToTelemetry(DeviceModel device) {

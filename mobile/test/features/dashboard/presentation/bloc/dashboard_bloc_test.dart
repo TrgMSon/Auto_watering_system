@@ -74,7 +74,7 @@ void main() {
       expect(DashboardTelemetryUpdated(testTelemetry1).props, [testTelemetry1]);
       expect(const DashboardTelemetryEmpty().props, isEmpty);
       expect(const DashboardTelemetryFailed('error').props, ['error']);
-      expect(const DashboardPumpToggled(true).props, [true]);
+      expect(const DashboardPumpToggled(true, durationSeconds: 60).props, [true, 60]);
     });
 
     test('DashboardLoaded props equality and copyWith isRefreshing', () {
@@ -82,8 +82,14 @@ void main() {
         devices: [testDevice1],
         isRefreshing: false,
       );
-      final refreshingLoaded = initialLoaded.copyWith(isRefreshing: true);
+      final refreshingLoaded = initialLoaded.copyWith(
+        isRefreshing: true,
+        pumpOffAt: DateTime(2026, 11, 2, 12, 0),
+        pumpErrorMessage: 'Err',
+      );
       expect(refreshingLoaded.isRefreshing, isTrue);
+      expect(refreshingLoaded.pumpOffAt, equals(DateTime(2026, 11, 2, 12, 0)));
+      expect(refreshingLoaded.pumpErrorMessage, equals('Err'));
       expect(initialLoaded == refreshingLoaded, isFalse);
     });
 
@@ -488,19 +494,25 @@ void main() {
     });
 
     group('DashboardPumpToggled', () {
+      final fixedNow = DateTime(2026, 11, 2, 12, 0, 0);
+      Completer<void>? togglePumpCompleter;
+
       blocTest<DashboardBloc, DashboardState>(
-        'emits [isTogglingPump: true, isTogglingPump: false] on success',
+        'emits [isTogglingPump: true, isTogglingPump: false] with pumpOffAt on success',
         build: () {
-          when(() => mockRepository.togglePump(testDevice1.id, true))
+          when(() => mockRepository.togglePump(testDevice1.id, true, duration: any(named: 'duration')))
               .thenAnswer((_) async {});
-          return DashboardBloc(repository: mockRepository);
+          return DashboardBloc(
+            repository: mockRepository,
+            now: () => fixedNow,
+          );
         },
         seed: () => DashboardLoaded(
           devices: [testDevice1],
           selectedDevice: testDevice1,
           telemetry: testTelemetry1,
         ),
-        act: (bloc) => bloc.add(const DashboardPumpToggled(true)),
+        act: (bloc) => bloc.add(const DashboardPumpToggled(true, durationSeconds: 60)),
         expect: () => [
           DashboardLoaded(
             devices: [testDevice1],
@@ -514,17 +526,18 @@ void main() {
             telemetry: testTelemetry1,
             isTogglingPump: false,
             pumpStatus: true,
+            pumpOffAt: fixedNow.add(const Duration(seconds: 60)),
           ),
         ],
         verify: (_) {
-          verify(() => mockRepository.togglePump(testDevice1.id, true)).called(1);
+          verify(() => mockRepository.togglePump(testDevice1.id, true, duration: 60)).called(1);
         },
       );
 
       blocTest<DashboardBloc, DashboardState>(
-        'resets isTogglingPump to false when togglePump throws exception',
+        'resets isTogglingPump to false and sets pumpErrorMessage when togglePump throws exception',
         build: () {
-          when(() => mockRepository.togglePump(testDevice1.id, false))
+          when(() => mockRepository.togglePump(testDevice1.id, false, duration: any(named: 'duration')))
               .thenThrow(Exception('Device offline'));
           return DashboardBloc(repository: mockRepository);
         },
@@ -546,12 +559,123 @@ void main() {
             selectedDevice: testDevice1,
             telemetry: testTelemetry2,
             isTogglingPump: false,
-            errorMessage: 'Exception: Device offline',
+            pumpErrorMessage: 'Exception: Device offline',
           ),
         ],
         verify: (_) {
-          verify(() => mockRepository.togglePump(testDevice1.id, false)).called(1);
+          verify(() => mockRepository.togglePump(testDevice1.id, false, duration: 0)).called(1);
         },
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'telemetry received while awaiting togglePump is not lost when togglePump completes',
+        setUp: () {
+          togglePumpCompleter = Completer<void>();
+          when(() => mockRepository.togglePump(testDevice1.id, true, duration: any(named: 'duration')))
+              .thenAnswer((_) => togglePumpCompleter!.future);
+        },
+        build: () => DashboardBloc(
+          repository: mockRepository,
+          now: () => fixedNow,
+        ),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+        ),
+        act: (bloc) async {
+          bloc.add(const DashboardPumpToggled(true, durationSeconds: 120));
+          await Future<void>.delayed(Duration.zero);
+          bloc.add(DashboardTelemetryUpdated(testTelemetry2));
+          await Future<void>.delayed(Duration.zero);
+          togglePumpCompleter!.complete();
+        },
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry1,
+            isTogglingPump: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry2,
+            pumpStatus: testTelemetry2.isPumpOn,
+            isTogglingPump: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry2,
+            pumpStatus: true,
+            pumpOffAt: fixedNow.add(const Duration(seconds: 120)),
+            isTogglingPump: false,
+          ),
+        ],
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'pumpErrorMessage is not erased when new telemetry arrives',
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+          pumpErrorMessage: 'Exception: Command timeout',
+        ),
+        act: (bloc) => bloc.add(DashboardTelemetryUpdated(testTelemetry2)),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry2,
+            pumpStatus: testTelemetry2.isPumpOn,
+            pumpErrorMessage: 'Exception: Command timeout',
+          ),
+        ],
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'switching device while awaiting togglePump does not overwrite the new device state',
+        setUp: () {
+          togglePumpCompleter = Completer<void>();
+          when(() => mockRepository.togglePump(testDevice1.id, true, duration: any(named: 'duration')))
+              .thenAnswer((_) => togglePumpCompleter!.future);
+        },
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+        ),
+        act: (bloc) async {
+          bloc.add(const DashboardPumpToggled(true));
+          await Future<void>.delayed(Duration.zero);
+          bloc.add(DashboardDeviceSelected(testDevice2));
+          await Future<void>.delayed(Duration.zero);
+          togglePumpCompleter!.complete();
+        },
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry1,
+            isTogglingPump: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: null,
+            isTogglingPump: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: null,
+            isTogglingPump: false,
+          ),
+        ],
       );
 
       blocTest<DashboardBloc, DashboardState>(
@@ -561,7 +685,7 @@ void main() {
         act: (bloc) => bloc.add(const DashboardPumpToggled(true)),
         expect: () => [],
         verify: (_) {
-          verifyNever(() => mockRepository.togglePump(any(), any()));
+          verifyNever(() => mockRepository.togglePump(any(), any(), duration: any(named: 'duration')));
         },
       );
     });

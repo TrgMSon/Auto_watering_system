@@ -246,7 +246,7 @@ void main() {
       expect(find.text('Độ ẩm đất'), findsNothing);
     });
 
-    testWidgets('renders loading spinner replacing switch when isTogglingPump is true', (tester) async {
+    testWidgets('renders loading spinner replacing switch and pending text when isTogglingPump is true', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
@@ -258,6 +258,7 @@ void main() {
 
       expect(find.byType(Switch), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Đang chờ thiết bị xác nhận...'), findsOneWidget);
     });
 
     testWidgets('renders active pump status text when isPumpOn is true', (tester) async {
@@ -273,10 +274,24 @@ void main() {
       final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
       expect(pumpSwitch.value, isTrue);
     });
+
+    testWidgets('renders countdown text when pump is on and pumpOffAt is set', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOn,
+        pumpStatus: true,
+        pumpOffAt: DateTime.now().add(const Duration(seconds: 120)),
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.textContaining('Còn '), findsOneWidget);
+    });
   });
 
   group('DashboardPage User Interactions', () {
-    testWidgets('tapping switch when pump is OFF dispatches DashboardPumpToggled(true)', (tester) async {
+    testWidgets('tapping switch when pump is OFF opens bottom sheet and selecting duration dispatches DashboardPumpToggled', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
@@ -292,7 +307,82 @@ void main() {
       await tester.tap(switchFinder);
       await tester.pumpAndSettle();
 
-      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true))).called(1);
+      expect(find.text('Chọn thời gian bơm'), findsOneWidget);
+      await tester.tap(find.text('2 phút (mặc định)'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true, durationSeconds: 120))).called(1);
+    });
+
+    testWidgets('selecting 1 minute in bottom sheet dispatches DashboardPumpToggled with 60 seconds', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      final switchFinder = find.byType(Switch);
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('1 phút'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true, durationSeconds: 60))).called(1);
+    });
+
+    testWidgets('dismissing bottom sheet without selection does not dispatch DashboardPumpToggled', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      final switchFinder = find.byType(Switch);
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chọn thời gian bơm'), findsOneWidget);
+
+      // Tap outside to dismiss modal bottom sheet
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mockDashboardBloc.add(any()));
+    });
+
+    testWidgets('shows SnackBar when pumpErrorMessage is emitted', (tester) async {
+      final stateController = StreamController<DashboardState>.broadcast();
+      addTearDown(stateController.close);
+
+      whenListen(
+        mockDashboardBloc,
+        stateController.stream,
+        initialState: DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetryOff,
+        ),
+      );
+
+      await tester.pumpWidget(buildTestWidget());
+
+      stateController.add(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        pumpErrorMessage: 'Thiết bị từ chối lệnh bơm.',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Thiết bị từ chối lệnh bơm.'), findsOneWidget);
     });
 
     testWidgets('tapping switch when pump is ON dispatches DashboardPumpToggled(false)', (tester) async {

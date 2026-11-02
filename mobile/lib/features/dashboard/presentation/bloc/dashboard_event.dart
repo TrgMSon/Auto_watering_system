@@ -43,8 +43,10 @@ class DashboardTelemetryFailed extends DashboardEvent {
 
 class DashboardPumpToggled extends DashboardEvent {
   final bool turnOn;
-  const DashboardPumpToggled(this.turnOn);
+  final int? durationSeconds;
+
+  const DashboardPumpToggled(this.turnOn, {this.durationSeconds});
 
   @override
-  List<Object?> get props => [turnOn];
+  List<Object?> get props => [turnOn, durationSeconds];
 }

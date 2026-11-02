@@ -89,6 +89,53 @@ void main() {
       expect(data, hasLength(1));
       expect(data.first, isNull);
     });
+
+    test('isPumpOn becomes true when pump is turned on, and false after duration expires', () async {
+      when(() => mockApiClient.post(any(), body: any(named: 'body'))).thenAnswer((_) async => {
+        'command_id': 'cmd-1',
+      });
+      when(() => mockApiClient.get(any())).thenAnswer((invocation) async {
+        final path = invocation.positionalArguments[0] as String;
+        if (path.contains('/ack')) {
+          return {'status': 'SUCCEEDED'};
+        }
+        return {
+          'device_id': 'ESP_001',
+          'soil_moisture': 45.0,
+          'temperature': 25.0,
+          'humidity': 60.0,
+          'water_level': 80.0,
+          'recorded_at': DateTime.now().toIso8601String(),
+        };
+      });
+
+      final repository = DashboardRepositoryImpl(
+        mockApiClient,
+        pollInterval: const Duration(milliseconds: 20),
+      );
+
+      // Duration: 1 second
+      await repository.togglePump('ESP_001', true, duration: 1);
+
+      final stream = repository.watchTelemetry('ESP_001', null);
+      final readings = <TelemetryModel?>[];
+      final completer = Completer<void>();
+
+      final subscription = stream.listen((telemetry) {
+        readings.add(telemetry);
+        if (readings.any((r) => r?.isPumpOn == true) &&
+            readings.any((r) => r?.isPumpOn == false) &&
+            !completer.isCompleted) {
+          completer.complete();
+        }
+      });
+
+      await completer.future.timeout(const Duration(seconds: 3));
+      await subscription.cancel();
+
+      expect(readings.any((r) => r?.isPumpOn == true), isTrue);
+      expect(readings.last?.isPumpOn, isFalse);
+    });
   });
 }
 

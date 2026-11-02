@@ -51,7 +51,13 @@ class MockAuthRepository implements AuthRepository {
 
 class MockDashboardRepository implements DashboardRepository {
   bool _isAutoWatering = false;
-  bool _isPumpOn = false;
+  final Map<String, DateTime> _pumpOffAt = {};
+
+  bool? _isPumpOn(String deviceId) {
+    final offAt = _pumpOffAt[deviceId];
+    if (offAt == null) return null;
+    return DateTime.now().isBefore(offAt);
+  }
 
   @override
   Future<DashboardSummary> getDashboardSummary() async {
@@ -98,7 +104,11 @@ class MockDashboardRepository implements DashboardRepository {
   @override
   Future<void> togglePump(String deviceId, bool turnOn, {int duration = 120}) async {
     await Future.delayed(const Duration(milliseconds: 600));
-    _isPumpOn = turnOn;
+    if (turnOn) {
+      _pumpOffAt[deviceId] = DateTime.now().add(Duration(seconds: duration));
+    } else {
+      _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+    }
   }
 
   @override
@@ -112,7 +122,7 @@ class MockDashboardRepository implements DashboardRepository {
         temperature: 25.0 + random.nextDouble() * 10,
         humidity: 60.0 + random.nextDouble() * 30,
         waterLevel: 80.0 - random.nextDouble() * 5,
-        isPumpOn: _isPumpOn,
+        isPumpOn: _isPumpOn(deviceId),
         recordedAt: DateTime.now(),
       );
     }
