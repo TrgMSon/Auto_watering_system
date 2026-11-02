@@ -10,6 +10,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final DashboardRepository repository;
   final DateTime Function() _now;
   StreamSubscription<TelemetryModel?>? _telemetrySubscription;
+  int _activeLoadRequestId = 0;
 
   DashboardBloc({
     required this.repository,
@@ -29,17 +30,22 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     DashboardLoadRequested event,
     Emitter<DashboardState> emit,
   ) async {
+    final requestId = ++_activeLoadRequestId;
     if (state is DashboardLoaded) {
-      await _refreshDashboard(state as DashboardLoaded, emit);
+      await _refreshDashboard(state as DashboardLoaded, emit, requestId);
     } else {
-      await _initialLoadDashboard(emit);
+      await _initialLoadDashboard(emit, requestId);
     }
   }
 
-  Future<void> _initialLoadDashboard(Emitter<DashboardState> emit) async {
+  Future<void> _initialLoadDashboard(
+    Emitter<DashboardState> emit,
+    int requestId,
+  ) async {
     emit(const DashboardLoading());
     try {
       final devices = await repository.getDevices();
+      if (requestId != _activeLoadRequestId) return;
       if (devices.isNotEmpty) {
         final initialDevice = devices.first;
         emit(DashboardLoaded(devices: devices, selectedDevice: initialDevice));
@@ -48,6 +54,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         emit(const DashboardLoaded(devices: []));
       }
     } catch (e) {
+      if (requestId != _activeLoadRequestId) return;
       emit(DashboardError(message: e.toString()));
     }
   }
@@ -55,10 +62,12 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   Future<void> _refreshDashboard(
     DashboardLoaded currentState,
     Emitter<DashboardState> emit,
+    int requestId,
   ) async {
     emit(currentState.copyWith(isRefreshing: true, clearError: true));
     try {
       final devices = await repository.getDevices();
+      if (requestId != _activeLoadRequestId) return;
       final latestState = _currentLoadedState(currentState);
       if (devices.isEmpty) {
         _telemetrySubscription?.cancel();
@@ -67,6 +76,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       }
       _handleRefreshedDevices(latestState, devices, emit);
     } catch (e) {
+      if (requestId != _activeLoadRequestId) return;
       emit(_currentLoadedState(currentState).copyWith(
         isRefreshing: false,
         errorMessage: e.toString(),
@@ -241,6 +251,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     DashboardResetRequested event,
     Emitter<DashboardState> emit,
   ) {
+    _activeLoadRequestId++;
     _telemetrySubscription?.cancel();
     _telemetrySubscription = null;
     emit(const DashboardInitial());
@@ -248,6 +259,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
   @override
   Future<void> close() {
+    _activeLoadRequestId++;
     _telemetrySubscription?.cancel();
     return super.close();
   }

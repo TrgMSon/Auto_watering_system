@@ -710,6 +710,57 @@ void main() {
 
         await bloc.close();
       });
+
+      test('ignores initial getDevices result if reset occurs while request is pending', () async {
+        final completer = Completer<List<DeviceModel>>();
+        when(() => mockRepository.getDevices())
+            .thenAnswer((_) => completer.future);
+
+        final bloc = DashboardBloc(repository: mockRepository);
+        bloc.add(const DashboardLoadRequested());
+        await pumpEventQueue();
+
+        expect(bloc.state, isA<DashboardLoading>());
+
+        bloc.add(const DashboardResetRequested());
+        await pumpEventQueue();
+
+        expect(bloc.state, equals(const DashboardInitial()));
+
+        completer.complete([testDevice1]);
+        await pumpEventQueue();
+
+        expect(bloc.state, equals(const DashboardInitial()));
+        expect(telemetryController.hasListener, isFalse);
+
+        await bloc.close();
+      });
+
+      test('ignores refreshed getDevices result if reset occurs while refresh is pending', () async {
+        final completer = Completer<List<DeviceModel>>();
+        when(() => mockRepository.getDevices())
+            .thenAnswer((_) => completer.future);
+
+        final bloc = DashboardBloc(repository: mockRepository);
+        bloc.emit(DashboardLoaded(devices: [testDevice1], selectedDevice: testDevice1));
+
+        bloc.add(const DashboardLoadRequested());
+        await pumpEventQueue();
+
+        expect((bloc.state as DashboardLoaded).isRefreshing, isTrue);
+
+        bloc.add(const DashboardResetRequested());
+        await pumpEventQueue();
+
+        expect(bloc.state, equals(const DashboardInitial()));
+
+        completer.complete([testDevice1]);
+        await pumpEventQueue();
+
+        expect(bloc.state, equals(const DashboardInitial()));
+
+        await bloc.close();
+      });
     });
   });
 }
