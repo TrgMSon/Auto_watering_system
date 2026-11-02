@@ -81,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 _buildHeader(context),
                 const SizedBox(height: 48),
-                _buildUsernameField(),
+                _buildEmailField(),
                 const SizedBox(height: 16),
                 _buildPasswordField(),
                 const SizedBox(height: 32),
@@ -128,19 +128,20 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildUsernameField() {
+  Widget _buildEmailField() {
     return TextFormField(
       controller: _usernameController,
+      keyboardType: TextInputType.emailAddress,
       decoration: InputDecoration(
-        labelText: 'Tên đăng nhập',
-        prefixIcon: const Icon(Icons.person_outline),
+        labelText: 'Email',
+        prefixIcon: const Icon(Icons.email_outlined),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
         ),
       ),
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
-          return 'Vui lòng nhập tên đăng nhập';
+          return 'Vui lòng nhập email';
         }
         if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value.trim())) {
           return 'Vui lòng nhập email hợp lệ';

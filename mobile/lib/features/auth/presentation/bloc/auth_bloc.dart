@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/user.dart';
 import '../../domain/usecases/get_current_user_usecase.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
@@ -36,11 +37,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthChecking());
     try {
       final user = await getCurrentUserUseCase();
-      if (user != null) {
-        emit(AuthAuthenticated(user: user));
-      } else {
+      if (user == null) {
         emit(const AuthUnauthenticated());
+        return;
       }
+      await _handleUserRole(user, emit);
     } catch (_) {
       emit(const AuthUnauthenticated());
     }
@@ -56,12 +57,27 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         username: event.username,
         password: event.password,
       );
-      emit(AuthAuthenticated(user: user));
+      await _handleUserRole(user, emit);
     } catch (e) {
       emit(const AuthError(
         message: 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
       ));
     }
+  }
+
+  Future<void> _handleUserRole(User user, Emitter<AuthState> emit) async {
+    if (user.isAdmin) {
+      try {
+        await logoutUseCase();
+      } catch (_) {
+        // Đảm bảo không bị crash khi xoá phiên
+      }
+      emit(const AuthError(
+        message: 'Tài khoản quản trị vui lòng sử dụng trang web quản trị.',
+      ));
+      return;
+    }
+    emit(AuthAuthenticated(user: user));
   }
 
   Future<void> _onLogoutRequested(

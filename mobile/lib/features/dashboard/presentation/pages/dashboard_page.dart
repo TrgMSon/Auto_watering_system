@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
 import '../../../../core/widgets/app_error_widget.dart';
+import '../../../../core/widgets/empty_device_widget.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -106,7 +107,11 @@ class _DashboardPageState extends State<DashboardPage> {
           if (state.devices.isEmpty) {
             return Scaffold(
               appBar: AppBar(title: const Text('Tổng quan')),
-              body: const Center(child: Text('Bạn chưa có thiết bị nào.')),
+              body: EmptyDeviceWidget(
+                onReload: () => context
+                    .read<DashboardBloc>()
+                    .add(const DashboardLoadRequested()),
+              ),
             );
           }
           

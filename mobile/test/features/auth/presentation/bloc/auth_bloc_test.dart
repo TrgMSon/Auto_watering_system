@@ -29,6 +29,14 @@ void main() {
     role: UserRole.user,
   );
 
+  const testAdminUser = User(
+    id: 2,
+    username: 'admin',
+    email: 'admin@example.com',
+    fullName: 'Admin User',
+    role: UserRole.admin,
+  );
+
   setUp(() {
     mockLoginUseCase = MockLoginUseCase();
     mockLogoutUseCase = MockLogoutUseCase();
@@ -68,6 +76,109 @@ void main() {
       expect: () => [
         const AuthChecking(),
         const AuthUnauthenticated(),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'calls logoutUseCase and emits [AuthChecking, AuthError] when user has ADMIN role',
+      build: () {
+        when(() => mockGetCurrentUserUseCase())
+            .thenAnswer((_) async => testAdminUser);
+        when(() => mockLogoutUseCase()).thenAnswer((_) async {});
+        return AuthBloc(
+          loginUseCase: mockLoginUseCase,
+          logoutUseCase: mockLogoutUseCase,
+          getCurrentUserUseCase: mockGetCurrentUserUseCase,
+        );
+      },
+      act: (bloc) => bloc.add(const AuthCheckRequested()),
+      expect: () => [
+        const AuthChecking(),
+        const AuthError(
+          message: 'Tài khoản quản trị vui lòng sử dụng trang web quản trị.',
+        ),
+      ],
+      verify: (_) {
+        verify(() => mockLogoutUseCase()).called(1);
+      },
+    );
+  });
+
+  group('AuthBloc - AuthLoginRequested', () {
+    blocTest<AuthBloc, AuthState>(
+      'emits [AuthLoading, AuthAuthenticated] when login succeeds with normal user',
+      build: () {
+        when(() => mockLoginUseCase(
+              username: 'test@example.com',
+              password: 'password123',
+            )).thenAnswer((_) async => testUser);
+        return AuthBloc(
+          loginUseCase: mockLoginUseCase,
+          logoutUseCase: mockLogoutUseCase,
+          getCurrentUserUseCase: mockGetCurrentUserUseCase,
+        );
+      },
+      act: (bloc) => bloc.add(const AuthLoginRequested(
+        username: 'test@example.com',
+        password: 'password123',
+      )),
+      expect: () => [
+        const AuthLoading(),
+        const AuthAuthenticated(user: testUser),
+      ],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'calls logoutUseCase and emits [AuthLoading, AuthError] when login succeeds with ADMIN role',
+      build: () {
+        when(() => mockLoginUseCase(
+              username: 'admin@example.com',
+              password: 'password123',
+            )).thenAnswer((_) async => testAdminUser);
+        when(() => mockLogoutUseCase()).thenAnswer((_) async {});
+        return AuthBloc(
+          loginUseCase: mockLoginUseCase,
+          logoutUseCase: mockLogoutUseCase,
+          getCurrentUserUseCase: mockGetCurrentUserUseCase,
+        );
+      },
+      act: (bloc) => bloc.add(const AuthLoginRequested(
+        username: 'admin@example.com',
+        password: 'password123',
+      )),
+      expect: () => [
+        const AuthLoading(),
+        const AuthError(
+          message: 'Tài khoản quản trị vui lòng sử dụng trang web quản trị.',
+        ),
+      ],
+      verify: (_) {
+        verify(() => mockLogoutUseCase()).called(1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'emits [AuthLoading, AuthError] when loginUseCase throws an exception',
+      build: () {
+        when(() => mockLoginUseCase(
+              username: any(named: 'username'),
+              password: any(named: 'password'),
+            )).thenThrow(Exception('Invalid credentials'));
+        return AuthBloc(
+          loginUseCase: mockLoginUseCase,
+          logoutUseCase: mockLogoutUseCase,
+          getCurrentUserUseCase: mockGetCurrentUserUseCase,
+        );
+      },
+      act: (bloc) => bloc.add(const AuthLoginRequested(
+        username: 'wrong@example.com',
+        password: 'password123',
+      )),
+      expect: () => [
+        const AuthLoading(),
+        const AuthError(
+          message: 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
+        ),
       ],
     );
   });

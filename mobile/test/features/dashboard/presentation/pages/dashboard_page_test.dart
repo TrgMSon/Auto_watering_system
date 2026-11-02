@@ -122,13 +122,21 @@ void main() {
       verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(2);
     });
 
-    testWidgets('renders empty message when device list is empty', (tester) async {
+    testWidgets('renders empty message, icon, instructions and reload button when device list is empty', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(const DashboardLoaded(devices: []));
 
       await tester.pumpWidget(buildTestWidget());
 
+      expect(find.byIcon(Icons.devices_other), findsOneWidget);
       expect(find.text('Bạn chưa có thiết bị nào.'), findsOneWidget);
+      expect(find.text('Liên hệ quản trị viên để được gán thiết bị'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Tải lại'), findsOneWidget);
       expect(find.byType(DropdownButton<DeviceModel>), findsNothing);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Tải lại'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(2);
     });
 
     testWidgets('renders Loaded state: dropdown, pump card, sensor cards, and RefreshIndicator', (tester) async {

@@ -42,7 +42,7 @@ void main() {
 
       expect(find.byType(AppLoadingIndicator), findsOneWidget);
       expect(find.text('Đang kiểm tra phiên đăng nhập...'), findsOneWidget);
-      expect(find.text('Tên đăng nhập'), findsNothing);
+      expect(find.text('Email'), findsNothing);
       expect(find.text('Mật khẩu'), findsNothing);
     });
 
@@ -52,9 +52,30 @@ void main() {
 
       await tester.pumpWidget(createWidget());
 
-      expect(find.text('Tên đăng nhập'), findsOneWidget);
+      expect(find.text('Email'), findsOneWidget);
       expect(find.text('Mật khẩu'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'Đăng nhập'), findsOneWidget);
+    });
+
+    testWidgets('shows validation error when email is empty or invalid',
+        (tester) async {
+      when(() => mockAuthBloc.state).thenReturn(const AuthUnauthenticated());
+
+      await tester.pumpWidget(createWidget());
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
+      await tester.pump();
+
+      expect(find.text('Vui lòng nhập email'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'),
+        'invalid-email',
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
+      await tester.pump();
+
+      expect(find.text('Vui lòng nhập email hợp lệ'), findsOneWidget);
     });
 
     testWidgets('submitting valid form dispatches AuthLoginRequested',
@@ -64,7 +85,7 @@ void main() {
       await tester.pumpWidget(createWidget());
 
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Tên đăng nhập'),
+        find.widgetWithText(TextFormField, 'Email'),
         'user@test.com',
       );
       await tester.enterText(
