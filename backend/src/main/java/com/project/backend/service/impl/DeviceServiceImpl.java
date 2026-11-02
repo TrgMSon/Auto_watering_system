@@ -32,6 +32,8 @@ import com.project.backend.model.Device;
 import com.project.backend.model.DeviceConfig;
 import com.project.backend.model.Schedule;
 import com.project.backend.model.User;
+import com.project.backend.model.UserDevice;
+import com.project.backend.model.enums.DeviceStatus;
 import com.project.backend.model.enums.Role;
 import com.project.backend.repository.DeviceConfigRepository;
 import com.project.backend.repository.DeviceRepository;
@@ -40,6 +42,7 @@ import com.project.backend.repository.SensorLogRepository;
 import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.repository.UserRepository;
 import com.project.backend.service.DeviceService;
+import com.project.backend.service.EmqxManagementService;
 import com.project.backend.service.MqttCommandAcknowledgmentService;
 
 @Service
@@ -54,6 +57,7 @@ public class DeviceServiceImpl implements DeviceService {
     private final UserRepository userRepository;
     private final MqttDeviceCommandPublisher commandPublisher;
     private final MqttCommandAcknowledgmentService acknowledgmentService;
+    private final EmqxManagementService emqxManagementService;
 
     public DeviceServiceImpl(
             DeviceRepository deviceRepository,
@@ -63,7 +67,8 @@ public class DeviceServiceImpl implements DeviceService {
             UserDeviceRepository userDeviceRepository,
             UserRepository userRepository,
             MqttDeviceCommandPublisher commandPublisher,
-            MqttCommandAcknowledgmentService acknowledgmentService) {
+            MqttCommandAcknowledgmentService acknowledgmentService,
+            EmqxManagementService emqxManagementService) {
         this.deviceRepository = deviceRepository;
         this.deviceConfigRepository = deviceConfigRepository;
         this.scheduleRepository = scheduleRepository;
@@ -72,6 +77,7 @@ public class DeviceServiceImpl implements DeviceService {
         this.userRepository = userRepository;
         this.commandPublisher = commandPublisher;
         this.acknowledgmentService = acknowledgmentService;
+        this.emqxManagementService = emqxManagementService;
     }
 
     @Override
@@ -106,7 +112,7 @@ public class DeviceServiceImpl implements DeviceService {
         device.setDeviceName(trimToNull(request.getDeviceName()));
         device.setHardwareVersion(trimToNull(request.getHardwareVersion()));
         device.setFirmwareVersion(trimToNull(request.getFirmwareVersion()));
-        device.setStatus("inactive");
+        device.setStatus(DeviceStatus.REGISTERED.value());
         device.setBlePassKey(bleSecret);
         device.setMqttUsername(mqttUsername);
         device.setMqttPassword(mqttPassword);
@@ -114,6 +120,7 @@ public class DeviceServiceImpl implements DeviceService {
         device.setUpdatedAt(now);
 
         Device created = deviceRepository.save(device);
+        emqxManagementService.createDeviceUser(mqttUsername, mqttPassword);
         return new DeviceCreatedResponse(
                 created.getId(),
                 created.getDeviceName(),
@@ -130,6 +137,9 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional(readOnly = true)
     public List<DeviceSummaryResponse> getUserDevices(int userId) {
         return userDeviceRepository.findDevicesByUserId(userId).stream()
+                .filter(userDevice -> !"viewer_locked".equalsIgnoreCase(userDevice.getPermission()))
+                .filter(userDevice -> !DeviceStatus.DECOMMISSIONED.value()
+                        .equalsIgnoreCase(userDevice.getDevice().getStatus()))
                 .map(userDevice -> {
                     Device device = userDevice.getDevice();
                     return new DeviceSummaryResponse(
@@ -196,19 +206,50 @@ public class DeviceServiceImpl implements DeviceService {
         if (userDeviceRepository.existsByUser_IdAndDevice_Id(userId, deviceId)) {
             throw new ConflictException("Thiết bị đã được đăng ký với tài khoản này");
         }
-        if (device.getStatus() != null && device.getStatus().equalsIgnoreCase("active")) {
-            throw new ConflictException("Thiết bị đã được đăng ký");
+        DeviceStatus status = DeviceStatus.from(device.getStatus())
+                .orElse("inactive".equalsIgnoreCase(device.getStatus())
+                        ? DeviceStatus.REGISTERED
+                        : null);
+        if (status != DeviceStatus.REGISTERED) {
+            throw new ConflictException("Thiết bị không ở trạng thái có thể gán chủ sở hữu");
         }
-
-        User userCreate = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Người dùng đăng ký thiết bị không tồn tại"));
-        if (userCreate.getRole() == Role.ADMIN)
-            userRepository.assignOwner("owner", userId);
-
-        if (deviceRepository.updateDeviceStatus("active", deviceId) != 1) {
-            throw new ConflictException("Không thể cập nhật trạng thái thiết bị");
-        }
+        device.setStatus(DeviceStatus.PROVISIONED.value());
+        device.setUpdatedAt(LocalDateTime.now());
+        deviceRepository.save(device);
         deviceRepository.addUserDevice(userId, deviceId, "owner", LocalDateTime.now());
+    }
+
+    @Override
+    @Transactional
+    public void addViewer(String deviceId, int ownerId, int viewerId) {
+        Device device = requireOwnerDevice(deviceId, ownerId);
+        if (DeviceStatus.DECOMMISSIONED.value().equalsIgnoreCase(device.getStatus())) {
+            throw new ConflictException("Thiết bị đã ngừng hoạt động");
+        }
+        if (ownerId == viewerId) {
+            throw new ConflictException("Chủ sở hữu không thể tự thêm làm người xem");
+        }
+
+        User viewer = userRepository.findById(viewerId)
+                .orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
+        if (viewer.getRole() != Role.USER) {
+            throw new ConflictException("Chỉ tài khoản người dùng mới có thể được chia sẻ thiết bị");
+        }
+        if (userDeviceRepository.existsByUser_IdAndDevice_Id(viewerId, deviceId)) {
+            throw new ConflictException("Người dùng đã được chia sẻ thiết bị này");
+        }
+
+        userDeviceRepository.save(new UserDevice(
+                0, viewer, device, "viewer", LocalDateTime.now()));
+    }
+
+    @Override
+    @Transactional
+    public void removeViewer(String deviceId, int ownerId, int viewerId) {
+        requireOwnerDevice(deviceId, ownerId);
+        if (userDeviceRepository.deleteViewerLink(viewerId, deviceId) != 1) {
+            throw new NotFoundException("Không tìm thấy người xem của thiết bị");
+        }
     }
 
     @Override
@@ -230,7 +271,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (deviceId == null || deviceId.isEmpty())
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         validateThresholds(
                 request.getSoilMoistureMin(), request.getSoilMoistureMax(),
                 "Độ ẩm đất tối thiểu phải nhỏ hơn hoặc bằng tối đa");
@@ -267,7 +308,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (deviceId == null || deviceId.isEmpty())
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         String action = request.getAction().trim().toUpperCase(Locale.ROOT);
         if (!action.equals("ON") && !action.equals("OFF")) {
             throw new IllegalArgumentException("action chỉ nhận giá trị ON hoặc OFF");
@@ -297,7 +338,7 @@ public class DeviceServiceImpl implements DeviceService {
         if (deviceId == null || deviceId.isEmpty())
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         String mode = request.getMode().trim().toLowerCase(Locale.ROOT);
         if (!mode.equals("auto") && !mode.equals("manual")) {
             throw new IllegalArgumentException("mode chỉ nhận giá trị auto hoặc manual");
@@ -327,7 +368,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public ScheduleResponse createSchedule(
             String deviceId, int userId, ScheduleRequest request) {
-        Device device = requireOwnedDevice(deviceId, userId);
+        Device device = requireOwnerOperableDevice(deviceId, userId);
         Schedule schedule = new Schedule(
                 0,
                 device,
@@ -345,7 +386,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public ScheduleResponse updateSchedule(
             String deviceId, int scheduleId, int userId, ScheduleRequest request) {
-        requireOwnedDevice(deviceId, userId);
+        requireOwnerOperableDevice(deviceId, userId);
         Schedule schedule = scheduleRepository.findByIdAndDevice_Id(scheduleId, deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy lịch tưới"));
         schedule.setStartTime(request.getStartTime());
@@ -360,7 +401,10 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     @Transactional
     public void deleteSchedule(String deviceId, int scheduleId, int userId) {
-        requireOwnedDevice(deviceId, userId);
+        Device device = requireOwnerDevice(deviceId, userId);
+        if (!DeviceStatus.ACTIVE.value().equalsIgnoreCase(device.getStatus())) {
+            throw new ConflictException("Thiết bị chưa ở trạng thái hoạt động");
+        }
         Schedule schedule = scheduleRepository.findByIdAndDevice_Id(scheduleId, deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy lịch tưới"));
 
@@ -373,8 +417,30 @@ public class DeviceServiceImpl implements DeviceService {
 
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
-        if (!userDeviceRepository.existsByUser_IdAndDevice_Id(userId, deviceId)) {
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(userId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        if (!("owner".equalsIgnoreCase(association.getPermission())
+                        || "viewer".equalsIgnoreCase(association.getPermission()))
+                || DeviceStatus.DECOMMISSIONED.value().equalsIgnoreCase(device.getStatus())) {
             throw new NotFoundException("Không tìm thấy thiết bị");
+        }
+        return device;
+    }
+
+    private Device requireOwnerOperableDevice(String deviceId, int userId) {
+        Device device = requireOwnedDevice(deviceId, userId);
+        if (!DeviceStatus.ACTIVE.value().equalsIgnoreCase(device.getStatus())) {
+            throw new ConflictException("Thiết bị chưa ở trạng thái hoạt động");
+        }
+        return device;
+    }
+
+    private Device requireOwnerDevice(String deviceId, int ownerId) {
+        Device device = requireOwnedDevice(deviceId, ownerId);
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(ownerId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        if (!"owner".equalsIgnoreCase(association.getPermission())) {
+            throw new ConflictException("Chỉ chủ sở hữu mới có thể quản lý quyền chia sẻ thiết bị");
         }
         return device;
     }

@@ -24,6 +24,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
 import com.project.backend.service.MqttCommandAcknowledgmentService;
+import com.project.backend.service.DeviceLifecycleService;
 import com.project.backend.service.impl.SensorDataServiceImpl;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -33,9 +34,13 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 public class MqttConfig {
     private static final Logger logger = LoggerFactory.getLogger(MqttConfig.class);
     private SensorDataServiceImpl sensorDataServiceImpl;
+    private final DeviceLifecycleService deviceLifecycleService;
 
-    public MqttConfig(SensorDataServiceImpl sensorDataServiceImpl) {
+    public MqttConfig(
+            SensorDataServiceImpl sensorDataServiceImpl,
+            DeviceLifecycleService deviceLifecycleService) {
         this.sensorDataServiceImpl = sensorDataServiceImpl;
+        this.deviceLifecycleService = deviceLifecycleService;
     }
 
     @Value("${app.mqtt.broker-url:}")
@@ -82,13 +87,12 @@ public class MqttConfig {
 
     @Bean
     public MessageProducer inbound() {
-        MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(
-                        clientId + "_inbound",
-                        mqttClientFactory(),
-                        "iot/garden/+/telemetry",
-                        "iot/garden/+/status",
-                        "iot/garden/+/ack");
+        MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
+                clientId + "_inbound",
+                mqttClientFactory(),
+                "iot/garden/+/telemetry",
+                "iot/garden/+/status",
+                "iot/garden/+/ack");
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(0, 1, 1);
@@ -109,11 +113,11 @@ public class MqttConfig {
                     : messagePayload.toString();
             if (topicName.endsWith("/ack")) {
                 acknowledgmentService.handleMessage(topicName, payload);
-            } 
-            else if (topicName.endsWith("/telemetry")) {
+            } else if (topicName.endsWith("/telemetry")) {
                 sensorDataServiceImpl.recordSensorLog(topicName, payload);
-            }
-            else {
+            } else if (topicName.endsWith("/status")) {
+                deviceLifecycleService.handleMqttStatus(topicName, payload);
+            } else {
                 logger.info("MQTT message received; topic={}, payload={}", topicName, payload);
             }
         };
@@ -127,8 +131,7 @@ public class MqttConfig {
     @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
     public MessageHandler mqttOutbound() {
-        MqttPahoMessageHandler messageHandler =
-                new MqttPahoMessageHandler(clientId + "_outbound", mqttClientFactory());
+        MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler(clientId + "_outbound", mqttClientFactory());
         messageHandler.setAsync(false);
         messageHandler.setDefaultQos(1);
         messageHandler.setCompletionTimeout(5000);

@@ -1,6 +1,7 @@
 package com.project.backend.repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +11,8 @@ import com.project.backend.model.Device;
 import jakarta.transaction.Transactional;
 
 public interface DeviceRepository extends JpaRepository<Device, String> {
+    List<Device> findAllByStatusAndLastActiveAtBefore(String status, LocalDateTime cutoff);
+
     @Modifying
     @Transactional
     @Query(value = """

@@ -23,6 +23,7 @@ public class Device {
     @Column(name = "firmware_version")
     private String firmwareVersion;
 
+    @Column(length = 20)
     private String status;
 
     @Column(name = "last_active_at")

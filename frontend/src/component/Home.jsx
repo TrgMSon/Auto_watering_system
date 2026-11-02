@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import DeviceManagement from './DeviceManagement';
+import UserManagement from './UserManagement';
+import { authenticatedFetch } from '../authenticatedFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 const DEVICE_STORAGE_KEY = 'garden-admin-device-id';
@@ -62,10 +64,10 @@ function normalizeWater(data) {
 }
 
 async function fetchStats(path, token, signal) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     signal,
-  });
+  }, token);
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
@@ -192,6 +194,13 @@ function Home({ auth, onLogout }) {
           >
             <DeviceIcon /> <span>Thiết bị IoT</span>
           </button>
+          <button
+            className={`side-nav__item side-nav__button ${activePage === 'users' ? 'side-nav__item--active' : ''}`}
+            onClick={() => setActivePage('users')}
+            aria-current={activePage === 'users' ? 'page' : undefined}
+          >
+            <UsersIcon /> <span>Người dùng</span>
+          </button>
         </nav>
 
         <div className="sidebar__bottom">
@@ -213,7 +222,9 @@ function Home({ auth, onLogout }) {
         <header className="topbar">
           <div className="breadcrumbs">
             <span>Workspace</span><b>/</b>
-            <strong>{activePage === 'devices' ? 'Thiết bị IoT' : 'Tổng quan'}</strong>
+            <strong>{activePage === 'devices'
+              ? 'Thiết bị IoT'
+              : activePage === 'users' ? 'Người dùng' : 'Tổng quan'}</strong>
           </div>
           <div className="topbar__actions">
             <div className="system-status"><span className="status-dot" /> Hệ thống hoạt động</div>
@@ -225,6 +236,8 @@ function Home({ auth, onLogout }) {
         <div className="dashboard-content">
           {activePage === 'devices' ? (
             <DeviceManagement accessToken={auth.accessToken} />
+          ) : activePage === 'users' ? (
+            <UserManagement accessToken={auth.accessToken} />
           ) : (
             <>
           <section className="page-heading">
@@ -494,6 +507,7 @@ function formatTimeLabel(value) {
 function LeafIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.4 3.6C11.2 3.4 5.1 5 4.1 10.2c-.6 3.1 1.6 5.3 4.6 4.7 5.2-1 6.8-7.1 6.6-11.3M3.8 20.2c2.3-5 5.2-7.8 9.5-10.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
 function GridIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.7" /><rect x="14" y="3" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.7" /><rect x="14" y="14" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.7" /><rect x="3" y="14" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.7" /></svg>; }
 function DeviceIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="1.7" /><path d="M9 9h6v6H9zM12 2v2m0 16v2M2 12h2m16 0h2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
+function UsersIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M16 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20m6.5-9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm6-6.7a3.5 3.5 0 0 1 0 6.8m2 3.9h.1a3.4 3.4 0 0 1 3.4 3.4V20" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
 function PlantIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 20v-8m0 2c-4.8 0-7-2.3-7-7 4.8 0 7 2.3 7 7Zm0-3c0-4.8 2.3-7 7-7 0 4.8-2.3 7-7 7Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><path d="M7 20h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>; }
 function SoilIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18h16M5 15c2-2 4-2 7 0s5 2 7 0M6 11c2-2 4-2 6 0s4 2 6 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /><path d="M12 10V5m0 2c-2.3 0-3.5-1.1-3.5-3.5C10.9 3.5 12 4.7 12 7Zm0-1c0-2.3 1.1-3.5 3.5-3.5C15.5 4.9 14.3 6 12 6Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
 function HumidityIcon() { return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.2S5.7 10.5 5.7 14.8a6.3 6.3 0 1 0 12.6 0C18.3 10.5 12 3.2 12 3.2Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M9.2 15.1a2.8 2.8 0 0 0 2.8 2.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>; }

@@ -18,8 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MqttCommandAcknowledgmentService {
-    private static final Logger logger =
-            LoggerFactory.getLogger(MqttCommandAcknowledgmentService.class);
+    private static final Logger logger = LoggerFactory.getLogger(MqttCommandAcknowledgmentService.class);
     private static final Duration RETENTION = Duration.ofHours(24);
     private static final int MAX_TRACKED_COMMANDS = 10_000;
 
@@ -28,7 +27,8 @@ public class MqttCommandAcknowledgmentService {
     private final WateringHistoryService wateringHistoryService;
     private final WebSocketService webSocketService;
 
-    public MqttCommandAcknowledgmentService(ObjectMapper objectMapper, WateringHistoryService wateringHistoryService, WebSocketService webSocketService) {
+    public MqttCommandAcknowledgmentService(ObjectMapper objectMapper, WateringHistoryService wateringHistoryService,
+            WebSocketService webSocketService) {
         this.objectMapper = objectMapper;
         this.wateringHistoryService = wateringHistoryService;
         this.webSocketService = webSocketService;
@@ -83,11 +83,10 @@ public class MqttCommandAcknowledgmentService {
 
             if ("SUCCESS".equalsIgnoreCase(status) || "SUCCEEDED".equalsIgnoreCase(status)) {
                 updateStatus(deviceId, commandId, "SUCCEEDED", message);
-                if (action.equals("OFF")){
+                if (action.equals("OFF")) {
                     webSocketService.changePumpStatus(deviceId, "OFF");
                     wateringHistoryService.recordEndWatering(deviceId, LocalDateTime.now());
-                } 
-                else if (action.equals("ON")) {
+                } else if (action.equals("ON")) {
                     webSocketService.changePumpStatus(deviceId, "ON");
                     wateringHistoryService.recordStartWatering(deviceId, LocalDateTime.now());
                 }

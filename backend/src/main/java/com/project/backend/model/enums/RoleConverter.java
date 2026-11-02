@@ -15,6 +15,10 @@ public class RoleConverter implements AttributeConverter<Role, String> {
     @Override
     public Role convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.isEmpty()) return null;
-        return Role.valueOf(dbData.toUpperCase());
+        return switch (dbData.trim().toUpperCase()) {
+            case "USER", "OWNER", "VIEWER" -> Role.USER;
+            case "ADMIN" -> Role.ADMIN;
+            default -> throw new IllegalArgumentException("Vai trò tài khoản không hợp lệ: " + dbData);
+        };
     }
 }
