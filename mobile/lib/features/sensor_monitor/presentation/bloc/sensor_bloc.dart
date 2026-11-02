@@ -11,6 +11,7 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
   final GetRealtimeReadingsUseCase getRealtimeReadings;
 
   StreamSubscription? _realtimeSubscription;
+  int _activeHistoryRequestId = 0;
   static const int _maxBufferSize = 50;
 
   SensorBloc({
@@ -28,6 +29,7 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
     SensorHistoryRequested event,
     Emitter<SensorState> emit,
   ) async {
+    final requestId = ++_activeHistoryRequestId;
     emit(const SensorLoading());
     try {
       final readings = await getSensorHistory(
@@ -35,12 +37,15 @@ class SensorBloc extends Bloc<SensorEvent, SensorState> {
         from: event.from,
         to: event.to,
       );
+      if (requestId != _activeHistoryRequestId) return;
       emit(SensorLoaded(
         historyReadings: readings,
         latestReading: readings.isNotEmpty ? readings.last : null,
       ));
     } catch (e) {
-      emit(SensorError(message: e.toString()));
+      if (requestId == _activeHistoryRequestId) {
+        emit(SensorError(message: e.toString()));
+      }
     }
   }
 

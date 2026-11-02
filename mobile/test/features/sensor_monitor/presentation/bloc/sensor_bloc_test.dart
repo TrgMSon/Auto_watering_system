@@ -128,6 +128,60 @@ void main() {
         const SensorError(message: 'Exception: Network error'),
       ],
     );
+
+    test(
+      'ignores results of stale request when device is changed before previous request completes',
+      () async {
+        final completerA = Completer<List<SensorReading>>();
+
+        when(() => mockGetSensorHistory(
+              deviceId: 'ESP_001',
+              from: any(named: 'from'),
+              to: any(named: 'to'),
+            )).thenAnswer((_) => completerA.future);
+
+        when(() => mockGetSensorHistory(
+              deviceId: 'ESP_002',
+              from: any(named: 'from'),
+              to: any(named: 'to'),
+            )).thenAnswer((_) async => [testReading2]);
+
+        final bloc = SensorBloc(
+          getSensorHistory: mockGetSensorHistory,
+          getRealtimeReadings: mockGetRealtimeReadings,
+        );
+
+        // Request device A (pending)
+        bloc.add(SensorHistoryRequested(
+          deviceId: 'ESP_001',
+          from: from,
+          to: to,
+        ));
+        await pumpEventQueue();
+
+        // Switch to device B (finishes first)
+        bloc.add(SensorHistoryRequested(
+          deviceId: 'ESP_002',
+          from: from,
+          to: to,
+        ));
+        await pumpEventQueue();
+
+        // Device B has finished and state is loaded with B's data
+        expect(bloc.state, isA<SensorLoaded>());
+        expect((bloc.state as SensorLoaded).historyReadings, equals([testReading2]));
+
+        // Device A finishes later
+        completerA.complete([testReading1]);
+        await pumpEventQueue();
+
+        // State must STILL be device B's data, NOT overwritten by device A
+        expect(bloc.state, isA<SensorLoaded>());
+        expect((bloc.state as SensorLoaded).historyReadings, equals([testReading2]));
+
+        await bloc.close();
+      },
+    );
   });
 
   group('SensorBloc - SensorRealtimeStarted', () {
