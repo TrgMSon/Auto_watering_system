@@ -17,35 +17,35 @@ import com.project.backend.dto.device.DeviceSummaryResponse;
 import com.project.backend.dto.sensor.SensorReadingResponse;
 
 public interface DeviceService {
-    List<AdminDeviceResponse> getAllDevices();
+        List<AdminDeviceResponse> getAllDevices();
 
-    DeviceCreatedResponse createDevice(CreateDeviceRequest request);
+        DeviceCreatedResponse createDevice(CreateDeviceRequest request);
 
-    List<DeviceSummaryResponse> getUserDevices(int userId);
+        List<DeviceSummaryResponse> getUserDevices(int userId);
 
-    List<SensorReadingResponse> getSensorReadings(
-            String deviceId, int userId, java.time.LocalDateTime from, java.time.LocalDateTime to);
+        List<SensorReadingResponse> getSensorReadings(
+                        String deviceId, int userId, java.time.LocalDateTime from, java.time.LocalDateTime to);
 
-    SensorReadingResponse getLatestSensorReading(String deviceId, int userId);
+        SensorReadingResponse getLatestSensorReading(String deviceId, int userId);
 
-    void registerDevice(String deviceId, int userId, int userCreateId);
+        void registerDevice(String deviceId, int userId, int userCreateId);
 
-    DeviceConfigResponse getDeviceConfig(String deviceId, int userId);
+        DeviceConfigResponse getDeviceConfig(String deviceId, int userId);
 
-    DeviceConfigResponse updateDeviceConfig(String deviceId, int userId, DeviceConfigRequest request);
+        DeviceConfigResponse updateDeviceConfig(String deviceId, int userId, DeviceConfigRequest request);
 
-    DeviceCommandResponse controlPump(String deviceId, int userId, DeviceCommandRequest request);
+        DeviceCommandResponse controlPump(String deviceId, int userId, DeviceCommandRequest request);
 
-    CommandAcknowledgmentResponse getCommandAcknowledgment(
-            String deviceId, String commandId, int userId);
+        CommandAcknowledgmentResponse getCommandAcknowledgment(
+                        String deviceId, String commandId, int userId);
 
-    DeviceConfigResponse setWateringMode(String deviceId, int userId, DeviceModeRequest request);
+        DeviceConfigResponse setWateringMode(String deviceId, int userId, DeviceModeRequest request);
 
-    List<ScheduleResponse> getSchedules(String deviceId, int userId);
+        List<ScheduleResponse> getSchedules(String deviceId, int userId);
 
-    ScheduleResponse createSchedule(String deviceId, int userId, ScheduleRequest request);
+        ScheduleResponse createSchedule(String deviceId, int userId, ScheduleRequest request);
 
-    ScheduleResponse updateSchedule(String deviceId, int scheduleId, int userId, ScheduleRequest request);
+        ScheduleResponse updateSchedule(String deviceId, int scheduleId, int userId, ScheduleRequest request);
 
-    void deleteSchedule(String deviceId, int scheduleId, int userId);
+        void deleteSchedule(String deviceId, int scheduleId, int userId);
 }

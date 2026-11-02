@@ -32,6 +32,8 @@ import com.project.backend.repository.SensorLogRepository;
 import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.repository.UserRepository;
 import com.project.backend.service.MqttCommandAcknowledgmentService;
+import com.project.backend.service.impl.DeviceServiceImpl;
+import com.project.backend.service.impl.MqttDeviceCommandPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class DeviceServiceImplTest {

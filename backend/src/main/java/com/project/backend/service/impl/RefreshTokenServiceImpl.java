@@ -56,17 +56,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         entity.setRevokedAt(LocalDateTime.now());
         refreshTokenRepository.save(entity);
     }
-    
-    //cơ chế rotation refreshtoken 
+
+    // cơ chế rotation refreshtoken
     @Override
     public String rotate(RefreshToken oldToken) {
-    oldToken.setRevoked(true);
-    oldToken.setRevokedAt(LocalDateTime.now());
-    refreshTokenRepository.save(oldToken);
+        oldToken.setRevoked(true);
+        oldToken.setRevokedAt(LocalDateTime.now());
+        refreshTokenRepository.save(oldToken);
 
-    // tạo token mới cho cùng user
-    return createRefreshToken(oldToken.getUser());
-   }
-    
+        // tạo token mới cho cùng user
+        return createRefreshToken(oldToken.getUser());
+    }
+
 }
-

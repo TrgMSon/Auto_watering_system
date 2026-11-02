@@ -23,24 +23,26 @@ import com.project.backend.service.RefreshTokenService;
 
 import jakarta.transaction.Transactional;
 
-@Service 
+@Service
 public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
-    public AuthServiceImpl(UserRepository userRepository, JwtService jwtService, PasswordEncoder passwordEncoder, RefreshTokenService refreshTokenService) {
+    public AuthServiceImpl(UserRepository userRepository, JwtService jwtService, PasswordEncoder passwordEncoder,
+            RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
     }
-    
+
     @Override
     public void register(RegisterRequest req) {
         if (userRepository.existsByEmail(req.getEmail())) {
-            throw new ConflictException("Email này đã được đăng ký trong hệ thống. Vui lòng đăng nhập hoặc sử dụng email khác.");
+            throw new ConflictException(
+                    "Email này đã được đăng ký trong hệ thống. Vui lòng đăng nhập hoặc sử dụng email khác.");
         }
 
         String passwordHash = passwordEncoder.encode(req.getPassword());
@@ -74,11 +76,11 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtService.generateToken(user);
         String refreshToken = refreshTokenService.createRefreshToken(user);
         UserResponse userResponse = UserResponse.builder()
-                                    .id(user.getId())
-                                    .email(user.getEmail())
-                                    .phoneNumber(user.getPhoneNumber())
-                                    .role(user.getRole().name())
-                                    .build();
+                .id(user.getId())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .role(user.getRole().name())
+                .build();
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

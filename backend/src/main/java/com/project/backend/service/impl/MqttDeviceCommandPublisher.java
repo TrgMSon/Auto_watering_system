@@ -8,7 +8,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.backend.config.MqttGateway;
-import com.project.backend.service.MqttCommandAcknowledgmentService;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +16,7 @@ import org.springframework.messaging.MessagingException;
 import org.springframework.stereotype.Component;
 
 import com.project.backend.exception.DeviceCommandException;
+import com.project.backend.service.MqttCommandAcknowledgmentService;
 
 @Component
 public class MqttDeviceCommandPublisher {

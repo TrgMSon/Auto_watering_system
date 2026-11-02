@@ -82,13 +82,12 @@ public class MqttConfig {
 
     @Bean
     public MessageProducer inbound() {
-        MqttPahoMessageDrivenChannelAdapter adapter =
-                new MqttPahoMessageDrivenChannelAdapter(
-                        clientId + "_inbound",
-                        mqttClientFactory(),
-                        "iot/garden/+/telemetry",
-                        "iot/garden/+/status",
-                        "iot/garden/+/ack");
+        MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
+                clientId + "_inbound",
+                mqttClientFactory(),
+                "iot/garden/+/telemetry",
+                "iot/garden/+/status",
+                "iot/garden/+/ack");
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(0, 1, 1);
@@ -109,11 +108,9 @@ public class MqttConfig {
                     : messagePayload.toString();
             if (topicName.endsWith("/ack")) {
                 acknowledgmentService.handleMessage(topicName, payload);
-            } 
-            else if (topicName.endsWith("/telemetry")) {
+            } else if (topicName.endsWith("/telemetry")) {
                 sensorDataServiceImpl.recordSensorLog(topicName, payload);
-            }
-            else {
+            } else {
                 logger.info("MQTT message received; topic={}, payload={}", topicName, payload);
             }
         };
@@ -127,8 +124,7 @@ public class MqttConfig {
     @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
     public MessageHandler mqttOutbound() {
-        MqttPahoMessageHandler messageHandler =
-                new MqttPahoMessageHandler(clientId + "_outbound", mqttClientFactory());
+        MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler(clientId + "_outbound", mqttClientFactory());
         messageHandler.setAsync(false);
         messageHandler.setDefaultQos(1);
         messageHandler.setCompletionTimeout(5000);

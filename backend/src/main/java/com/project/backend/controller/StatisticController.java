@@ -13,8 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-
-@RestController 
+@RestController
 @RequestMapping("/api/admin/statistics")
 public class StatisticController {
     private SensorDataServiceImpl sensorDataService;
@@ -27,7 +26,7 @@ public class StatisticController {
     public ResponseEntity<List<EnvironmentalStatsResponse>> getEnvironmentalStats(
             @RequestParam("deviceId") String deviceId,
             @RequestParam(name = "range", defaultValue = "24h") String range) {
-        
+
         List<EnvironmentalStatsResponse> stats = sensorDataService.getEnvironmentalStats(deviceId, range);
         return ResponseEntity.ok(stats);
     }
@@ -36,9 +35,9 @@ public class StatisticController {
     public ResponseEntity<List<WaterLevelStatsResponse>> getWaterLevelStats(
             @RequestParam("deviceId") String deviceId,
             @RequestParam(name = "range", defaultValue = "24h") String range) {
-        
+
         List<WaterLevelStatsResponse> stats = sensorDataService.getWaterLevelStats(deviceId, range);
         return ResponseEntity.ok(stats);
     }
-    
+
 }
