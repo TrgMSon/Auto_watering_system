@@ -23,18 +23,85 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     DashboardLoadRequested event,
     Emitter<DashboardState> emit,
   ) async {
+    if (state is DashboardLoaded) {
+      await _refreshDashboard(state as DashboardLoaded, emit);
+    } else {
+      await _initialLoadDashboard(emit);
+    }
+  }
+
+  Future<void> _initialLoadDashboard(Emitter<DashboardState> emit) async {
     emit(const DashboardLoading());
     try {
       final devices = await repository.getDevices();
       if (devices.isNotEmpty) {
-        emit(DashboardLoaded(devices: devices, selectedDevice: devices.first));
-        _listenToTelemetry(devices.first);
+        final initialDevice = devices.first;
+        emit(DashboardLoaded(devices: devices, selectedDevice: initialDevice));
+        _listenToTelemetry(initialDevice);
       } else {
         emit(const DashboardLoaded(devices: []));
       }
     } catch (e) {
       emit(DashboardError(message: e.toString()));
     }
+  }
+
+  Future<void> _refreshDashboard(
+    DashboardLoaded currentState,
+    Emitter<DashboardState> emit,
+  ) async {
+    emit(currentState.copyWith(isRefreshing: true, clearError: true));
+    try {
+      final devices = await repository.getDevices();
+      final latestState = _currentLoadedState(currentState);
+      if (devices.isEmpty) {
+        _telemetrySubscription?.cancel();
+        emit(const DashboardLoaded(devices: []));
+        return;
+      }
+      _handleRefreshedDevices(latestState, devices, emit);
+    } catch (e) {
+      emit(_currentLoadedState(currentState).copyWith(
+        isRefreshing: false,
+        errorMessage: e.toString(),
+      ));
+    }
+  }
+
+  DashboardLoaded _currentLoadedState(DashboardLoaded fallbackState) {
+    return state is DashboardLoaded ? (state as DashboardLoaded) : fallbackState;
+  }
+
+  void _handleRefreshedDevices(
+    DashboardLoaded currentState,
+    List<DeviceModel> devices,
+    Emitter<DashboardState> emit,
+  ) {
+    final currentSelectedId = currentState.selectedDevice?.id;
+    final matchedDevice = devices.cast<DeviceModel?>().firstWhere(
+      (d) => d?.id == currentSelectedId,
+      orElse: () => null,
+    );
+
+    if (matchedDevice != null) {
+      emit(currentState.copyWith(
+        devices: devices,
+        selectedDevice: matchedDevice,
+        isRefreshing: false,
+      ));
+      return;
+    }
+
+    final newSelectedDevice = devices.first;
+    emit(currentState.copyWith(
+      devices: devices,
+      selectedDevice: newSelectedDevice,
+      clearTelemetry: true,
+      isTelemetryEmpty: false,
+      clearPumpStatus: true,
+      isRefreshing: false,
+    ));
+    _listenToTelemetry(newSelectedDevice);
   }
 
   void _onDeviceSelected(

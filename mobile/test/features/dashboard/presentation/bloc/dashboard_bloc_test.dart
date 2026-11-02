@@ -77,6 +77,16 @@ void main() {
       expect(const DashboardPumpToggled(true).props, [true]);
     });
 
+    test('DashboardLoaded props equality and copyWith isRefreshing', () {
+      final initialLoaded = DashboardLoaded(
+        devices: [testDevice1],
+        isRefreshing: false,
+      );
+      final refreshingLoaded = initialLoaded.copyWith(isRefreshing: true);
+      expect(refreshingLoaded.isRefreshing, isTrue);
+      expect(initialLoaded == refreshingLoaded, isFalse);
+    });
+
     group('DashboardLoadRequested', () {
       blocTest<DashboardBloc, DashboardState>(
         'emits [DashboardLoading, DashboardLoaded] when getDevices succeeds with devices',
@@ -128,6 +138,243 @@ void main() {
         expect: () => [
           const DashboardLoading(),
           const DashboardError(message: 'Exception: Failed to load devices'),
+        ],
+        verify: (_) {
+          verify(() => mockRepository.getDevices()).called(1);
+        },
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'when already DashboardLoaded, keeps second device selected after refresh without re-subscribing',
+        build: () {
+          when(() => mockRepository.getDevices())
+              .thenAnswer((_) async => [testDevice1, testDevice2]);
+          return DashboardBloc(repository: mockRepository);
+        },
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice2,
+          telemetry: testTelemetry2,
+          pumpStatus: true,
+        ),
+        act: (bloc) => bloc.add(const DashboardLoadRequested()),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: true,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: true,
+            isRefreshing: false,
+          ),
+        ],
+        verify: (_) {
+          verify(() => mockRepository.getDevices()).called(1);
+          verifyNever(() => mockRepository.watchTelemetry(any(), any()));
+        },
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'when already DashboardLoaded and selected device is removed, falls back to first device and subscribes to telemetry',
+        build: () {
+          when(() => mockRepository.getDevices())
+              .thenAnswer((_) async => [testDevice1]);
+          return DashboardBloc(repository: mockRepository);
+        },
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice2,
+          telemetry: testTelemetry2,
+          pumpStatus: true,
+        ),
+        act: (bloc) => bloc.add(const DashboardLoadRequested()),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: true,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            telemetry: null,
+            pumpStatus: null,
+            isTelemetryEmpty: false,
+            isRefreshing: false,
+          ),
+        ],
+        verify: (_) {
+          verify(() => mockRepository.getDevices()).called(1);
+          verify(() => mockRepository.watchTelemetry(testDevice1.id, testDevice1.blePassKey))
+              .called(1);
+        },
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'when refresh fails, retains existing devices and telemetry and sets errorMessage',
+        build: () {
+          when(() => mockRepository.getDevices())
+              .thenThrow(Exception('Network error during refresh'));
+          return DashboardBloc(repository: mockRepository);
+        },
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice2,
+          telemetry: testTelemetry2,
+          pumpStatus: true,
+        ),
+        act: (bloc) => bloc.add(const DashboardLoadRequested()),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: true,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: true,
+            isRefreshing: false,
+            errorMessage: 'Exception: Network error during refresh',
+          ),
+        ],
+        verify: (_) {
+          verify(() => mockRepository.getDevices()).called(1);
+          verifyNever(() => mockRepository.watchTelemetry(any(), any()));
+        },
+      );
+
+      Completer<List<DeviceModel>>? inFlightGetDevicesCompleter;
+
+      blocTest<DashboardBloc, DashboardState>(
+        'when device changes and telemetry arrives while getDevices is awaiting, retains the new device and telemetry after refresh finishes',
+        setUp: () {
+          inFlightGetDevicesCompleter = Completer<List<DeviceModel>>();
+          when(() => mockRepository.getDevices())
+              .thenAnswer((_) => inFlightGetDevicesCompleter!.future);
+        },
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+        ),
+        act: (bloc) async {
+          bloc.add(const DashboardLoadRequested());
+          await Future<void>.delayed(Duration.zero);
+          bloc.add(DashboardDeviceSelected(testDevice2));
+          await Future<void>.delayed(Duration.zero);
+          bloc.add(DashboardTelemetryUpdated(testTelemetry2));
+          await Future<void>.delayed(Duration.zero);
+          inFlightGetDevicesCompleter!.complete([testDevice1, testDevice2]);
+        },
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry1,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: null,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: testTelemetry2.isPumpOn,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: testTelemetry2,
+            pumpStatus: testTelemetry2.isPumpOn,
+            isRefreshing: false,
+          ),
+        ],
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'when device changes while getDevices is awaiting and refresh fails, retains the new device and sets errorMessage',
+        setUp: () {
+          inFlightGetDevicesCompleter = Completer<List<DeviceModel>>();
+          when(() => mockRepository.getDevices())
+              .thenAnswer((_) => inFlightGetDevicesCompleter!.future);
+        },
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+        ),
+        act: (bloc) async {
+          bloc.add(const DashboardLoadRequested());
+          await Future<void>.delayed(Duration.zero);
+          bloc.add(DashboardDeviceSelected(testDevice2));
+          await Future<void>.delayed(Duration.zero);
+          inFlightGetDevicesCompleter!.completeError(Exception('Network error during refresh'));
+        },
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry1,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: null,
+            isRefreshing: true,
+          ),
+          DashboardLoaded(
+            devices: [testDevice1, testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: null,
+            isRefreshing: false,
+            errorMessage: 'Exception: Network error during refresh',
+          ),
+        ],
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'when refresh returns empty device list, emits DashboardLoaded with empty devices list',
+        build: () {
+          when(() => mockRepository.getDevices()).thenAnswer((_) async => []);
+          return DashboardBloc(repository: mockRepository);
+        },
+        seed: () => DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetry1,
+        ),
+        act: (bloc) => bloc.add(const DashboardLoadRequested()),
+        expect: () => [
+          DashboardLoaded(
+            devices: [testDevice1],
+            selectedDevice: testDevice1,
+            telemetry: testTelemetry1,
+            isRefreshing: true,
+          ),
+          const DashboardLoaded(
+            devices: [],
+            isRefreshing: false,
+          ),
         ],
         verify: (_) {
           verify(() => mockRepository.getDevices()).called(1);

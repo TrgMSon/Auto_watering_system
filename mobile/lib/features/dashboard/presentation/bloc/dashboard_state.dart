@@ -26,6 +26,7 @@ class DashboardLoaded extends DashboardState {
   final bool isBleConnected;
   final bool? pumpStatus;
   final String? errorMessage;
+  final bool isRefreshing;
 
   const DashboardLoaded({
     required this.devices,
@@ -36,6 +37,7 @@ class DashboardLoaded extends DashboardState {
     this.isBleConnected = false,
     this.pumpStatus,
     this.errorMessage,
+    this.isRefreshing = false,
   });
 
   DashboardLoaded copyWith({
@@ -50,6 +52,7 @@ class DashboardLoaded extends DashboardState {
     bool clearPumpStatus = false,
     String? errorMessage,
     bool clearError = false,
+    bool? isRefreshing,
   }) {
     return DashboardLoaded(
       devices: devices ?? this.devices,
@@ -60,6 +63,7 @@ class DashboardLoaded extends DashboardState {
       isBleConnected: isBleConnected ?? this.isBleConnected,
       pumpStatus: clearPumpStatus ? null : (pumpStatus ?? this.pumpStatus),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 
@@ -73,6 +77,7 @@ class DashboardLoaded extends DashboardState {
         isBleConnected,
         pumpStatus,
         errorMessage,
+        isRefreshing,
       ];
 }
 

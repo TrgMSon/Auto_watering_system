@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -335,6 +336,53 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(1);
+    });
+
+    testWidgets('pulling to refresh awaits bloc refresh completion', (tester) async {
+      final stateController = StreamController<DashboardState>.broadcast();
+      addTearDown(stateController.close);
+
+      whenListen(
+        mockDashboardBloc,
+        stateController.stream,
+        initialState: DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetryOff,
+          isRefreshing: false,
+        ),
+      );
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      // Perform pull-down gesture to trigger RefreshIndicator
+      await tester.fling(find.byType(ListView), const Offset(0.0, 300.0), 1000.0);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(1);
+
+      // Bloc emits refreshing state
+      stateController.add(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        isRefreshing: true,
+      ));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // RefreshIndicator is still active
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+
+      // Bloc emits completed refresh state
+      stateController.add(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        isRefreshing: false,
+      ));
+      await tester.pumpAndSettle();
     });
   });
 

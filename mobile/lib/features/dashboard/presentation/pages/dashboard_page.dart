@@ -104,7 +104,12 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             body: RefreshIndicator(
               onRefresh: () async {
-                context.read<DashboardBloc>().add(const DashboardLoadRequested());
+                final bloc = context.read<DashboardBloc>();
+                bloc.add(const DashboardLoadRequested());
+                await bloc.stream.firstWhere(
+                  (state) => state is! DashboardLoaded || !state.isRefreshing,
+                  orElse: () => bloc.state,
+                );
               },
               child: ListView(
                 padding: const EdgeInsets.all(16),
