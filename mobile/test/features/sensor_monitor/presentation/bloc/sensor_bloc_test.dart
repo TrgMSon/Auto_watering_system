@@ -52,7 +52,9 @@ void main() {
   });
 
   group('SensorLoaded.chartReadings', () {
-    test('merges history and realtime readings without duplicates and sorted by timestamp', () {
+    test(
+        'merges history and realtime readings without duplicates and sorted by timestamp',
+        () {
       final state = SensorLoaded(
         historyReadings: [testReading1, testReading2],
         latestReading: testReading3,
@@ -169,7 +171,8 @@ void main() {
 
         // Device B has finished and state is loaded with B's data
         expect(bloc.state, isA<SensorLoaded>());
-        expect((bloc.state as SensorLoaded).historyReadings, equals([testReading2]));
+        expect((bloc.state as SensorLoaded).historyReadings,
+            equals([testReading2]));
 
         // Device A finishes later
         completerA.complete([testReading1]);
@@ -177,7 +180,8 @@ void main() {
 
         // State must STILL be device B's data, NOT overwritten by device A
         expect(bloc.state, isA<SensorLoaded>());
-        expect((bloc.state as SensorLoaded).historyReadings, equals([testReading2]));
+        expect((bloc.state as SensorLoaded).historyReadings,
+            equals([testReading2]));
 
         await bloc.close();
       },
@@ -185,7 +189,9 @@ void main() {
   });
 
   group('SensorBloc - SensorRealtimeStarted', () {
-    test('calls getRealtimeReadings with deviceId and cancels previous stream on device change', () async {
+    test(
+        'calls getRealtimeReadings with deviceId and cancels previous stream on device change',
+        () async {
       final controller1 = StreamController<SensorReading>();
       final controller2 = StreamController<SensorReading>();
 
@@ -227,8 +233,8 @@ void main() {
     blocTest<SensorBloc, SensorState>(
       'appends reading to realtimeBuffer and updates latestReading',
       build: () {
-        when(() => mockGetRealtimeReadings('ESP_001'))
-            .thenAnswer((_) => Stream.fromIterable([testReading1, testReading2]));
+        when(() => mockGetRealtimeReadings('ESP_001')).thenAnswer(
+            (_) => Stream.fromIterable([testReading1, testReading2]));
         return SensorBloc(
           getSensorHistory: mockGetSensorHistory,
           getRealtimeReadings: mockGetRealtimeReadings,
@@ -258,7 +264,8 @@ void main() {
         getSensorHistory: mockGetSensorHistory,
         getRealtimeReadings: mockGetRealtimeReadings,
       ),
-      act: (bloc) => bloc.add(SensorRealtimeDataReceived(reading: testReading1)),
+      act: (bloc) =>
+          bloc.add(SensorRealtimeDataReceived(reading: testReading1)),
       expect: () => [], // No new state emitted, buffer does not grow
     );
   });
@@ -298,7 +305,8 @@ void main() {
         getSensorHistory: mockGetSensorHistory,
         getRealtimeReadings: mockGetRealtimeReadings,
       ),
-      act: (bloc) => bloc.add(SensorRealtimeDataReceived(reading: testReading2)),
+      act: (bloc) =>
+          bloc.add(SensorRealtimeDataReceived(reading: testReading2)),
       expect: () => [
         SensorLoaded(
           historyReadings: [testReading1],
@@ -315,7 +323,8 @@ void main() {
         getSensorHistory: mockGetSensorHistory,
         getRealtimeReadings: mockGetRealtimeReadings,
       ),
-      act: (bloc) => bloc.add(const SensorRealtimeFailed(message: 'No connection')),
+      act: (bloc) =>
+          bloc.add(const SensorRealtimeFailed(message: 'No connection')),
       expect: () => [
         const SensorError(message: 'No connection'),
       ],
@@ -323,7 +332,8 @@ void main() {
   });
 
   group('SensorBloc - SensorResetRequested', () {
-    test('cancels active realtime polling and resets state to SensorInitial', () async {
+    test('cancels active realtime polling and resets state to SensorInitial',
+        () async {
       final controller = StreamController<SensorReading>();
       when(() => mockGetRealtimeReadings('ESP_001'))
           .thenAnswer((_) => controller.stream);

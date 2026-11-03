@@ -34,7 +34,9 @@ jobs:
         run: flutter pub get
 
       - name: Build APK (Release)
-        run: flutter build apk --release
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: flutter build apk --release ${API_BASE_URL:+--dart-define=API_BASE_URL="$API_BASE_URL"}
 
       - name: Rename APK with timestamp
         run: |
