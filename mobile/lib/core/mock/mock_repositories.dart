@@ -88,14 +88,14 @@ class MockDashboardRepository implements DashboardRepository {
       DeviceModel(
         id: 'ESP_001',
         deviceName: 'Vườn Lan Ban Công',
-        status: 'ONLINE',
+        status: 'active',
         permission: 'OWNER',
         blePassKey: '123456',
       ),
       DeviceModel(
         id: 'ESP_002',
         deviceName: 'Vườn Hồng Sân Thượng',
-        status: 'OFFLINE',
+        status: 'offline',
         permission: 'VIEWER',
       ),
     ];

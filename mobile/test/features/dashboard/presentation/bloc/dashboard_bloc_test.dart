@@ -18,7 +18,7 @@ void main() {
   final testDevice1 = DeviceModel(
     id: 'ESP_001',
     deviceName: 'Vườn Lan Ban Công',
-    status: 'ONLINE',
+    status: 'active',
     permission: 'OWNER',
     blePassKey: '123456',
   );
@@ -26,7 +26,7 @@ void main() {
   final testDevice2 = DeviceModel(
     id: 'ESP_002',
     deviceName: 'Vườn Hồng Sân Thượng',
-    status: 'OFFLINE',
+    status: 'offline',
     permission: 'VIEWER',
   );
 

@@ -14,12 +14,12 @@ class ApiDeviceRepository implements DeviceRepository {
     final rows = response['data'];
     if (rows is! List) return const [];
     return rows.whereType<Map<String, dynamic>>().map((json) {
-      final status = json['status']?.toString().toUpperCase();
+      final status = json['status']?.toString().toLowerCase();
       return Device(
         id: json['id']?.toString() ?? '',
         name: json['device_name']?.toString() ?? 'Thiết bị',
         type: DeviceType.unknown,
-        isOnline: status == 'ONLINE',
+        isOnline: status == 'active',
         location: null,
       );
     }).toList();

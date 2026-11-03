@@ -434,8 +434,8 @@ class FakeBackend {
         .map((device) => {
               'id': device.id,
               'device_name': device.name,
-              'status': device.isOnline ? 'ONLINE' : 'OFFLINE',
-              'permission': 'OWNER',
+              'status': device.isOnline ? 'active' : 'offline',
+              'permission': 'owner',
             })
         .toList();
   }

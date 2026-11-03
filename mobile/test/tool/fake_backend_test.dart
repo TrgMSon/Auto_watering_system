@@ -114,18 +114,19 @@ void main() {
 
       final devices = await dashboardRepository.getDevices();
       expect(devices.map((device) => device.status), [
-        'ONLINE',
-        'OFFLINE',
-        'ONLINE',
-        'ONLINE',
-        'ONLINE',
+        'active',
+        'offline',
+        'active',
+        'active',
+        'active',
       ]);
+      expect(devices.map((device) => device.isOnline).toList(), [true, false, true, true, true]);
 
       await backend.runCommand('offline 1');
       await backend.runCommand('online 2');
       final updated = await dashboardRepository.getDevices();
-      expect(updated[0].status, 'OFFLINE');
-      expect(updated[1].status, 'ONLINE');
+      expect(updated[0].status, 'offline');
+      expect(updated[1].status, 'active');
     });
 
     test('returns no devices for the empty account', () async {

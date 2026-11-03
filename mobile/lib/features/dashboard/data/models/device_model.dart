@@ -19,7 +19,7 @@ class DeviceModel extends Equatable {
     return DeviceModel(
       id: json['id'] ?? '',
       deviceName: json['device_name'] ?? json['deviceName'] ?? '',
-      status: json['status'] ?? 'OFFLINE',
+      status: json['status'] ?? 'offline',
       permission: json['permission'] ?? 'VIEWER',
       blePassKey: json['ble_pass_key'] ?? json['blePassKey'],
     );
@@ -35,7 +35,8 @@ class DeviceModel extends Equatable {
     };
   }
 
-  bool get isOnline => status.toUpperCase() == 'ONLINE';
+  /// Backend chỉ cho điều khiển khi thiết bị ở trạng thái `active`.
+  bool get isOnline => status.toLowerCase() == 'active';
 
   @override
   List<Object?> get props => [id, deviceName, status, permission, blePassKey];
