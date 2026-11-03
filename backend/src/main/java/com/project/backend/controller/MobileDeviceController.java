@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.backend.common.ApiResponse;
+import com.project.backend.dto.device.BleSecretKeyResponse;
 import com.project.backend.dto.device.DeviceSummaryResponse;
 import com.project.backend.dto.sensor.SensorReadingResponse;
 import com.project.backend.service.DeviceService;
@@ -33,6 +34,14 @@ public class MobileDeviceController {
             Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success(
                 deviceService.getUserDevices(userId(authentication))));
+    }
+
+    @GetMapping("/{id}/ble-secret-key")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<ApiResponse<BleSecretKeyResponse>> getBleSecretKey(
+            @PathVariable String id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(
+                new BleSecretKeyResponse(deviceService.getBleSecretKey(id, userId(authentication)))));
     }
 
     @GetMapping("/{id}/telemetry")
