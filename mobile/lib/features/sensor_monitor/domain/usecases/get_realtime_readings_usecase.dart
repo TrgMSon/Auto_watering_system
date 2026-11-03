@@ -5,5 +5,6 @@ class GetRealtimeReadingsUseCase {
   final SensorRepository repository;
   const GetRealtimeReadingsUseCase(this.repository);
 
-  Stream<SensorReading> call() => repository.getRealtimeReadings();
+  Stream<SensorReading> call(String deviceId) =>
+      repository.getRealtimeReadings(deviceId);
 }

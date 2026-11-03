@@ -1,48 +1,102 @@
-name: Build Flutter APK
+# Build app Android trên máy Ubuntu của GitHub → file .apk ký bằng khóa debug.
+# Cần đặt biến API_BASE_URL ở Settings → Secrets and variables → Actions → Variables,
+# ví dụ https://api.example.com/api. Khi chạy tay có thể nhập địa chỉ khác.
+name: Android build (APK)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Cho phép trigger bằng tay
+    inputs:
+      api_base_url:
+        description: 'Địa chỉ API (bỏ trống để dùng biến API_BASE_URL)'
+        required: false
+        type: string
   push:
-    branches: [ "mobile_app" ]
-  pull_request:
-    branches: [ "mobile_app" ]
+    branches: [ 'mobile_app' ] # Chỉ chạy khi push lên nhánh mobile_app
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build_apk.yml'
+      - '!mobile/**/*.md'
+      - '!mobile/test/**'
+      - '!mobile/tool/**'
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # để đăng file lên Releases
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
+
     defaults:
       run:
         working-directory: ./mobile
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      # Nếu thiếu địa chỉ, app sẽ gọi 10.0.2.2 và không kết nối được trên điện thoại thật.
+      - name: Kiểm tra địa chỉ API
+        run: |
+          case "$API_BASE_URL" in
+            http://*|https://*) echo "API: $API_BASE_URL" ;;
+            *)
+              echo "::error::Chưa đặt API_BASE_URL hợp lệ (phải bắt đầu bằng http:// hoặc https://)."
+              exit 1
+              ;;
+          esac
+
+      - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
-          channel: 'stable'
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
 
-      - name: Install dependencies
+      - name: Cài thư viện
         run: flutter pub get
 
-      - name: Build APK (Release)
-        run: flutter build apk --release
-
-      - name: Rename APK with timestamp
+      - name: Cho phép gọi backend qua HTTP
         run: |
-          TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-release_$TIMESTAMP.apk
+          case "$API_BASE_URL" in
+            http://*)
+              sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+              grep -q 'android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
+              ;;
+          esac
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - name: Build APK (release)
+        run: flutter build apk --release --dart-define=API_BASE_URL="$API_BASE_URL"
+
+      - name: Đóng gói APK
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk watering-app.apk
+          ls -lh watering-app.apk
+
+      - name: Đăng lên Releases (link tải cố định)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="android-latest-${GITHUB_REF_NAME//\//-}"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" watering-app.apk --prerelease --target "$GITHUB_SHA" \
+            --title "Android mới nhất – $GITHUB_REF_NAME" \
+            --notes "APK từ commit ${GITHUB_SHA::7} trên nhánh $GITHUB_REF_NAME. Tải về và cài trực tiếp lên điện thoại Android."
+          echo "Link tải: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/watering-app.apk"
+
+      - uses: actions/upload-artifact@v5
         with:
-          name: release-apk
-          path: mobile/build/app/outputs/flutter-apk/app-release_*.apk
+          name: watering-app-android
+          # Do actions (ngoại trừ run) luôn lấy root repo làm gốc, ta cần trỏ vào thư mục mobile
+          path: mobile/watering-app.apk
+          retention-days: 14

@@ -1,11 +1,23 @@
 # Build app iOS trên máy macOS của GitHub → file .ipa CHƯA KÝ.
+# Cần đặt biến API_BASE_URL ở Settings → Secrets and variables → Actions → Variables,
+# ví dụ https://api.example.com/api. Khi chạy tay có thể nhập địa chỉ khác.
 name: iOS build (IPA chưa ký)
 
 on:
   workflow_dispatch: # Cho phép trigger bằng tay
+    inputs:
+      api_base_url:
+        description: 'Địa chỉ API (bỏ trống để dùng biến API_BASE_URL)'
+        required: false
+        type: string
   push:
     branches: [ 'mobile_app' ] # Chỉ chạy khi push lên nhánh mobile_app
-    paths-ignore: ['**.md', 'tool/**']
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ios_build.yml'
+      - '!mobile/**/*.md'
+      - '!mobile/test/**'
+      - '!mobile/tool/**'
 
 concurrency:
   group: ios-build-${{ github.ref }}
@@ -18,7 +30,10 @@ jobs:
   build-ios:
     runs-on: macos-15
     timeout-minutes: 60
-    
+
+    env:
+      API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL }}
+
     # Rất quan trọng: Báo cho GitHub Actions biết thư mục chứa Flutter project là "mobile"
     defaults:
       run:
@@ -27,29 +42,48 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Nếu thiếu địa chỉ, app sẽ gọi 10.0.2.2 và không kết nối được trên iPhone.
+      - name: Kiểm tra địa chỉ API
+        run: |
+          case "$API_BASE_URL" in
+            http://*|https://*) echo "API: $API_BASE_URL" ;;
+            *)
+              echo "::error::Chưa đặt API_BASE_URL hợp lệ (phải bắt đầu bằng http:// hoặc https://)."
+              exit 1
+              ;;
+          esac
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.47.2'
           cache: true
 
       - name: Cài thư viện
         run: flutter pub get
 
       - name: Tạo cấu trúc iOS (nếu dự án chưa có)
-        run: flutter create --platforms=ios .
+        run: flutter create --platforms=ios --org com.wateringsystem --project-name watering_app .
 
-      - name: Disable code signing requirement in Xcode
+      - name: Cho phép gọi backend qua HTTP
         run: |
-          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = \(.*\);/PRODUCT_BUNDLE_IDENTIFIER = \1; CODE_SIGNING_ALLOWED = "NO"; CODE_SIGNING_REQUIRED = "NO"; DEVELOPMENT_TEAM = "V8VXY724Y2";/g' ios/Runner.xcodeproj/project.pbxproj
+          case "$API_BASE_URL" in
+            http://*)
+              PLIST=ios/Runner/Info.plist
+              /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST"
+              /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
+              /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'Kết nối tới máy chủ tưới cây trong mạng nội bộ.'" "$PLIST"
+              ;;
+          esac
 
       - name: Build iOS (release, không ký)
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --dart-define=API_BASE_URL="$API_BASE_URL"
 
       - name: Đóng gói IPA
         run: |
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qr watering-app-unsigned.ipa Payload
+          zip -qry watering-app-unsigned.ipa Payload
           ls -lh watering-app-unsigned.ipa
 
       - name: Đăng lên Releases (link tải cố định)

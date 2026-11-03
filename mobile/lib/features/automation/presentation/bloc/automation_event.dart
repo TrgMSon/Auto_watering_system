@@ -44,9 +44,13 @@ class AutomationScheduleUpdated extends AutomationEvent {
 class AutomationScheduleDeleted extends AutomationEvent {
   final int scheduleId;
   final String deviceId;
-  
+
   const AutomationScheduleDeleted({required this.scheduleId, required this.deviceId});
 
   @override
   List<Object?> get props => [scheduleId, deviceId];
+}
+
+class AutomationResetRequested extends AutomationEvent {
+  const AutomationResetRequested();
 }

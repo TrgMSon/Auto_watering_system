@@ -51,7 +51,13 @@ class MockAuthRepository implements AuthRepository {
 
 class MockDashboardRepository implements DashboardRepository {
   bool _isAutoWatering = false;
-  bool _isPumpOn = false;
+  final Map<String, DateTime> _pumpOffAt = {};
+
+  bool? _isPumpOn(String deviceId) {
+    final offAt = _pumpOffAt[deviceId];
+    if (offAt == null) return null;
+    return DateTime.now().isBefore(offAt);
+  }
 
   @override
   Future<DashboardSummary> getDashboardSummary() async {
@@ -82,14 +88,14 @@ class MockDashboardRepository implements DashboardRepository {
       DeviceModel(
         id: 'ESP_001',
         deviceName: 'Vườn Lan Ban Công',
-        status: 'ONLINE',
+        status: 'active',
         permission: 'OWNER',
         blePassKey: '123456',
       ),
       DeviceModel(
         id: 'ESP_002',
         deviceName: 'Vườn Hồng Sân Thượng',
-        status: 'OFFLINE',
+        status: 'offline',
         permission: 'VIEWER',
       ),
     ];
@@ -98,11 +104,15 @@ class MockDashboardRepository implements DashboardRepository {
   @override
   Future<void> togglePump(String deviceId, bool turnOn, {int duration = 120}) async {
     await Future.delayed(const Duration(milliseconds: 600));
-    _isPumpOn = turnOn;
+    if (turnOn) {
+      _pumpOffAt[deviceId] = DateTime.now().add(Duration(seconds: duration));
+    } else {
+      _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+    }
   }
 
   @override
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey) async* {
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey) async* {
     final random = Random();
     while (true) {
       await Future.delayed(const Duration(seconds: 5));
@@ -112,7 +122,7 @@ class MockDashboardRepository implements DashboardRepository {
         temperature: 25.0 + random.nextDouble() * 10,
         humidity: 60.0 + random.nextDouble() * 30,
         waterLevel: 80.0 - random.nextDouble() * 5,
-        isPumpOn: _isPumpOn,
+        isPumpOn: _isPumpOn(deviceId),
         recordedAt: DateTime.now(),
       );
     }
@@ -125,7 +135,11 @@ class MockSensorRepository implements SensorRepository {
   Timer? _timer;
 
   @override
-  Future<List<SensorReading>> getSensorHistory({required DateTime from, required DateTime to}) async {
+  Future<List<SensorReading>> getSensorHistory({
+    required String deviceId,
+    required DateTime from,
+    required DateTime to,
+  }) async {
     await Future.delayed(const Duration(seconds: 1));
     final list = <SensorReading>[];
     var current = from;
@@ -144,7 +158,7 @@ class MockSensorRepository implements SensorRepository {
   }
 
   @override
-  Stream<SensorReading> getRealtimeReadings() {
+  Stream<SensorReading> getRealtimeReadings(String deviceId) {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!_controller.isClosed) {

@@ -8,10 +8,20 @@ import '../../domain/repositories/dashboard_repository.dart';
 import '../../domain/entities/dashboard_summary.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
-  DashboardRepositoryImpl(this._apiClient);
+  DashboardRepositoryImpl(
+    this._apiClient, {
+    Duration pollInterval = const Duration(seconds: 5),
+  }) : _pollInterval = pollInterval;
 
   final ApiClient _apiClient;
-  final Map<String, bool> _pumpStatus = {};
+  final Duration _pollInterval;
+  final Map<String, DateTime> _pumpOffAt = {};
+
+  bool? _isPumpOn(String deviceId) {
+    final offAt = _pumpOffAt[deviceId];
+    if (offAt == null) return null;
+    return DateTime.now().isBefore(offAt);
+  }
 
   @override
   Future<List<DeviceModel>> getDevices() async {
@@ -45,7 +55,11 @@ class DashboardRepositoryImpl implements DashboardRepository {
       );
       final status = acknowledgment['status']?.toString().toUpperCase();
       if (status == 'SUCCEEDED') {
-        _pumpStatus[deviceId] = turnOn;
+        if (turnOn) {
+          _pumpOffAt[deviceId] = DateTime.now().add(Duration(seconds: duration));
+        } else {
+          _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+        }
         return;
       }
       if (status == 'FAILED' || status == 'PUBLISH_FAILED') {
@@ -62,17 +76,30 @@ class DashboardRepositoryImpl implements DashboardRepository {
   }
 
   @override
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey) async* {
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey) async* {
     while (true) {
-      final response = await _apiClient.get(
-        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
-      );
-      if (response.isNotEmpty) {
-        yield TelemetryModel.fromJson(response).copyWith(
-          isPumpOn: _pumpStatus[deviceId],
+      try {
+        final response = await _apiClient.get(
+          '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
         );
+        if (response.isNotEmpty) {
+          final model = TelemetryModel.fromJson(response);
+          yield TelemetryModel(
+            deviceId: model.deviceId,
+            soilMoisture: model.soilMoisture,
+            temperature: model.temperature,
+            humidity: model.humidity,
+            waterLevel: model.waterLevel,
+            isPumpOn: _isPumpOn(deviceId),
+            recordedAt: model.recordedAt,
+          );
+        } else {
+          yield null;
+        }
+      } catch (e, stackTrace) {
+        yield* Stream<TelemetryModel?>.error(e, stackTrace);
       }
-      await Future<void>.delayed(const Duration(seconds: 5));
+      await Future<void>.delayed(_pollInterval);
     }
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_error_widget.dart';
+import '../../../../core/widgets/app_loading_indicator.dart';
 import '../../data/models/device_config_model.dart';
 import '../../data/models/schedule_model.dart';
 import '../bloc/automation_bloc.dart';
@@ -42,10 +44,21 @@ class _AutomationPageState extends State<AutomationPage> {
       body: BlocBuilder<AutomationBloc, AutomationState>(
         builder: (context, state) {
           if (state is AutomationLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingIndicator(
+              message: 'Đang tải cấu hình tự động...',
+            );
           }
           if (state is AutomationError) {
-            return Center(child: Text('Lỗi: ${state.message}'));
+            return AppErrorWidget(
+              message: state.message,
+              onRetry: () {
+                if (widget.deviceId.isNotEmpty) {
+                  context
+                      .read<AutomationBloc>()
+                      .add(AutomationLoadRequested(widget.deviceId));
+                }
+              },
+            );
           }
           if (state is AutomationInitial) {
             return const Center(child: Text('Chưa tìm thấy thiết bị của tài khoản.'));

@@ -4,6 +4,7 @@ class RouteNames {
   static const String login = '/login';
   static const String dashboard = '/dashboard';
   static const String analytics = '/analytics';
+  static const String monitor = '/monitor';
   static const String devices = '/devices';
   static const String deviceDetail = 'detail/:deviceId';
   static const String settings = '/settings';

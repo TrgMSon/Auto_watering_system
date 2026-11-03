@@ -9,5 +9,5 @@ abstract class DashboardRepository {
   // New API-first methods for Tab 1
   Future<List<DeviceModel>> getDevices();
   Future<void> togglePump(String deviceId, bool turnOn, {int duration = 120});
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey);
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey);
 }

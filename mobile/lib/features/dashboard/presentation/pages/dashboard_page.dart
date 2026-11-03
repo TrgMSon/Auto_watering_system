@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
 import '../../../../core/widgets/app_error_widget.dart';
+import '../../../../core/widgets/empty_device_widget.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -22,9 +25,68 @@ class _DashboardPageState extends State<DashboardPage> {
     context.read<DashboardBloc>().add(const DashboardLoadRequested());
   }
 
+  Future<int?> _showPumpDurationSheet(BuildContext context) {
+    const options = [
+      {'label': '1 phút', 'seconds': 60},
+      {'label': '2 phút (mặc định)', 'seconds': 120},
+      {'label': '5 phút', 'seconds': 300},
+      {'label': '10 phút', 'seconds': 600},
+    ];
+
+    return showModalBottomSheet<int>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Chọn thời gian bơm',
+                    style: Theme.of(sheetContext).textTheme.titleMedium,
+                  ),
+                ),
+                ...options.map((opt) {
+                  final seconds = opt['seconds'] as int;
+                  final label = opt['label'] as String;
+                  return ListTile(
+                    title: Text(label),
+                    onTap: () => Navigator.of(sheetContext).pop(seconds),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<DashboardBloc, DashboardState>(
+    return BlocConsumer<DashboardBloc, DashboardState>(
+      listenWhen: (previous, current) =>
+          current is DashboardLoaded &&
+          current.pumpErrorMessage != null &&
+          (previous is! DashboardLoaded ||
+              previous.pumpErrorMessage != current.pumpErrorMessage),
+      listener: (context, state) {
+        if (state is DashboardLoaded && state.pumpErrorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.pumpErrorMessage!),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      },
       builder: (context, state) {
         if (state is DashboardInitial || state is DashboardLoading) {
           return const Scaffold(
@@ -45,13 +107,18 @@ class _DashboardPageState extends State<DashboardPage> {
           if (state.devices.isEmpty) {
             return Scaffold(
               appBar: AppBar(title: const Text('Tổng quan')),
-              body: const Center(child: Text('Bạn chưa có thiết bị nào.')),
+              body: EmptyDeviceWidget(
+                onReload: () => context
+                    .read<DashboardBloc>()
+                    .add(const DashboardLoadRequested()),
+              ),
             );
           }
           
           final selectedDevice = state.selectedDevice ?? state.devices.first;
           final telemetry = state.telemetry;
           final pumpStatus = state.pumpStatus ?? telemetry?.isPumpOn;
+          final isOnline = selectedDevice.isOnline;
 
           return Scaffold(
             appBar: AppBar(
@@ -88,13 +155,17 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Row(
                     children: [
                       Icon(
-                        state.isBleConnected ? Icons.bluetooth_connected : Icons.wifi,
-                        color: state.isBleConnected ? Colors.blueAccent : Colors.greenAccent,
+                        state.isBleConnected
+                            ? Icons.bluetooth_connected
+                            : (isOnline ? Icons.wifi : Icons.wifi_off),
+                        color: state.isBleConnected
+                            ? Colors.blueAccent
+                            : (isOnline ? Colors.greenAccent : Colors.grey),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        selectedDevice.status,
+                        isOnline ? 'Online' : 'Offline',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -104,7 +175,12 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             body: RefreshIndicator(
               onRefresh: () async {
-                context.read<DashboardBloc>().add(const DashboardLoadRequested());
+                final bloc = context.read<DashboardBloc>();
+                bloc.add(const DashboardLoadRequested());
+                await bloc.stream.firstWhere(
+                  (state) => state is! DashboardLoaded || !state.isRefreshing,
+                  orElse: () => bloc.state,
+                );
               },
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -134,7 +210,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.water_drop, color: AppColors.primary),
-                                ),
+                                								),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
@@ -146,18 +222,41 @@ class _DashboardPageState extends State<DashboardPage> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      Text(
-                                        pumpStatus == null
-                                            ? 'Chưa có trạng thái từ thiết bị'
-                                            : pumpStatus
-                                                ? 'Đang tưới nước'
-                                                : 'Đang tắt',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: pumpStatus == true ? AppColors.primary : AppColors.textSecondary,
+                                      if (!isOnline)
+                                        Text(
+                                          'Thiết bị đang offline',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        )
+                                      else if (state.isTogglingPump)
+                                        Text(
+                                          'Đang chờ thiết bị xác nhận...',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        )
+                                      else if (pumpStatus == true && state.pumpOffAt != null)
+                                        PumpCountdownText(pumpOffAt: state.pumpOffAt!)
+                                      else
+                                        Text(
+                                          pumpStatus == null
+                                              ? 'Chưa có trạng thái từ thiết bị'
+                                              : (pumpStatus
+                                                  ? 'Đang tưới nước'
+                                                  : 'Đang tắt'),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: pumpStatus == true
+                                                ? AppColors.primary
+                                                : AppColors.textSecondary,
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
@@ -176,9 +275,22 @@ class _DashboardPageState extends State<DashboardPage> {
                                 )
                               : Switch(
                                   value: pumpStatus ?? false,
-                                  onChanged: (value) {
-                                    context.read<DashboardBloc>().add(DashboardPumpToggled(value));
-                                  },
+                                  onChanged: isOnline
+                                      ? (value) async {
+                                          if (!value) {
+                                            context
+                                                .read<DashboardBloc>()
+                                                .add(const DashboardPumpToggled(false));
+                                            return;
+                                          }
+                                          final seconds = await _showPumpDurationSheet(context);
+                                          if (seconds != null && context.mounted) {
+                                            context.read<DashboardBloc>().add(
+                                              DashboardPumpToggled(true, durationSeconds: seconds),
+                                            );
+                                          }
+                                        }
+                                      : null,
                                 ),
                         ],
                       ),
@@ -188,13 +300,31 @@ class _DashboardPageState extends State<DashboardPage> {
                   
                   // Sensor Grid
                   Text('Thông số hiện tại', style: Theme.of(context).textTheme.titleMedium),
+                  if (telemetry != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Cập nhật lần cuối: ${Formatters.formatDateTime(telemetry.recordedAt)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   
-                  if (telemetry == null)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: CircularProgressIndicator(),
-                    ))
+                  if (state.isTelemetryEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text('Thiết bị chưa gửi dữ liệu'),
+                      ),
+                    )
+                  else if (telemetry == null)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   else
                     GridView.count(
                       crossAxisCount: 2,
@@ -292,6 +422,78 @@ class SensorCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class PumpCountdownText extends StatefulWidget {
+  final DateTime pumpOffAt;
+
+  const PumpCountdownText({
+    super.key,
+    required this.pumpOffAt,
+  });
+
+  @override
+  State<PumpCountdownText> createState() => _PumpCountdownTextState();
+}
+
+class _PumpCountdownTextState extends State<PumpCountdownText> {
+  Timer? _timer;
+  late Duration _remaining;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateRemaining();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(_updateRemaining);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant PumpCountdownText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pumpOffAt != widget.pumpOffAt) {
+      _updateRemaining();
+    }
+  }
+
+  void _updateRemaining() {
+    final diff = widget.pumpOffAt.difference(DateTime.now());
+    _remaining = diff.isNegative ? Duration.zero : diff;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_remaining == Duration.zero) {
+      return Text(
+        'Đang tắt',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+      );
+    }
+    final minutes = (_remaining.inSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_remaining.inSeconds % 60).toString().padLeft(2, '0');
+    return Text(
+      'Còn $minutes:$seconds',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w500,
+          ),
     );
   }
 }

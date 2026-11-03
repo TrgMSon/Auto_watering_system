@@ -1,30 +1,24 @@
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/api_client.dart';
-import '../../../dashboard/data/models/device_model.dart';
 import '../../domain/entities/sensor_reading.dart';
 import '../../domain/repositories/sensor_repository.dart';
 
 class ApiSensorRepository implements SensorRepository {
-  ApiSensorRepository(this._apiClient);
+  ApiSensorRepository(
+    this._apiClient, {
+    Duration pollInterval = const Duration(seconds: 5),
+  }) : _pollInterval = pollInterval;
 
   final ApiClient _apiClient;
-
-  Future<String?> _getDeviceId() async {
-    final response = await _apiClient.get(ApiEndpoints.devices);
-    final rows = response['data'];
-    if (rows is! List || rows.isEmpty) return null;
-    final first = rows.first;
-    if (first is! Map<String, dynamic>) return null;
-    return DeviceModel.fromJson(first).id;
-  }
+  final Duration _pollInterval;
 
   @override
   Future<List<SensorReading>> getSensorHistory({
+    required String deviceId,
     required DateTime from,
     required DateTime to,
   }) async {
-    final deviceId = await _getDeviceId();
-    if (deviceId == null) return const [];
+    if (deviceId.isEmpty) return const [];
     final response = await _apiClient.get(
       '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry',
       queryParameters: {
@@ -41,15 +35,18 @@ class ApiSensorRepository implements SensorRepository {
   }
 
   @override
-  Stream<SensorReading> getRealtimeReadings() async* {
-    final deviceId = await _getDeviceId();
-    if (deviceId == null) return;
+  Stream<SensorReading> getRealtimeReadings(String deviceId) async* {
+    if (deviceId.isEmpty) return;
     while (true) {
-      final response = await _apiClient.get(
-        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
-      );
-      if (response.isNotEmpty) yield _readingFromJson(response);
-      await Future<void>.delayed(const Duration(seconds: 5));
+      try {
+        final response = await _apiClient.get(
+          '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
+        );
+        if (response.isNotEmpty) yield _readingFromJson(response);
+      } catch (e, stackTrace) {
+        yield* Stream<SensorReading>.error(e, stackTrace);
+      }
+      await Future<void>.delayed(_pollInterval);
     }
   }
 

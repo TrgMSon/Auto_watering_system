@@ -21,19 +21,27 @@ class DashboardLoaded extends DashboardState {
   final List<DeviceModel> devices;
   final DeviceModel? selectedDevice;
   final TelemetryModel? telemetry;
+  final bool isTelemetryEmpty;
   final bool isTogglingPump;
   final bool isBleConnected;
   final bool? pumpStatus;
+  final DateTime? pumpOffAt;
   final String? errorMessage;
+  final String? pumpErrorMessage;
+  final bool isRefreshing;
 
   const DashboardLoaded({
     required this.devices,
     this.selectedDevice,
     this.telemetry,
+    this.isTelemetryEmpty = false,
     this.isTogglingPump = false,
     this.isBleConnected = false,
     this.pumpStatus,
+    this.pumpOffAt,
     this.errorMessage,
+    this.pumpErrorMessage,
+    this.isRefreshing = false,
   });
 
   DashboardLoaded copyWith({
@@ -41,21 +49,31 @@ class DashboardLoaded extends DashboardState {
     DeviceModel? selectedDevice,
     TelemetryModel? telemetry,
     bool clearTelemetry = false,
+    bool? isTelemetryEmpty,
     bool? isTogglingPump,
     bool? isBleConnected,
     bool? pumpStatus,
     bool clearPumpStatus = false,
+    DateTime? pumpOffAt,
+    bool clearPumpOffAt = false,
     String? errorMessage,
     bool clearError = false,
+    String? pumpErrorMessage,
+    bool clearPumpError = false,
+    bool? isRefreshing,
   }) {
     return DashboardLoaded(
       devices: devices ?? this.devices,
       selectedDevice: selectedDevice ?? this.selectedDevice,
       telemetry: clearTelemetry ? null : (telemetry ?? this.telemetry),
+      isTelemetryEmpty: isTelemetryEmpty ?? (clearTelemetry ? false : this.isTelemetryEmpty),
       isTogglingPump: isTogglingPump ?? this.isTogglingPump,
       isBleConnected: isBleConnected ?? this.isBleConnected,
       pumpStatus: clearPumpStatus ? null : (pumpStatus ?? this.pumpStatus),
+      pumpOffAt: clearPumpOffAt ? null : (pumpOffAt ?? this.pumpOffAt),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      pumpErrorMessage: clearPumpError ? null : (pumpErrorMessage ?? this.pumpErrorMessage),
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 
@@ -64,10 +82,14 @@ class DashboardLoaded extends DashboardState {
         devices,
         selectedDevice,
         telemetry,
+        isTelemetryEmpty,
         isTogglingPump,
         isBleConnected,
         pumpStatus,
+        pumpOffAt,
         errorMessage,
+        pumpErrorMessage,
+        isRefreshing,
       ];
 }
 

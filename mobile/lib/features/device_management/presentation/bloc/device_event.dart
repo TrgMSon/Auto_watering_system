@@ -36,3 +36,7 @@ class DeviceToggleRequested extends DeviceEvent {
   @override
   List<Object?> get props => [deviceId, activate];
 }
+
+class DeviceResetRequested extends DeviceEvent {
+  const DeviceResetRequested();
+}
