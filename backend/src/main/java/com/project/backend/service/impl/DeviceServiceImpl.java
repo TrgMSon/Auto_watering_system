@@ -98,7 +98,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public DeviceCreatedResponse createDevice(CreateDeviceRequest request) {
         String deviceId = request.getId().trim().replace('-', ':').toUpperCase(Locale.ROOT);
-        if (deviceRepository.existsById(deviceId)) {
+        if (deviceRepository.existsById(Objects.requireNonNull(deviceId))) {
             throw new ConflictException("Thiết bị đã tồn tại");
         }
 
@@ -149,6 +149,16 @@ public class DeviceServiceImpl implements DeviceService {
                             userDevice.getPermission());
                 })
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String getBleSecretKey(String deviceId, int userId) {
+        Device device = requireOwnedDevice(deviceId, userId);
+        if (device.getBlePassKey() == null || device.getBlePassKey().isBlank()) {
+            throw new ConflictException("Thiết bị chưa được cấu hình khóa BLE");
+        }
+        return device.getBlePassKey();
     }
 
     private String trimToNull(String value) {

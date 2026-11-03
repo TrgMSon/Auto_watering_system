@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.backend.dto.device.CreateDeviceRequest;
 import com.project.backend.exception.ConflictException;
+import com.project.backend.exception.NotFoundException;
 import com.project.backend.model.Device;
 import com.project.backend.model.User;
 import com.project.backend.model.UserDevice;
@@ -118,6 +119,38 @@ class DeviceServiceImplTest {
 
         assertThrows(ConflictException.class, () -> deviceService.createDevice(request));
         verify(deviceRepository, never()).save(any(Device.class));
+    }
+
+    @Test
+    void retrievesBleSecretKeyForLinkedUser() {
+        String deviceId = "AA:BB:CC:DD:EE:FF";
+        Device device = new Device();
+        device.setId(deviceId);
+        device.setStatus("active");
+        device.setBlePassKey("ble-secret");
+        UserDevice userDevice = new UserDevice();
+        userDevice.setPermission("owner");
+
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+        when(userDeviceRepository.findByUser_IdAndDevice_Id(12, deviceId))
+                .thenReturn(Optional.of(userDevice));
+
+        assertEquals("ble-secret", deviceService.getBleSecretKey(deviceId, 12));
+    }
+
+    @Test
+    void rejectsBleSecretKeyRequestFromUnlinkedUser() {
+        String deviceId = "AA:BB:CC:DD:EE:FF";
+        Device device = new Device();
+        device.setId(deviceId);
+        device.setStatus("active");
+        device.setBlePassKey("ble-secret");
+
+        when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+        when(userDeviceRepository.findByUser_IdAndDevice_Id(12, deviceId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> deviceService.getBleSecretKey(deviceId, 12));
     }
 
     @Test

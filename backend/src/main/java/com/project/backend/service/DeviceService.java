@@ -23,6 +23,8 @@ public interface DeviceService {
 
     List<DeviceSummaryResponse> getUserDevices(int userId);
 
+    String getBleSecretKey(String deviceId, int userId);
+
     List<SensorReadingResponse> getSensorReadings(
             String deviceId, int userId, java.time.LocalDateTime from, java.time.LocalDateTime to);
 
