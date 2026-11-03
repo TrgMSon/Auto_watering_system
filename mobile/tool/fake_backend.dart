@@ -1,5 +1,6 @@
-// Backend giả để test app trên máy ảo, không cần DB, MQTT hay ESP thật.
-// Chạy trong thư mục mobile: dart tool/fake_backend.dart [port]
+// Backend giả để test app, không cần DB, MQTT hay ESP thật.
+// Chạy trong thư mục mobile: dart tool/fake_backend.dart [port] [--lan]
+// Mặc định chỉ máy này và máy ảo gọi được; thêm --lan để điện thoại cùng Wi-Fi gọi được.
 // Dữ liệu chỉ nằm trong bộ nhớ và mất khi tắt script.
 import 'dart:async';
 import 'dart:convert';
@@ -27,11 +28,14 @@ Commands:
   quit         stop the fake backend''';
 
 Future<void> main(List<String> args) async {
-  final port = args.isEmpty ? 8081 : int.parse(args.first);
-  final backend = FakeBackend(logRequests: true);
+  final allowLan = args.contains('--lan');
+  final portArgs = args.where((arg) => arg != '--lan');
+  final port = portArgs.isEmpty ? 8081 : int.parse(portArgs.first);
+  final backend = FakeBackend(logRequests: true, allowLan: allowLan);
   await backend.start(port: port);
 
   stdout.writeln('Fake backend: http://127.0.0.1:${backend.port}/api');
+  if (allowLan) await _printLanAddresses(backend.port);
   stdout.writeln(
     'Accounts (password $testPassword): user@test.com, empty@test.com, admin@test.com',
   );
@@ -44,6 +48,15 @@ Future<void> main(List<String> args) async {
   }
   await backend.stop();
   exit(0);
+}
+
+Future<void> _printLanAddresses(int port) async {
+  final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
+  for (final interface in interfaces) {
+    for (final address in interface.addresses) {
+      stdout.writeln('  LAN (${interface.name}): http://${address.address}:$port/api');
+    }
+  }
 }
 
 enum _PumpBehavior { succeeds, rejects, noResponse }
@@ -93,9 +106,10 @@ class _Reply {
 }
 
 class FakeBackend {
-  FakeBackend({this.logRequests = false});
+  FakeBackend({this.logRequests = false, this.allowLan = false});
 
   final bool logRequests;
+  final bool allowLan;
 
   static const List<_Account> _accounts = [
     _Account(1, 'user@test.com', 'USER'),
@@ -144,7 +158,9 @@ class FakeBackend {
   int get port => _port;
 
   Future<void> start({int port = 0}) async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+    final address =
+        allowLan ? InternetAddress.anyIPv4 : InternetAddress.loopbackIPv4;
+    final server = await HttpServer.bind(address, port);
     _port = server.port;
     _server = server;
     server.listen(_handleRequest);
