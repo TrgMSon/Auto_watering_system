@@ -156,6 +156,7 @@ Các API thiết bị yêu cầu bearer token. Thiết bị phải thuộc ngư�
 | --- | --- | --- |
 | `GET` | `/api/devices/{id}/config` | Đọc cấu hình và ngưỡng thiết bị |
 | `PUT` | `/api/devices/{id}/config` | Lưu cấu hình và gửi cấu hình đến thiết bị |
+| `GET` | `/api/devices/{id}/ble-secret-key` | Lấy khóa BLE của thiết bị đã liên kết để xác thực kết nối BLE |
 | `POST` | `/api/devices/{id}/control` | Gửi lệnh điều khiển máy bơm |
 | `POST` | `/api/devices/{id}/mode` | Cập nhật chế độ `auto` hoặc `manual` |
 | `GET` | `/api/devices/{id}/schedules` | Liệt kê lịch tưới |
