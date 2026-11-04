@@ -20,7 +20,7 @@ test('shows the administrator login page when no session exists', () => {
   expect(screen.getByLabelText('Mật khẩu')).toBeInTheDocument();
 });
 
-test('logs in an administrator and opens the dashboard', async () => {
+test('logs in an administrator and opens the device-management tab', async () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     status: 200,
@@ -45,8 +45,14 @@ test('logs in an administrator and opens the dashboard', async () => {
   fireEvent.click(screen.getByRole('button', { name: /đăng nhập/i }));
 
   await waitFor(() => {
-    expect(screen.getByRole('heading', { name: /tổng quan/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Quản lý thiết bị' })).toBeInTheDocument();
   });
+  expect(screen.getByRole('button', { name: 'Thiết bị IoT' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: 'Tổng quan' })).not.toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    expect.stringContaining('/api/admin/statistics/'),
+    expect.anything(),
+  );
   expect(global.fetch).toHaveBeenCalledWith(
     '/api/auth/login',
     expect.objectContaining({
@@ -131,7 +137,7 @@ test('automatically logs out when the access token expires', async () => {
   }));
 
   render(<App />);
-  expect(screen.getByRole('heading', { name: /tổng quan/i })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Quản lý thiết bị' })).toBeInTheDocument();
 
   await act(async () => {
     jest.advanceTimersByTime(10_001);
