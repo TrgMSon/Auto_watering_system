@@ -15,8 +15,15 @@ class AutomationRepositoryImpl implements IAutomationRepository {
 
   @override
   Future<DeviceConfigModel> getDeviceConfig(String deviceId) async {
-    final response = await _apiClient.get('${_devicePath(deviceId)}/config');
-    return DeviceConfigModel.fromJson(response);
+    try {
+      final response = await _apiClient.get('${_devicePath(deviceId)}/config');
+      return DeviceConfigModel.fromJson(response);
+    } on ApiException catch (e) {
+      // Backend trả 404 khi thiết bị chưa có cấu hình; nó chỉ tạo cấu hình khi lưu lần đầu.
+      // Nếu thiết bị không tồn tại thì getSchedules vẫn báo lỗi 404.
+      if (e.statusCode != 404) rethrow;
+      return DeviceConfigModel.fromJson({'device_id': deviceId});
+    }
   }
 
   @override
