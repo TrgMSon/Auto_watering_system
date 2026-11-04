@@ -33,6 +33,14 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> register({required String email, required String password}) async {
+    await _apiClient.post(
+      ApiEndpoints.register,
+      body: {'email': email, 'password': password},
+    );
+  }
+
+  @override
   Future<void> logout() async {
     final refreshToken = await _apiClient.refreshToken;
     try {

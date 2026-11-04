@@ -39,6 +39,16 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _onRegister() async {
+    final email = await context.push<String>(RouteNames.register);
+    if (email == null || !mounted) return;
+    _usernameController.text = email;
+    _passwordController.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đăng ký thành công. Vui lòng đăng nhập.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,6 +96,11 @@ class _LoginPageState extends State<LoginPage> {
                 _buildPasswordField(),
                 const SizedBox(height: 32),
                 _buildLoginButton(),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _onRegister,
+                  child: const Text('Chưa có tài khoản? Đăng ký'),
+                ),
               ],
             ),
           ),

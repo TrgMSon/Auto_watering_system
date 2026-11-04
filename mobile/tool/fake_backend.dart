@@ -117,6 +117,9 @@ class FakeBackend {
     _Account(3, 'admin@test.com', 'ADMIN'),
   ];
 
+  final Map<String, _Account> _registeredAccounts = {};
+  final Map<String, String> _registeredPasswords = {};
+
   final List<_Device> _devices = [
     _Device(
         id: 'ESP_01',
@@ -293,6 +296,7 @@ class FakeBackend {
     }
     return switch (action) {
       'login' => _login(body),
+      'register' => _register(body),
       'refresh-token' => _refreshSession(body),
       'logout' => const _Reply(200, 'Đăng xuất thành công'),
       _ => const _Reply(404, 'Không tìm thấy API.'),
@@ -335,10 +339,30 @@ class FakeBackend {
 
   _Reply _login(Map<String, dynamic> body) {
     final account = _findAccount(body['email']);
-    if (account == null || body['password'] != testPassword) {
+    final password = _registeredPasswords[account?.email] ?? testPassword;
+    if (account == null || body['password'] != password) {
       return const _Reply(401, 'Email hoặc mật khẩu không đúng.');
     }
     return _Reply(200, 'Login successfully', _sessionFor(account));
+  }
+
+  _Reply _register(Map<String, dynamic> body) {
+    final email = body['email'];
+    final password = body['password'];
+    if (email is! String || !email.contains('@')) {
+      return const _Reply(400, 'email: Không đúng định dạng email, ');
+    }
+    if (password is! String || password.length < 8) {
+      return const _Reply(
+          400, 'password: Mật khẩu phải có độ dài ít nhất là 8 kí tự, ');
+    }
+    if (_findAccount(email) != null) {
+      return const _Reply(409, 'Email này đã được đăng ký trong hệ thống.');
+    }
+    final id = _accounts.length + _registeredAccounts.length + 1;
+    _registeredAccounts[email] = _Account(id, email, 'USER', hasDevices: false);
+    _registeredPasswords[email] = password;
+    return const _Reply(201, 'Đăng ký tài khoản thành công!');
   }
 
   _Reply _refreshSession(Map<String, dynamic> body) {
@@ -382,7 +406,7 @@ class FakeBackend {
   }
 
   _Account? _findAccount(Object? email) {
-    for (final account in _accounts) {
+    for (final account in [..._accounts, ..._registeredAccounts.values]) {
       if (account.email == email) return account;
     }
     return null;
