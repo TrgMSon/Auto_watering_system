@@ -225,7 +225,3 @@ API dashboard thống kê:
 
 - `GET /api/admin/statistics/environmental?deviceId={id}&range={24h|7d|30d}`
 - `GET /api/admin/statistics/water-level?deviceId={id}&range={24h|7d|30d}`
-
-## Tài liệu mobile
-
-Tài liệu kiến trúc và thiết kế mobile nằm trong [`mobile/docs/`](mobile/docs/), bao gồm [architecture.md](mobile/docs/architecture.md).
