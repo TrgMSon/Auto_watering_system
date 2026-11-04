@@ -137,6 +137,18 @@ Tạo bản build production bằng:
 npm run build
 ```
 
+### Triển khai frontend cùng backend trên Render
+
+Docker image của backend build React frontend và đóng gói vào Spring Boot, vì vậy
+trang đăng nhập và API dùng chung một origin. Trên Render, đặt **Root Directory**
+trống (repository root), **Dockerfile Path** là `backend/Dockerfile`, và
+**Docker Build Context Directory** là `.`. Sau đó deploy lại Web Service backend.
+Không cần tạo Static Site riêng hay đặt `REACT_APP_API_BASE_URL` cho bản này:
+frontend production gọi API tương đối dưới `/api`. Khi mở URL của backend, người
+dùng chưa đăng nhập sẽ thấy form đăng nhập; token quản trị còn hạn trong
+`localStorage` sẽ đưa thẳng vào dashboard. Route `/login` cũng được backend
+chuyển về ứng dụng frontend khi tải lại trang.
+
 ### 4. Cài đặt và chạy ứng dụng mobile
 
 Mở terminal tại thư mục `mobile`, tải dependencies và khởi chạy ứng dụng trên emulator/thiết bị đang kết nối:
