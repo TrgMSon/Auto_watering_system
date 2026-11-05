@@ -1,0 +1,265 @@
+.firmware-management__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.firmware-management__eyebrow {
+  color: #5a8b66;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .8px;
+}
+
+.firmware-management__heading h1 {
+  margin: 7px 0 6px;
+  color: #203a2e;
+  font-size: 26px;
+  letter-spacing: -1px;
+}
+
+.firmware-management__heading p,
+.firmware-management__history-heading p {
+  margin: 0;
+  color: #89948c;
+  font-size: 11px;
+}
+
+.firmware-management__badge {
+  padding: 10px 13px;
+  border: 1px solid #e2ebe3;
+  border-radius: 9px;
+  color: #397653;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.firmware-management__layout {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.firmware-management__card {
+  min-width: 0;
+  padding: 22px 24px;
+  border: 1px solid #e8ede9;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 7px 24px rgb(31 65 44 / 3%);
+}
+
+.firmware-management__card h2 {
+  margin: 0;
+  color: #30483a;
+  font-size: 14px;
+}
+
+.firmware-management__hint {
+  margin: 8px 0 0;
+  color: #89948c;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.firmware-management__field {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  color: #4c5e52;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.firmware-management__field input:not([type="file"]),
+.firmware-management__field textarea,
+.firmware-management__field input[type="file"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #e1e8e2;
+  border-radius: 8px;
+  color: #344b3c;
+  background: #fcfdfc;
+  font: inherit;
+  font-weight: 400;
+}
+
+.firmware-management__field textarea {
+  resize: vertical;
+}
+
+.firmware-management__field input[type="file"] {
+  padding: 8px;
+}
+
+.firmware-management__field small {
+  color: #8b968e;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.firmware-management__submit,
+.firmware-management__refresh {
+  min-height: 36px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.firmware-management__submit {
+  width: 100%;
+  margin-top: 20px;
+  border: 0;
+  color: #fff;
+  background: #287852;
+}
+
+.firmware-management__submit:hover:not(:disabled) {
+  background: #206a48;
+}
+
+.firmware-management__submit:disabled,
+.firmware-management__refresh:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.firmware-management__history-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.firmware-management__history-heading p {
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.firmware-management__refresh {
+  padding: 0 11px;
+  border: 1px solid #dce8de;
+  color: #34714c;
+  background: #f8fbf8;
+}
+
+.firmware-management__empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: #89948c;
+  font-size: 11px;
+  text-align: center;
+}
+
+.firmware-management__release-list {
+  display: grid;
+  gap: 10px;
+  max-height: 480px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.firmware-management__release {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid #edf0ed;
+  border-radius: 9px;
+  background: #fcfdfc;
+}
+
+.firmware-management__release-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #344b3c;
+  font-size: 12px;
+}
+
+.firmware-management__release-title span {
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: #397653;
+  background: #edf6ef;
+  font-size: 8px;
+  letter-spacing: .35px;
+}
+
+.firmware-management__release p {
+  margin: 0;
+  color: #657369;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.firmware-management__release small {
+  color: #89948c;
+  font-size: 9px;
+}
+
+.firmware-management__release code {
+  overflow-wrap: anywhere;
+  color: #748078;
+  font-size: 9px;
+}
+
+.firmware-management__message,
+.firmware-management__notice {
+  padding: 11px 12px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.firmware-management__message--error {
+  border-color: #f0d8cb;
+  color: #965b3f;
+  background: #fff9f5;
+}
+
+.firmware-management__message--success {
+  border-color: #d4e8d8;
+  color: #34714c;
+  background: #f3faf4;
+}
+
+.firmware-management__notice {
+  display: grid;
+  gap: 5px;
+  margin-top: 18px;
+  border-color: #e8e2cf;
+  color: #766b52;
+  background: #fffdf6;
+}
+
+.firmware-management__notice strong {
+  color: #665a3e;
+}
+
+@media (max-width: 850px) {
+  .firmware-management__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .firmware-management__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .firmware-management__card {
+    padding: 18px;
+  }
+}

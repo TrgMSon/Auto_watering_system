@@ -16,10 +16,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.backend.common.ApiResponse;
+import com.project.backend.dto.device.AddViewerRequest;
+import com.project.backend.dto.device.BleStatusRequest;
+import com.project.backend.dto.device.CommandAcknowledgmentResponse;
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
-import com.project.backend.dto.device.CommandAcknowledgmentResponse;
-import com.project.backend.dto.device.BleStatusRequest;
 import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
@@ -27,6 +28,7 @@ import com.project.backend.dto.device.PumpControlRequest;
 import com.project.backend.dto.device.RegisterDeviceRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
+import com.project.backend.dto.device.DeviceViewerResponse;
 import com.project.backend.service.DeviceService;
 import com.project.backend.service.DeviceLifecycleService;
 
@@ -78,15 +80,25 @@ public class DeviceController {
                 return ResponseEntity.ok(ApiResponse.success("Đã mở khóa quyền xem thiết bị", null));
         }
 
-        @PostMapping("/viewers/{viewerId}")
+        @PostMapping("/viewers")
         @PreAuthorize("hasRole('USER')")
         public ResponseEntity<ApiResponse<Void>> addViewer(
                         @PathVariable("id") String deviceId,
-                        @PathVariable int viewerId,
+                        @Valid @RequestBody AddViewerRequest request,
                         Authentication authentication) {
-                deviceService.addViewer(deviceId, userId(authentication), viewerId);
+                deviceService.addViewer(deviceId, userId(authentication), request.email());
                 return ResponseEntity.status(HttpStatus.CREATED)
-                                .body(ApiResponse.success("Đã chia sẻ quyền điều khiển thiết bị", null));
+                                .body(ApiResponse.success("Đã chia sẻ quyền truy cập thiết bị", null));
+        }
+
+        @GetMapping("/viewers")
+        @PreAuthorize("hasRole('USER')")
+        public ResponseEntity<ApiResponse<List<DeviceViewerResponse>>> getViewers(
+                        @PathVariable("id") String deviceId,
+                        Authentication authentication) {
+                return ResponseEntity.ok(ApiResponse.success(
+                                "Đã lấy danh sách người được chia sẻ",
+                                deviceService.getDeviceViewers(deviceId, userId(authentication))));
         }
 
         @DeleteMapping("/viewers/{viewerId}")

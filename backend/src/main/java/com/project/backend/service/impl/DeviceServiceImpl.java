@@ -22,6 +22,7 @@ import com.project.backend.dto.device.DeviceConfigResponse;
 import com.project.backend.dto.device.CreateDeviceRequest;
 import com.project.backend.dto.device.DeviceCreatedResponse;
 import com.project.backend.dto.device.DeviceSummaryResponse;
+import com.project.backend.dto.device.DeviceViewerResponse;
 import com.project.backend.dto.device.DeviceModeRequest;
 import com.project.backend.dto.device.ScheduleRequest;
 import com.project.backend.dto.device.ScheduleResponse;
@@ -44,6 +45,7 @@ import com.project.backend.repository.UserRepository;
 import com.project.backend.service.DeviceService;
 import com.project.backend.service.EmqxManagementService;
 import com.project.backend.service.MqttCommandAcknowledgmentService;
+import com.project.backend.service.WebSocketService;
 
 @Service
 public class DeviceServiceImpl implements DeviceService {
@@ -58,6 +60,7 @@ public class DeviceServiceImpl implements DeviceService {
     private final MqttDeviceCommandPublisher commandPublisher;
     private final MqttCommandAcknowledgmentService acknowledgmentService;
     private final EmqxManagementService emqxManagementService;
+    private final WebSocketService webSocketService;
 
     public DeviceServiceImpl(
             DeviceRepository deviceRepository,
@@ -68,7 +71,8 @@ public class DeviceServiceImpl implements DeviceService {
             UserRepository userRepository,
             MqttDeviceCommandPublisher commandPublisher,
             MqttCommandAcknowledgmentService acknowledgmentService,
-            EmqxManagementService emqxManagementService) {
+            EmqxManagementService emqxManagementService,
+            WebSocketService webSocketService) {
         this.deviceRepository = deviceRepository;
         this.deviceConfigRepository = deviceConfigRepository;
         this.scheduleRepository = scheduleRepository;
@@ -78,6 +82,7 @@ public class DeviceServiceImpl implements DeviceService {
         this.commandPublisher = commandPublisher;
         this.acknowledgmentService = acknowledgmentService;
         this.emqxManagementService = emqxManagementService;
+        this.webSocketService = webSocketService;
     }
 
     @Override
@@ -231,26 +236,43 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     @Transactional
-    public void addViewer(String deviceId, int ownerId, int viewerId) {
+    public void addViewer(String deviceId, int ownerId, String viewerEmail) {
         Device device = requireOwnerDevice(deviceId, ownerId);
         if (DeviceStatus.DECOMMISSIONED.value().equalsIgnoreCase(device.getStatus())) {
             throw new ConflictException("Thiết bị đã ngừng hoạt động");
         }
-        if (ownerId == viewerId) {
-            throw new ConflictException("Chủ sở hữu không thể tự thêm làm người xem");
-        }
 
-        User viewer = userRepository.findById(viewerId)
-                .orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
+        if (viewerEmail == null || viewerEmail.isBlank()) {
+            throw new IllegalArgumentException("Email không được để trống");
+        }
+        String normalizedEmail = viewerEmail.trim();
+        User viewer = userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản với email này"));
+        if (ownerId == viewer.getId()) {
+            throw new ConflictException("Chủ sở hữu không thể tự chia sẻ thiết bị với chính mình");
+        }
         if (viewer.getRole() != Role.USER) {
             throw new ConflictException("Chỉ tài khoản người dùng mới có thể được chia sẻ thiết bị");
         }
-        if (userDeviceRepository.existsByUser_IdAndDevice_Id(viewerId, deviceId)) {
+        if (userDeviceRepository.existsByUser_IdAndDevice_Id(viewer.getId(), deviceId)) {
             throw new ConflictException("Người dùng đã được chia sẻ thiết bị này");
         }
 
         userDeviceRepository.save(new UserDevice(
                 0, viewer, device, "viewer", LocalDateTime.now()));
+        webSocketService.notifyDeviceShared(viewer.getId(), device.getId(), device.getDeviceName());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DeviceViewerResponse> getDeviceViewers(String deviceId, int ownerId) {
+        requireOwnerDevice(deviceId, ownerId);
+        return userDeviceRepository.findViewersByDeviceId(deviceId).stream()
+                .map(userDevice -> new DeviceViewerResponse(
+                        userDevice.getUser().getId(),
+                        userDevice.getUser().getEmail(),
+                        userDevice.getPermission()))
+                .toList();
     }
 
     @Override

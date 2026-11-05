@@ -2,6 +2,7 @@ package com.project.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,16 +38,17 @@ public class EmqxManagementService {
         this.apiKey = apiKey;
         this.apiSecret = apiSecret;
         this.authenticatorId = authenticatorId;
-        this.restClient = restClientBuilder.clone().baseUrl(baseUrl).build();
+        this.restClient = restClientBuilder.clone().baseUrl(Objects.requireNonNull(baseUrl)).build();
     }
 
+    @SuppressWarnings("null")
     public void createDeviceUser(String username, String password) {
         requireConfiguration();
         try {
             restClient.post()
                     .uri(AUTHENTICATOR_USERS_PATH, authenticatorId)
-                    .headers(headers -> headers.setBasicAuth(apiKey, apiSecret))
-                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(headers -> headers.setBasicAuth(Objects.requireNonNull(apiKey), Objects.requireNonNull(apiSecret)))
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                     .body(Map.of(
                             "user_id", username,
                             "password", password,
@@ -73,7 +75,7 @@ public class EmqxManagementService {
             disconnectDeviceClients(username);
             restClient.delete()
                     .uri(AUTHENTICATOR_USERS_PATH + "/{username}", authenticatorId, username)
-                    .headers(headers -> headers.setBasicAuth(apiKey, apiSecret))
+                    .headers(headers -> headers.setBasicAuth(Objects.requireNonNull(apiKey), Objects.requireNonNull(apiSecret)))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientResponseException exception) {
@@ -98,7 +100,7 @@ public class EmqxManagementService {
                             .path("/clients")
                             .queryParam("username", username)
                             .build())
-                    .headers(headers -> headers.setBasicAuth(apiKey, apiSecret))
+                    .headers(headers -> headers.setBasicAuth(Objects.requireNonNull(apiKey), Objects.requireNonNull(apiSecret)))
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientResponseException exception) {
@@ -134,7 +136,7 @@ public class EmqxManagementService {
         try {
             restClient.delete()
                     .uri("/clients/{clientId}", clientId)
-                    .headers(headers -> headers.setBasicAuth(apiKey, apiSecret))
+                    .headers(headers -> headers.setBasicAuth(Objects.requireNonNull(apiKey), Objects.requireNonNull(apiSecret)))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientResponseException exception) {
