@@ -198,7 +198,8 @@ Các API thiết bị yêu cầu bearer token. Thiết bị phải thuộc ngư�
 | `POST` | `/api/devices/{id}/register` | Gán thiết bị cho người dùng (quyền admin) |
 | `GET` | `/api/devices/{id}/commands/{commandId}/ack` | Kiểm tra trạng thái xác nhận lệnh |
 | `POST` | `/api/devices/{id}/ble-status` | Chủ sở hữu báo kết quả kiểm tra BLE bằng `{"reachable":true\|false}` |
-| `POST` | `/api/devices/{id}/viewers/{viewerId}` | Chủ sở hữu chia sẻ thiết bị với tài khoản người dùng |
+| `POST` | `/api/devices/{id}/viewers` | Chủ sở hữu chia sẻ thiết bị với tài khoản người dùng theo email; body: `{"email":"viewer@example.com"}`; gửi thông báo WebSocket riêng cho tài khoản đó |
+| `GET` | `/api/devices/{id}/viewers` | Chủ sở hữu lấy danh sách tài khoản được chia sẻ, gồm `viewerId`, `email` và `permission` (`viewer` hoặc `viewer_locked`) |
 | `DELETE` | `/api/devices/{id}/viewers/{viewerId}` | Chủ sở hữu xóa quyền truy cập của viewer |
 | `POST` | `/api/devices/{id}/viewers/{viewerId}/lock` | Chủ sở hữu tạm khóa quyền xem |
 | `DELETE` | `/api/devices/{id}/viewers/{viewerId}/lock` | Chủ sở hữu mở khóa quyền xem |
@@ -221,13 +222,17 @@ Các endpoint dưới đây yêu cầu bearer token có role `ADMIN`.
 
 Yêu cầu thêm thiết bị nhận `id` (MAC theo dạng `AA:BB:CC:DD:EE:FF`, bắt buộc), cùng các trường tùy chọn `deviceName`, `hardwareVersion`, `firmwareVersion`. Thiết bị mới có trạng thái `registered`; backend tạo khóa BLE và MQTT ngẫu nhiên, lưu lại và trả `ble_secret_key`, `mqtt_username`, `mqtt_password` một lần trong response `201 Created` để phục vụ provisioning. MQTT username có dạng `dev_AABBCCDDEEFF`; username/password không vượt quá 55 ký tự. API liệt kê thiết bị không trả các thông tin xác thực này. Gán chủ sở hữu bằng `POST /api/devices/{id}/register` chuyển thiết bị sang `provisioned`, không tự đánh dấu đã kết nối.
 
-Role tài khoản chỉ gồm `user` và `admin`; owner/viewer là quyền theo từng thiết bị trong `user_device.permission`. Đăng ký mới và được admin gán thiết bị không đổi role tài khoản; người được gán nhận permission `owner`. Owner có thể cấp hoặc xóa liên kết `viewer`; viewer dùng được các API đọc, cấu hình, điều khiển và lịch tưới như owner, nhưng không thể xóa lịch hoặc quản lý/chia sẻ quyền người dùng khác. Tài khoản bị khóa (`viewer_locked`) không truy cập thiết bị.
+Role tài khoản chỉ gồm `user` và `admin`; owner/viewer là quyền theo từng thiết bị trong `user_device.permission`. Đăng ký mới và được admin gán thiết bị không đổi role tài khoản; người được gán nhận permission `owner`. Owner có thể chia sẻ thiết bị với tài khoản `user` đã tồn tại bằng email qua `POST /api/devices/{id}/viewers`, hoặc xóa liên kết `viewer`; viewer dùng được các API đọc, cấu hình, điều khiển và lịch tưới như owner, nhưng không thể xóa lịch hoặc quản lý/chia sẻ quyền người dùng khác. Tài khoản bị khóa (`viewer_locked`) không truy cập thiết bị.
 
 ### Vòng đời thiết bị và trạng thái
 
 Vòng đời lưu trong cột `device.status`: `registered` → `provisioned` → `active` ↔ `offline`; các trạng thái ngoại lệ gồm `fault`, `maintenance`, `decommissioned`. Thiết bị chỉ được điều khiển/cập nhật cấu hình từ xa khi `active`; người dùng được chia sẻ có thể đọc trạng thái khi offline và điều khiển BLE tại chỗ. Sau đăng ký, thiết bị cần publish JSON `{"status":"ACTIVE","firmware_version":"1.0.0"}` lên `iot/garden/{MAC}/status` khi kết nối MQTT và publish `{"status":"OFFLINE"}` trong Last Will. Heartbeat được tính từ bản tin ACTIVE hoặc telemetry; sau 30 giây không có heartbeat, backend tự chuyển `active` thành `offline` (scheduler kiểm tra mỗi 10 giây). Bản tin `{"status":"MAINTENANCE"}` hoặc API bảo trì chuyển trạng thái sang `maintenance`. Khi kết thúc bảo trì, backend khôi phục `active` nếu heartbeat còn mới, `provisioned` nếu đã gán chủ sở hữu nhưng chưa hoạt động, hoặc `registered` nếu chưa gán.
 
 Mobile gửi kết quả BLE qua `POST /api/devices/{id}/ble-status` với `{"reachable":false}` để đánh dấu `fault`; gửi `{"reachable":true}` sau đó sẽ phục hồi về `active`, `offline` hoặc `provisioned` dựa trên heartbeat. Chủ sở hữu có thể khóa/mở quyền `viewer` riêng; tài khoản bị khóa không thấy thiết bị. Chỉ owner được thêm/xóa/khóa/mở viewer; viewer được phép thao tác trên thiết bị như owner, ngoại trừ xóa lịch và quản lý quyền chia sẻ.
+
+### WebSocket
+
+Kết nối STOMP tại `/ws` yêu cầu gửi JWT access token trong native header `Authorization` ở frame `CONNECT` với scheme Bearer; backend xác định user từ claim đã ký, không nhận `userId` do client tự khai báo. Client nhận thông báo riêng bằng cách subscribe `/users/queue/notifications`. Khi owner chia sẻ thiết bị với tài khoản đã tồn tại, backend gửi event JSON dạng `{"type":"device_shared","deviceId":"...","deviceName":"...","message":"..."}` tới tài khoản đó. Đây là thông báo realtime, không được lưu để đọc lại khi client offline.
 
 Nếu database đang có role tài khoản `owner` hoặc `viewer`, cập nhật dữ liệu trước khi triển khai phiên bản mới:
 

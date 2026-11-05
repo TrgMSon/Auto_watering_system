@@ -52,6 +52,15 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Integer>
             """)
     List<UserDevice> findDevicesByUserId(int userId);
 
+    @Query("""
+            SELECT userDevice FROM UserDevice userDevice
+            JOIN FETCH userDevice.user
+            WHERE userDevice.device.id = :deviceId
+              AND LOWER(userDevice.permission) IN ('viewer', 'viewer_locked')
+            ORDER BY userDevice.user.email ASC
+            """)
+    List<UserDevice> findViewersByDeviceId(@Param("deviceId") String deviceId);
+
     @Query(value = """
             SELECT user_id FROM user_device WHERE device_id = ?1
             """, nativeQuery = true)
