@@ -79,6 +79,7 @@ hs_err_pid*
 replay_pid*
 
 # React js
+backend/data/firmware/
 node_modules
 /frontend/node_modules/
 

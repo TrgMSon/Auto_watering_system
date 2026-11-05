@@ -65,6 +65,7 @@ public class SecurityConfig {
                                 "/robots.txt", "/logo*.png")
                         .permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/firmware/check", "/api/firmware/*/download").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

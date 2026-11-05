@@ -183,7 +183,7 @@ Tiền tố: `iot/garden/{deviceId}`, ví dụ
 | Wi-Fi bảo mật | Đã yêu cầu, chưa đủ chi tiết | Chốt pairing/MITM/bond reset, escape ký tự pipe, MTU/long write; chưa nhận password thật |
 | Đọc Device ID qua BLE | Thiếu schema | Tài liệu yêu cầu fallback đọc ID nhưng bảng GATT chưa chỉ rõ vị trí/payload |
 | Lịch tưới | Backend/Mobile có CRUD | Chưa thấy publisher lịch hoặc scheduler thực thi; chưa chốt phía chạy lịch/timezone |
-| OTA | Chưa triển khai/chưa có hợp đồng | Metadata firmware_version không phải OTA |
+| OTA | Backend API đã có; ESP32 client chưa triển khai | Metadata firmware_version chưa tự tạo OTA |
 
 Bằng chứng mâu thuẫn thời gian:
 `mobile/lib/features/automation/presentation/widgets/advanced_config_bottom_sheet.dart:50,152–157`;
@@ -220,7 +220,30 @@ Ghi nhận tại F1.2a (đã được bổ sung bằng khảo sát F1.2b-1 ở m
 
 Không cài toolchain/dependency và không tuyên bố đã biên dịch/chạy trên ESP32.
 
-## 7. Quyết định trước F2
+## 7. Hợp đồng OTA backend
+
+Backend hiện nhận file firmware ESP32 `.bin` đã biên dịch từ dashboard, không
+nhận mã nguồn và không chạy Arduino CLI. Admin phát hành multipart
+`POST /api/admin/firmware` với `version`, `file` và `notes` tùy chọn. Backend
+lưu metadata trong bảng `firmware_release` (xem
+`backend/src/main/resources/db/manual/firmware_release.sql`) và file trong
+`FIRMWARE_STORAGE_DIR`; cần áp dụng SQL trước khi triển khai và mount thư mục
+lưu trữ bền vững khi chạy container.
+
+ESP32 gọi `GET /api/firmware/check?currentVersion=<phiên bản đã cài>` định kỳ.
+Các trường nằm trong `data` của `ApiResponse`. Khi `data.update_available` là
+`true`, dùng `data.download_url` để tải binary; `data.latest_version`,
+`data.sha256` và `data.size_bytes` cho biết phiên bản và thông tin xác minh.
+Firmware phải tự kiểm tra checksum trước khi cài và xử lý rollback/khôi phục
+an toàn. Check và download không yêu cầu JWT để thiết bị có thể truy cập, vì
+vậy chỉ phát hành những binary có thể được tải công khai; triển khai thực tế
+phải dùng HTTPS.
+
+Các endpoint/backend và giao diện quản trị đã có; không có bằng chứng firmware
+trong repository đã triển khai polling, HTTP download, xác thực checksum hay
+OTA partition/rollback. Chưa thực hiện OTA trên board.
+
+## Quyết định trước F2
 
 - Board/core đã xác định ở mục 9; cần xác nhận các tùy chọn board và kiểm chứng
   quy trình staging/build, giữ entry point đã yêu cầu.

@@ -24,6 +24,7 @@
 - **Quản lý thiết bị qua API:** xem thiết bị đã gán, cấu hình ngưỡng cảm biến, chọn chế độ tưới, tạo/cập nhật/xóa lịch tưới và chia sẻ quyền owner/viewer.
 - **Điều khiển và giám sát:** gửi lệnh bật/tắt máy bơm, theo dõi xác nhận lệnh; nhận telemetry và trạng thái thiết bị qua MQTT, lưu dữ liệu cảm biến trong MySQL.
 - **Vòng đời và kết nối thiết bị:** provisioning thông tin MQTT/BLE, theo dõi trạng thái online/offline, hỗ trợ bảo trì và decommission; thiết bị giao tiếp với backend qua MQTT.
+- **Cập nhật firmware OTA:** quản trị viên phát hành file `.bin` ESP32 từ dashboard; thiết bị kiểm tra phiên bản mới và tải file từ backend qua HTTP.
 - **Thống kê cảm biến:** backend có API lấy dữ liệu thống kê môi trường và mực nước; hiện chưa có màn hình thống kê trên dashboard quản trị.
 - **Ứng dụng mobile:** đăng nhập và lấy dữ liệu thiết bị/cảm biến thực tế từ backend; hỗ trợ các màn hình tổng quan, tự động hóa, theo dõi cảm biến, quản lý thiết bị/người dùng và hồ sơ.
 
@@ -217,6 +218,47 @@ Các endpoint dưới đây yêu cầu bearer token có role `ADMIN`.
 | `POST` | `/api/admin/devices/{id}/maintenance` | Chuyển thiết bị sang bảo trì |
 | `POST` | `/api/admin/devices/{id}/maintenance/complete` | Kết thúc bảo trì |
 | `POST` | `/api/admin/devices/{id}/decommission` | Admin quyết định thu hồi quyền sử dụng, ngừng thiết bị, xóa credential backend và gỡ liên kết người dùng |
+
+### Cập nhật firmware OTA
+
+Trước khi chạy backend lần đầu sau thay đổi này, áp dụng schema
+[`firmware_release.sql`](backend/src/main/resources/db/manual/firmware_release.sql)
+trên database MySQL. Hibernate đang đặt `ddl-auto=none`, nên bảng không được
+tự tạo. File firmware được lưu ngoài database tại `FIRMWARE_STORAGE_DIR`
+(mặc định `./data/firmware`); khi chạy trong container, mount thư mục này ra
+storage bền vững để firmware không mất khi container bị thay thế.
+
+| Phương thức | Endpoint | Quyền | Chức năng |
+| --- | --- | --- | --- |
+| `GET` | `/api/admin/firmware` | ADMIN | Liệt kê các bản firmware, mới nhất trước |
+| `POST` | `/api/admin/firmware` | ADMIN | Tải lên multipart gồm `version`, `file` và `notes` tùy chọn |
+| `GET` | `/api/firmware/check?currentVersion={version}` | Công khai, chỉ đọc | Trả `latest_version`, `update_available`, SHA-256, dung lượng và `download_url` |
+| `GET` | `/api/firmware/{version}/download` | Công khai, chỉ đọc | Tải file firmware nhị phân |
+
+Chỉ nhận file `.bin` có ESP image header, tối đa 4 MB; phiên bản phải duy nhất.
+Mỗi lần tải lên sẽ trở thành phiên bản mới nhất và các phiên bản cũ vẫn có thể
+tải xuống. Thiết bị có thể kiểm tra định kỳ 5 giây như sơ đồ OTA. Endpoint kiểm
+tra/tải xuống là công khai để ESP32 dùng được mà không cần JWT; chỉ phát hành
+firmware có thể chia sẻ công khai. Backend/frontend không biên dịch mã nguồn,
+không ra lệnh cập nhật từ xa và không thực hiện OTA trên ESP32: firmware trên
+thiết bị cần tự gọi API, tải file, kiểm tra SHA-256 và cài đặt an toàn. Dùng
+HTTPS cho các endpoint trên khi triển khai ngoài môi trường phát triển.
+
+Response kiểm tra được bọc trong `data` của `ApiResponse`, ví dụ:
+
+```json
+{
+  "success": true,
+  "data": {
+    "current_version": "1.0.0",
+    "latest_version": "1.2.0",
+    "update_available": true,
+    "sha256": "<sha256>",
+    "size_bytes": 123456,
+    "download_url": "/api/firmware/1.2.0/download"
+  }
+}
+```
 
 ### Tạo thiết bị và phân quyền
 
