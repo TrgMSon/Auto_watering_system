@@ -24,7 +24,7 @@ public class FirmwareRelease {
     @Column(length = 500)
     private String notes;
 
-    @Column(name = "stored_file_name", nullable = false, unique = true, length = 80)
+    @Column(name = "stored_file_name", unique = true, length = 80)
     private String storedFileName;
 
     @Column(name = "sha256", nullable = false, length = 64)
