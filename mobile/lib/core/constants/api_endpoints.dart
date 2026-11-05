@@ -12,4 +12,18 @@ class ApiEndpoints {
   static const String logout = '/auth/logout';
 
   static const String devices = '/devices';
+  static const String statistics = '/statistics';
+
+  static String get webSocketUrl => webSocketUrlFor(baseUrl);
+
+  /// Backend bật SockJS tại `/ws`, nên WebSocket thuần nằm ở `/ws/websocket`.
+  static String webSocketUrlFor(String apiBaseUrl) {
+    final uri = Uri.parse(apiBaseUrl);
+    return uri
+        .replace(
+          scheme: uri.scheme == 'https' ? 'wss' : 'ws',
+          path: '${uri.path.replaceFirst(RegExp(r'/api/?$'), '')}/ws/websocket',
+        )
+        .toString();
+  }
 }

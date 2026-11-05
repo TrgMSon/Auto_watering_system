@@ -54,3 +54,13 @@ class DashboardPumpToggled extends DashboardEvent {
 class DashboardResetRequested extends DashboardEvent {
   const DashboardResetRequested();
 }
+
+class DashboardPumpStatusReceived extends DashboardEvent {
+  final String deviceId;
+  final bool isOn;
+
+  const DashboardPumpStatusReceived({required this.deviceId, required this.isOn});
+
+  @override
+  List<Object?> get props => [deviceId, isOn];
+}

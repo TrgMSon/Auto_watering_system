@@ -7,8 +7,9 @@ import '../../domain/entities/sensor_reading.dart';
 import '../bloc/sensor_bloc.dart';
 import '../bloc/sensor_event.dart';
 import '../bloc/sensor_state.dart';
+import '../bloc/statistics_bloc.dart';
 import '../widgets/sensor_telemetry_card.dart';
-import '../widgets/telemetry_line_chart.dart';
+import '../widgets/statistics_section.dart';
 
 class SensorMonitorPage extends StatefulWidget {
   final String deviceId;
@@ -48,6 +49,11 @@ class _SensorMonitorPageState extends State<SensorMonitorPage> {
         to: now,
       ))
       ..add(SensorRealtimeStarted(deviceId: widget.deviceId));
+    final statisticsBloc = context.read<StatisticsBloc>();
+    statisticsBloc.add(StatisticsRequested(
+      deviceId: widget.deviceId,
+      range: statisticsBloc.state.range,
+    ));
   }
 
   @override
@@ -95,7 +101,7 @@ class _SensorMonitorPageState extends State<SensorMonitorPage> {
           _buildLatestCards(context, state.latestReading!),
           const SizedBox(height: 24),
         ],
-        _buildCharts(context, state.chartReadings),
+        StatisticsSection(deviceId: widget.deviceId),
       ],
     );
   }
@@ -135,50 +141,6 @@ class _SensorMonitorPageState extends State<SensorMonitorPage> {
           unit: '%',
           icon: Icons.cloud,
           color: AppColors.humidity,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCharts(BuildContext context, List<SensorReading> chartData) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Biểu đồ 24 giờ qua',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: TelemetryLineChart(
-            readings: chartData,
-            title: 'Độ ẩm đất',
-            valueExtractor: (r) => r.soilMoisture,
-            color: AppColors.moisture,
-            unit: '%',
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: TelemetryLineChart(
-            readings: chartData,
-            title: 'Nhiệt độ',
-            valueExtractor: (r) => r.temperature,
-            color: AppColors.temperature,
-            unit: '°C',
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: TelemetryLineChart(
-            readings: chartData,
-            title: 'Độ ẩm không khí',
-            valueExtractor: (r) => r.humidity,
-            color: AppColors.humidity,
-            unit: '%',
-          ),
         ),
       ],
     );

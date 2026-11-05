@@ -132,6 +132,21 @@ class ApiClient {
     Object? body,
   }) async {
     try {
+      return await _sendOnce(method: method, uri: uri, headers: headers, body: body);
+    } on ApiException catch (e) {
+      // Kết nối có thể đã bị máy chủ đóng. Chỉ thử lại GET để không gửi lặp lệnh như bật bơm.
+      if (method != 'GET' || e.statusCode != 0) rethrow;
+      return _sendOnce(method: method, uri: uri, headers: headers, body: body);
+    }
+  }
+
+  Future<http.Response> _sendOnce({
+    required String method,
+    required Uri uri,
+    required Map<String, String> headers,
+    Object? body,
+  }) async {
+    try {
       final request = http.Request(method, uri)..headers.addAll(headers);
       if (body != null) {
         request.body = jsonEncode(body);
@@ -143,8 +158,8 @@ class ApiClient {
       throw const ApiException(0, 'Không có kết nối mạng. Vui lòng kiểm tra lại.');
     } on TimeoutException {
       throw const ApiException(408, 'Hết thời gian chờ phản hồi từ máy chủ.');
-    } on http.ClientException catch (e) {
-      throw ApiException(0, 'Lỗi kết nối: ${e.message}');
+    } on http.ClientException {
+      throw const ApiException(0, 'Mất kết nối tới máy chủ. Vui lòng thử lại.');
     }
   }
 
@@ -228,6 +243,11 @@ class ApiClient {
       decoded = jsonDecode(bodyString);
     } on FormatException {
       throw ApiException(response.statusCode, 'Phản hồi từ máy chủ không đúng định dạng JSON.');
+    }
+
+    // API thống kê trả thẳng danh sách, không bọc trong {success, data}.
+    if (decoded is List && response.statusCode >= 200 && response.statusCode < 300) {
+      return <String, dynamic>{'data': decoded};
     }
 
     if (decoded is! Map<String, dynamic>) {

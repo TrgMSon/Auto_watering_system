@@ -23,6 +23,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     on<DashboardTelemetryEmpty>(_onTelemetryEmpty);
     on<DashboardTelemetryFailed>(_onTelemetryFailed);
     on<DashboardPumpToggled>(_onPumpToggled);
+    on<DashboardPumpStatusReceived>(_onPumpStatusReceived);
     on<DashboardResetRequested>(_onResetRequested);
   }
 
@@ -176,6 +177,22 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     if (state is DashboardLoaded) {
       emit((state as DashboardLoaded).copyWith(errorMessage: event.message));
     }
+  }
+
+  void _onPumpStatusReceived(
+    DashboardPumpStatusReceived event,
+    Emitter<DashboardState> emit,
+  ) {
+    repository.applyPumpStatus(event.deviceId, isOn: event.isOn);
+    final currentState = state;
+    if (currentState is! DashboardLoaded ||
+        currentState.selectedDevice?.id != event.deviceId) {
+      return;
+    }
+    emit(currentState.copyWith(
+      pumpStatus: event.isOn,
+      clearPumpOffAt: !event.isOn,
+    ));
   }
 
   Future<void> _onPumpToggled(

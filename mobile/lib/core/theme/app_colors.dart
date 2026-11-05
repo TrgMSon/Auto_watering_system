@@ -16,6 +16,7 @@ class AppColors {
   static const Color info = Color(0xFF29B6F6);
 
   static const Color moisture = Color(0xFF42A5F5);
+  static const Color waterLevel = Color(0xFF26A69A);
   static const Color temperature = Color(0xFFFF7043);
   static const Color humidity = Color(0xFF66BB6A);
   static const Color light = Color(0xFFFFCA28);

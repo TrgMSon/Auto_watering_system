@@ -103,6 +103,16 @@ class DashboardRepositoryImpl implements DashboardRepository {
     }
   }
 
+  @override
+  void applyPumpStatus(String deviceId, {required bool isOn}) {
+    if (!isOn) {
+      _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+    } else if (_isPumpOn(deviceId) == false) {
+      // Không biết thời lượng của lệnh bật từ người khác, nên bỏ mốc tắt cũ.
+      _pumpOffAt.remove(deviceId);
+    }
+  }
+
   // Legacy methods
   @override
   Future<DashboardSummary> getDashboardSummary() async {

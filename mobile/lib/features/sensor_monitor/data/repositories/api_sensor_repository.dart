@@ -1,6 +1,7 @@
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/sensor_reading.dart';
+import '../../domain/entities/statistics_point.dart';
 import '../../domain/repositories/sensor_repository.dart';
 
 class ApiSensorRepository implements SensorRepository {
@@ -49,6 +50,57 @@ class ApiSensorRepository implements SensorRepository {
       await Future<void>.delayed(_pollInterval);
     }
   }
+
+  @override
+  Future<List<StatisticsPoint>> getStatistics({
+    required String deviceId,
+    required StatisticsRange range,
+  }) async {
+    if (deviceId.isEmpty) return const [];
+    final queryParameters = {'deviceId': deviceId, 'range': range.apiValue};
+    final responses = await Future.wait([
+      _apiClient.get(
+        '${ApiEndpoints.statistics}/environmental',
+        queryParameters: queryParameters,
+      ),
+      _apiClient.get(
+        '${ApiEndpoints.statistics}/water-level',
+        queryParameters: queryParameters,
+      ),
+    ]);
+
+    final points = <DateTime, StatisticsPoint>{};
+    for (final json in _rows(responses[0])) {
+      final time = DateTime.tryParse(json['timeLabel']?.toString() ?? '');
+      if (time == null) continue;
+      points[time] = StatisticsPoint(
+        time: time,
+        soilMoisture: _optionalNumber(json['avgSoilMoisture']),
+        temperature: _optionalNumber(json['avgTemperature']),
+        humidity: _optionalNumber(json['avgHumidity']),
+      );
+    }
+    for (final json in _rows(responses[1])) {
+      final time = DateTime.tryParse(json['timeLabel']?.toString() ?? '');
+      if (time == null) continue;
+      final point = points[time];
+      points[time] = StatisticsPoint(
+        time: time,
+        soilMoisture: point?.soilMoisture,
+        temperature: point?.temperature,
+        humidity: point?.humidity,
+        waterLevel: _optionalNumber(json['avgWaterLevel']),
+      );
+    }
+    return points.values.toList()..sort((a, b) => a.time.compareTo(b.time));
+  }
+
+  Iterable<Map<String, dynamic>> _rows(Map<String, dynamic> response) {
+    final rows = response['data'];
+    return rows is List ? rows.whereType<Map<String, dynamic>>() : const [];
+  }
+
+  double? _optionalNumber(dynamic value) => value is num ? value.toDouble() : null;
 
   SensorReading _readingFromJson(Map<String, dynamic> json) {
     final timestamp = json['recorded_at']?.toString();

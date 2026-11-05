@@ -1,4 +1,5 @@
 import '../entities/sensor_reading.dart';
+import '../entities/statistics_point.dart';
 
 abstract class SensorRepository {
   Future<List<SensorReading>> getSensorHistory({
@@ -7,4 +8,8 @@ abstract class SensorRepository {
     required DateTime to,
   });
   Stream<SensorReading> getRealtimeReadings(String deviceId);
+  Future<List<StatisticsPoint>> getStatistics({
+    required String deviceId,
+    required StatisticsRange range,
+  });
 }
