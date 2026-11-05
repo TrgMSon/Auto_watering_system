@@ -1,22 +1,18 @@
 package com.project.backend.service.impl;
 
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.project.backend.dto.firmware.FirmwareCheckResponse;
@@ -25,7 +21,9 @@ import com.project.backend.exception.ConflictException;
 import com.project.backend.exception.DeviceCommandException;
 import com.project.backend.exception.IllegalArgumentException;
 import com.project.backend.exception.NotFoundException;
+import com.project.backend.model.FirmwareBinary;
 import com.project.backend.model.FirmwareRelease;
+import com.project.backend.repository.FirmwareBinaryRepository;
 import com.project.backend.repository.FirmwareReleaseRepository;
 import com.project.backend.service.FirmwareService;
 
@@ -35,15 +33,15 @@ public class FirmwareServiceImpl implements FirmwareService {
     private static final long DEFAULT_MAX_FILE_SIZE = 4 * 1024 * 1024;
 
     private final FirmwareReleaseRepository firmwareReleaseRepository;
-    private final Path storageDirectory;
+    private final FirmwareBinaryRepository firmwareBinaryRepository;
     private final long maxFileSize;
 
     public FirmwareServiceImpl(
             FirmwareReleaseRepository firmwareReleaseRepository,
-            @Value("${app.firmware.storage-dir:./data/firmware}") String storageDirectory,
+            FirmwareBinaryRepository firmwareBinaryRepository,
             @Value("${app.firmware.max-file-size:4194304}") long maxFileSize) {
         this.firmwareReleaseRepository = firmwareReleaseRepository;
-        this.storageDirectory = Path.of(storageDirectory).toAbsolutePath().normalize();
+        this.firmwareBinaryRepository = firmwareBinaryRepository;
         this.maxFileSize = maxFileSize > 0 ? maxFileSize : DEFAULT_MAX_FILE_SIZE;
     }
 
@@ -55,6 +53,7 @@ public class FirmwareServiceImpl implements FirmwareService {
     }
 
     @Override
+    @Transactional
     public FirmwareReleaseResponse upload(String version, String notes, MultipartFile file) {
         String normalizedVersion = version == null ? "" : version.trim();
         if (!VERSION_PATTERN.matcher(normalizedVersion).matches()) {
@@ -87,44 +86,25 @@ public class FirmwareServiceImpl implements FirmwareService {
             throw new IllegalArgumentException("File không có header firmware ESP32 hợp lệ");
         }
 
-        String storedFileName = UUID.randomUUID() + ".bin";
-        Path storedFile = storageDirectory.resolve(storedFileName);
-        Path temporaryFile = storageDirectory.resolve(storedFileName + ".tmp");
         FirmwareRelease release = new FirmwareRelease();
         release.setVersion(normalizedVersion);
         release.setNotes(notes == null || notes.isBlank() ? null : notes.trim());
-        release.setStoredFileName(storedFileName);
         release.setSha256(sha256(firmware));
         release.setSizeBytes(firmware.length);
         release.setCreatedAt(LocalDateTime.now());
 
+        FirmwareRelease savedRelease;
         try {
-            Files.createDirectories(storageDirectory);
-            Files.write(temporaryFile, firmware);
-            try {
-                Files.move(temporaryFile, storedFile, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException exception) {
-                try {
-                    Files.move(temporaryFile, storedFile);
-                } catch (IOException fallbackException) {
-                    fallbackException.addSuppressed(exception);
-                    throw fallbackException;
-                }
-            }
-            try {
-                return toResponse(firmwareReleaseRepository.save(release));
-            } catch (DataIntegrityViolationException exception) {
-                deleteAfterFailure(storedFile, exception);
-                throw new ConflictException("Phiên bản firmware đã tồn tại");
-            } catch (RuntimeException exception) {
-                deleteAfterFailure(storedFile, exception);
-                throw exception;
-            }
-        } catch (IOException exception) {
-            deleteAfterFailure(temporaryFile, exception);
-            deleteAfterFailure(storedFile, exception);
-            throw new DeviceCommandException("Không thể lưu file firmware trên máy chủ", exception);
+            savedRelease = firmwareReleaseRepository.save(release);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("Phiên bản firmware đã tồn tại");
         }
+
+        FirmwareBinary binary = new FirmwareBinary();
+        binary.setReleaseId(savedRelease.getId());
+        binary.setFirmwareData(firmware);
+        firmwareBinaryRepository.save(binary);
+        return toResponse(savedRelease);
     }
 
     @Override
@@ -145,15 +125,15 @@ public class FirmwareServiceImpl implements FirmwareService {
                 updateAvailable ? "/api/firmware/" + latestRelease.getVersion() + "/download" : null);
     }
 
+    @SuppressWarnings("null")
     @Override
-    public Path getFirmwareFile(String version) {
+    @Transactional(readOnly = true)
+    public byte[] getFirmwareData(String version) {
         FirmwareRelease release = firmwareReleaseRepository.findByVersion(version)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy phiên bản firmware"));
-        Path firmwareFile = storageDirectory.resolve(release.getStoredFileName()).normalize();
-        if (!firmwareFile.startsWith(storageDirectory) || !Files.isRegularFile(firmwareFile)) {
-            throw new DeviceCommandException("File firmware không tồn tại trên máy chủ");
-        }
-        return firmwareFile;
+        return firmwareBinaryRepository.findById(release.getId())
+                .map(FirmwareBinary::getFirmwareData)
+                .orElseThrow(() -> new DeviceCommandException("Dữ liệu firmware không tồn tại trong database"));
     }
 
     private static FirmwareReleaseResponse toResponse(FirmwareRelease release) {
@@ -170,14 +150,6 @@ public class FirmwareServiceImpl implements FirmwareService {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(firmware));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is required by the Java runtime", exception);
-        }
-    }
-
-    private static void deleteAfterFailure(Path path, Exception originalException) {
-        try {
-            Files.deleteIfExists(path);
-        } catch (IOException cleanupException) {
-            originalException.addSuppressed(cleanupException);
         }
     }
 }

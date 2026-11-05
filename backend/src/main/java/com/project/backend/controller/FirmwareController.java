@@ -1,8 +1,6 @@
 package com.project.backend.controller;
 
-import java.nio.file.Path;
-
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,12 +33,12 @@ public class FirmwareController {
     @SuppressWarnings("null")
     @GetMapping("/{version}/download")
     public ResponseEntity<Resource> downloadFirmware(@PathVariable String version) {
-        Path firmwareFile = firmwareService.getFirmwareFile(version);
+        byte[] firmwareData = firmwareService.getFirmwareData(version);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .contentLength(firmwareFile.toFile().length())
+                .contentLength(firmwareData.length)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"firmware-" + version + ".bin\"")
-                .body(new FileSystemResource(firmwareFile));
+                .body(new ByteArrayResource(firmwareData));
     }
 }
