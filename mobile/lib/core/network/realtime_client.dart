@@ -13,6 +13,13 @@ class DeviceSharedEvent {
   const DeviceSharedEvent({required this.deviceId, required this.message});
 }
 
+class PumpStatusEvent {
+  final String deviceId;
+  final bool isOn;
+
+  const PumpStatusEvent({required this.deviceId, required this.isOn});
+}
+
 class DeviceAlertEvent {
   final String deviceId;
   final String message;
@@ -40,21 +47,21 @@ class RealtimeClient {
   final String _url;
 
   final _deviceShared = StreamController<DeviceSharedEvent>.broadcast();
-  final _pumpStatus = StreamController<bool>.broadcast();
+  final _pumpStatus = StreamController<PumpStatusEvent>.broadcast();
   final _deviceAlerts = StreamController<DeviceAlertEvent>.broadcast();
 
   StompClient? _client;
   Timer? _reconnectTimer;
   void Function()? _unsubscribeDevice;
   String? _watchedDeviceId;
+  String? _deniedDeviceId;
   bool _isWanted = false;
   bool _isConnected = false;
   bool _tokenRejected = false;
 
   Stream<DeviceSharedEvent> get deviceShared => _deviceShared.stream;
 
-  /// Backend chỉ gửi ON/OFF, không kèm mã thiết bị.
-  Stream<bool> get pumpStatus => _pumpStatus.stream;
+  Stream<PumpStatusEvent> get pumpStatus => _pumpStatus.stream;
 
   Stream<DeviceAlertEvent> get deviceAlerts => _deviceAlerts.stream;
 
@@ -67,6 +74,7 @@ class RealtimeClient {
   void disconnect() {
     _isWanted = false;
     _tokenRejected = false;
+    _deniedDeviceId = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _closeClient();
@@ -75,6 +83,7 @@ class RealtimeClient {
   void watchDevice(String? deviceId) {
     if (deviceId == _watchedDeviceId) return;
     _watchedDeviceId = deviceId;
+    _deniedDeviceId = null;
     _subscribeToWatchedDevice();
   }
 
@@ -91,10 +100,8 @@ class RealtimeClient {
       onConnect: (_) {
         if (identical(client, _client)) _onConnected(client);
       },
-      onStompError: (_) {
-        if (!identical(client, _client)) return;
-        _tokenRejected = true;
-        _scheduleReconnect();
+      onStompError: (frame) {
+        if (identical(client, _client)) _onStompError(frame);
       },
       onWebSocketError: (_) {
         if (identical(client, _client)) _scheduleReconnect();
@@ -105,6 +112,18 @@ class RealtimeClient {
     ));
     _client = client;
     client.activate();
+  }
+
+  /// Backend đóng cả kết nối khi có lỗi, kể cả khi chỉ bị từ chối subscribe một thiết bị.
+  void _onStompError(StompFrame frame) {
+    final reason = frame.headers['message']?.toLowerCase() ?? '';
+    if (reason.contains('authentication') || reason.contains('identity')) {
+      _tokenRejected = true;
+    } else {
+      // Không subscribe lại thiết bị bị từ chối để tránh đóng kết nối lặp lại.
+      _deniedDeviceId = _watchedDeviceId;
+    }
+    _scheduleReconnect();
   }
 
   void _onConnected(StompClient client) {
@@ -126,7 +145,12 @@ class RealtimeClient {
     _unsubscribeDevice = null;
     final client = _client;
     final deviceId = _watchedDeviceId;
-    if (client == null || deviceId == null || !_isConnected) return;
+    if (client == null ||
+        deviceId == null ||
+        deviceId == _deniedDeviceId ||
+        !_isConnected) {
+      return;
+    }
     _unsubscribeDevice = client.subscribe(
       destination: '/topic/notification/$deviceId',
       callback: (frame) {
@@ -154,9 +178,17 @@ class RealtimeClient {
   }
 
   void _onPumpStatus(String? body) {
-    final status = body?.replaceAll('"', '').trim().toUpperCase();
-    if (status == 'ON') _pumpStatus.add(true);
-    if (status == 'OFF') _pumpStatus.add(false);
+    if (body == null) return;
+    try {
+      final json = jsonDecode(body);
+      if (json is! Map<String, dynamic>) return;
+      final deviceId = json['deviceId']?.toString() ?? '';
+      final status = json['status']?.toString().toUpperCase();
+      if (deviceId.isEmpty || (status != 'ON' && status != 'OFF')) return;
+      _pumpStatus.add(PumpStatusEvent(deviceId: deviceId, isOn: status == 'ON'));
+    } on FormatException {
+      // Bỏ qua thông báo sai định dạng để không làm hỏng kết nối.
+    }
   }
 
   void _scheduleReconnect() {

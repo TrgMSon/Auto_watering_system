@@ -183,10 +183,12 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     DashboardPumpStatusReceived event,
     Emitter<DashboardState> emit,
   ) {
+    repository.applyPumpStatus(event.deviceId, isOn: event.isOn);
     final currentState = state;
-    // Backend không gửi kèm mã thiết bị, nên chỉ áp dụng khi không thể nhầm thiết bị.
-    if (currentState is! DashboardLoaded || currentState.devices.length != 1) return;
-    repository.applyPumpStatus(currentState.devices.first.id, isOn: event.isOn);
+    if (currentState is! DashboardLoaded ||
+        currentState.selectedDevice?.id != event.deviceId) {
+      return;
+    }
     emit(currentState.copyWith(
       pumpStatus: event.isOn,
       clearPumpOffAt: !event.isOn,

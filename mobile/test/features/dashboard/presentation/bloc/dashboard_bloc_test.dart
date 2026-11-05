@@ -763,4 +763,45 @@ void main() {
       });
     });
   });
+
+  group('DashboardPumpStatusReceived', () {
+    blocTest<DashboardBloc, DashboardState>(
+      'updates the pump of the selected device',
+      build: () => DashboardBloc(repository: mockRepository),
+      seed: () => DashboardLoaded(
+        devices: [testDevice1, testDevice2],
+        selectedDevice: testDevice1,
+        pumpOffAt: DateTime(2026, 11, 5, 10),
+      ),
+      act: (bloc) => bloc.add(
+        DashboardPumpStatusReceived(deviceId: testDevice1.id, isOn: false),
+      ),
+      expect: () => [
+        DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          pumpStatus: false,
+        ),
+      ],
+      verify: (_) {
+        verify(() => mockRepository.applyPumpStatus(testDevice1.id, isOn: false)).called(1);
+      },
+    );
+
+    blocTest<DashboardBloc, DashboardState>(
+      'remembers the status of another device without changing the screen',
+      build: () => DashboardBloc(repository: mockRepository),
+      seed: () => DashboardLoaded(
+        devices: [testDevice1, testDevice2],
+        selectedDevice: testDevice1,
+      ),
+      act: (bloc) => bloc.add(
+        DashboardPumpStatusReceived(deviceId: testDevice2.id, isOn: true),
+      ),
+      expect: () => <DashboardState>[],
+      verify: (_) {
+        verify(() => mockRepository.applyPumpStatus(testDevice2.id, isOn: true)).called(1);
+      },
+    );
+  });
 }

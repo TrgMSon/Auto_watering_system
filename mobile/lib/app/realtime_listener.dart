@@ -67,8 +67,10 @@ class _RealtimeListenerState extends State<RealtimeListener> {
     context.read<DeviceBloc>().add(const DeviceLoadRequested());
   }
 
-  void _onPumpStatus(bool isOn) {
-    context.read<DashboardBloc>().add(DashboardPumpStatusReceived(isOn: isOn));
+  void _onPumpStatus(PumpStatusEvent event) {
+    context.read<DashboardBloc>().add(
+          DashboardPumpStatusReceived(deviceId: event.deviceId, isOn: event.isOn),
+        );
   }
 
   void _onDeviceAlert(DeviceAlertEvent event) {

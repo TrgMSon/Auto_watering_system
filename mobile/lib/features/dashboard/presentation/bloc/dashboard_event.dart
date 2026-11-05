@@ -56,10 +56,11 @@ class DashboardResetRequested extends DashboardEvent {
 }
 
 class DashboardPumpStatusReceived extends DashboardEvent {
+  final String deviceId;
   final bool isOn;
 
-  const DashboardPumpStatusReceived({required this.isOn});
+  const DashboardPumpStatusReceived({required this.deviceId, required this.isOn});
 
   @override
-  List<Object?> get props => [isOn];
+  List<Object?> get props => [deviceId, isOn];
 }

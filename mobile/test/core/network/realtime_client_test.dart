@@ -115,16 +115,18 @@ void main() {
 
   test('publishes pump status and ignores unknown values', () async {
     await connectAndOpen();
-    final events = <bool>[];
+    final events = <PumpStatusEvent>[];
     final sub = realtime.pumpStatus.listen(events.add);
 
     final callback = subscriptions['/users/queue/pump-status']!;
+    callback(frame('{"deviceId":"A","status":"ON"}'));
+    callback(frame('{"deviceId":"B","status":"OFF"}'));
+    callback(frame('{"deviceId":"A","status":"UNKNOWN"}'));
+    callback(frame('{"status":"ON"}'));
     callback(frame('ON'));
-    callback(frame('"OFF"'));
-    callback(frame('UNKNOWN'));
     await pumpEventQueue();
 
-    expect(events, [true, false]);
+    expect(events.map((e) => (e.deviceId, e.isOn)), [('A', true), ('B', false)]);
     await sub.cancel();
   });
 
@@ -155,13 +157,38 @@ void main() {
   test('refreshes the token and reconnects after the server rejects it', () async {
     await realtime.connect();
 
-    configs.first.onStompError(frame('invalid'));
+    configs.first.onStompError(StompFrame(
+      command: 'ERROR',
+      headers: const {'message': 'WebSocket authentication is invalid'},
+    ));
     await Future<void>.delayed(const Duration(milliseconds: 5));
 
     verify(() => apiClient.refreshSession()).called(1);
     verify(clients.first.deactivate).called(1);
     expect(configs.last.stompConnectHeaders, {'Authorization': 'Bearer token-2'});
     verify(clients.last.activate).called(1);
+  });
+
+  test('reconnects without the device when its subscription is denied', () async {
+    realtime.watchDevice('A');
+    await connectAndOpen();
+    expect(subscriptions.containsKey('/topic/notification/A'), isTrue);
+    subscriptions.clear();
+
+    configs.first.onStompError(StompFrame(
+      command: 'ERROR',
+      headers: const {'message': 'User is not allowed to subscribe to this device'},
+    ));
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    configs.last.onConnect(frame(''));
+
+    verifyNever(() => apiClient.refreshSession());
+    expect(configs, hasLength(2));
+    expect(subscriptions.containsKey('/topic/notification/A'), isFalse);
+    expect(subscriptions.containsKey('/users/queue/notifications'), isTrue);
+
+    realtime.watchDevice('B');
+    expect(subscriptions.containsKey('/topic/notification/B'), isTrue);
   });
 
   test('reconnects without refreshing after the network drops', () async {
