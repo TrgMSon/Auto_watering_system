@@ -1,6 +1,5 @@
 package com.project.backend.service;
 
-import java.nio.file.Path;
 import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -15,5 +14,5 @@ public interface FirmwareService {
 
     FirmwareCheckResponse checkForUpdate(String currentVersion);
 
-    Path getFirmwareFile(String version);
+    byte[] getFirmwareData(String version);
 }

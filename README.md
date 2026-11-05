@@ -219,14 +219,13 @@ Các endpoint dưới đây yêu cầu bearer token có role `ADMIN`.
 | `POST` | `/api/admin/devices/{id}/maintenance/complete` | Kết thúc bảo trì |
 | `POST` | `/api/admin/devices/{id}/decommission` | Admin quyết định thu hồi quyền sử dụng, ngừng thiết bị, xóa credential backend và gỡ liên kết người dùng |
 
-### Cập nhật firmware OTA
+### API thống kê
+| Phương thức | Endpoint | Chức năng |
+| --- | --- | --- |
+| `GET` | `/api/statistics/environmental?deviceId={id}&range={24h`\|`7d`\|`30d}` | Thống kê nhiệt độ, độ ẩm không khí, độ ẩm đất |
+| `GET` | `/api/statistics/water-level?deviceId={id}&range={24h`\|`7d`\|`30d}` | Thống kê mực nước trong bể |
 
-Trước khi chạy backend lần đầu sau thay đổi này, áp dụng schema
-[`firmware_release.sql`](backend/src/main/resources/db/manual/firmware_release.sql)
-trên database MySQL. Hibernate đang đặt `ddl-auto=none`, nên bảng không được
-tự tạo. File firmware được lưu ngoài database tại `FIRMWARE_STORAGE_DIR`
-(mặc định `./data/firmware`); khi chạy trong container, mount thư mục này ra
-storage bền vững để firmware không mất khi container bị thay thế.
+### Cập nhật firmware OTA
 
 | Phương thức | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
@@ -299,8 +298,3 @@ Yêu cầu cấu hình dùng các trường `auto_mode`, `soil_moisture_min`, `s
 Lệnh điều khiển có thể dùng `{"action":"ON","duration_seconds":300}` hoặc `{"action":"OFF"}`. `duration_seconds` không bắt buộc, mặc định là 300 giây hoặc giới hạn tối đa được cấu hình nếu nhỏ hơn. Thời lượng bật bơm vượt giới hạn cấu hình sẽ bị từ chối; lệnh tắt bơm gửi thời lượng bằng 0.
 
 Phản hồi gửi lệnh/cấu hình có `command_id` và `command_status: "PENDING"`. Dùng endpoint xác nhận ở bảng trên để kiểm tra trạng thái `PENDING`, `SUCCEEDED`, `FAILED` hoặc `PUBLISH_FAILED`. Thiết bị cần phản hồi trên topic `/ack` với cùng `command_id`; khi xử lý thất bại, gửi `status: "FAILED"` cùng thông điệp chẩn đoán. Backend chờ gửi MQTT tối đa 5 giây mỗi lần và thử lại tối đa 3 lần; nếu không gửi được, API trả `503 Service Unavailable`.
-
-### API thống kê backend (chưa tích hợp vào dashboard)
-
-- `GET /api/admin/statistics/environmental?deviceId={id}&range={24h|7d|30d}`
-- `GET /api/admin/statistics/water-level?deviceId={id}&range={24h|7d|30d}`
