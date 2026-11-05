@@ -12,6 +12,7 @@ class ApiEndpoints {
   static const String logout = '/auth/logout';
 
   static const String devices = '/devices';
+  static const String statistics = '/statistics';
 
   static String get webSocketUrl => webSocketUrlFor(baseUrl);
 

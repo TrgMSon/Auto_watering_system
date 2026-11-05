@@ -274,6 +274,21 @@ void main() {
       );
     });
 
+    test('accepts a bare JSON list and exposes it under data', () async {
+      when(() => mockSecureStorage.read(key: 'access_token'))
+          .thenAnswer((_) async => null);
+      when(() => mockHttpClient.send(any())).thenAnswer((_) async {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode(jsonEncode([{'id': 1}]))),
+          200,
+        );
+      });
+
+      final response = await apiClient.get('/statistics/environmental');
+
+      expect(response['data'], [{'id': 1}]);
+    });
+
     group('when the connection is reset', () {
       const resetError = 'Connection reset by peer';
 

@@ -13,6 +13,7 @@ import '../features/device_management/presentation/bloc/device_bloc.dart';
 import '../features/device_management/presentation/bloc/device_event.dart';
 import '../features/sensor_monitor/presentation/bloc/sensor_bloc.dart';
 import '../features/sensor_monitor/presentation/bloc/sensor_event.dart';
+import '../features/sensor_monitor/presentation/bloc/statistics_bloc.dart';
 import '../injection.dart';
 import 'realtime_listener.dart';
 import 'routes/app_router.dart';
@@ -33,6 +34,7 @@ class WateringApp extends StatelessWidget {
         ),
         BlocProvider(create: (_) => getIt<DashboardBloc>()),
         BlocProvider(create: (_) => getIt<SensorBloc>()),
+        BlocProvider(create: (_) => getIt<StatisticsBloc>()),
         BlocProvider(create: (_) => getIt<DeviceBloc>()),
         BlocProvider(create: (_) => getIt<AutomationBloc>()),
       ],
@@ -50,6 +52,9 @@ class WateringApp extends StatelessWidget {
                     .read<DashboardBloc>()
                     .add(const DashboardResetRequested());
                 context.read<SensorBloc>().add(const SensorResetRequested());
+                context
+                    .read<StatisticsBloc>()
+                    .add(const StatisticsResetRequested());
                 context
                     .read<AutomationBloc>()
                     .add(const AutomationResetRequested());

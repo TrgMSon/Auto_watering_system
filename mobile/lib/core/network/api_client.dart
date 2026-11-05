@@ -245,6 +245,11 @@ class ApiClient {
       throw ApiException(response.statusCode, 'Phản hồi từ máy chủ không đúng định dạng JSON.');
     }
 
+    // API thống kê trả thẳng danh sách, không bọc trong {success, data}.
+    if (decoded is List && response.statusCode >= 200 && response.statusCode < 300) {
+      return <String, dynamic>{'data': decoded};
+    }
+
     if (decoded is! Map<String, dynamic>) {
       throw ApiException(response.statusCode, 'Phản hồi API không hợp lệ.');
     }

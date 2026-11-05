@@ -27,6 +27,7 @@ import 'features/sensor_monitor/domain/repositories/sensor_repository.dart';
 import 'features/sensor_monitor/domain/usecases/get_realtime_readings_usecase.dart';
 import 'features/sensor_monitor/domain/usecases/get_sensor_history_usecase.dart';
 import 'features/sensor_monitor/presentation/bloc/sensor_bloc.dart';
+import 'features/sensor_monitor/presentation/bloc/statistics_bloc.dart';
 
 import 'features/device_management/domain/repositories/device_repository.dart';
 import 'features/device_management/data/repositories/api_device_repository.dart';
@@ -107,6 +108,10 @@ Future<void> configureDependencies() async {
   getIt.registerFactory(() => SensorBloc(
     getSensorHistory: getIt<GetSensorHistoryUseCase>(),
     getRealtimeReadings: getIt<GetRealtimeReadingsUseCase>(),
+  ));
+
+  getIt.registerFactory(() => StatisticsBloc(
+    repository: getIt<SensorRepository>(),
   ));
 
   getIt.registerFactory(() => DeviceBloc(
