@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Backend API | Java 21 · Spring Boot 3 · MySQL · MQTT | Kết nối thiết bị và lưu dữ liệu |
 | Dashboard quản trị | React | Gọi API backend |
-| Ứng dụng mobile | Flutter · BLoC | Giao diện demo, dữ liệu mock |
+| Ứng dụng mobile | Flutter · BLoC | Kết nối API backend, hiển thị dữ liệu thực |
 | Thiết bị IoT | ESP32 · MQTT | Telemetry, lệnh và xác nhận |
 
 ## Nội dung
@@ -25,7 +25,7 @@
 - **Điều khiển và giám sát:** gửi lệnh bật/tắt máy bơm, theo dõi xác nhận lệnh; nhận telemetry và trạng thái thiết bị qua MQTT, lưu dữ liệu cảm biến trong MySQL.
 - **Vòng đời và kết nối thiết bị:** provisioning thông tin MQTT/BLE, theo dõi trạng thái online/offline, hỗ trợ bảo trì và decommission; thiết bị giao tiếp với backend qua MQTT.
 - **Thống kê cảm biến:** backend có API lấy dữ liệu thống kê môi trường và mực nước; hiện chưa có màn hình thống kê trên dashboard quản trị.
-- **Ứng dụng mobile:** có các màn hình tổng quan, tự động hóa, theo dõi cảm biến, quản lý thiết bị/người dùng và hồ sơ; hiện chạy với repository mock, chưa kết nối backend.
+- **Ứng dụng mobile:** đăng nhập và lấy dữ liệu thiết bị/cảm biến thực tế từ backend; hỗ trợ các màn hình tổng quan, tự động hóa, theo dõi cảm biến, quản lý thiết bị/người dùng và hồ sơ.
 
 ### Sơ đồ hệ thống
 
@@ -38,14 +38,14 @@ flowchart LR
     API <-->|MQTT| Broker[MQTT Broker]
     Broker <-->|Telemetry / lệnh / xác nhận| Device[Thiết bị IoT]
     User[Người dùng] --> Mobile[Ứng dụng mobile - Flutter]
-    Mobile --> Mock[Dữ liệu giả lập trong ứng dụng]
+    Mobile -->|REST API / JWT| API
 ```
 
 ### Các thành phần
 
 - **Backend (`backend/`)**: Java 21 và Spring Boot 3, tổ chức theo controller, service, repository và model. Spring Security/JWT xác thực người dùng; Spring Data JPA truy cập MySQL; Spring Integration MQTT nhận telemetry/trạng thái/xác nhận và gửi lệnh/cấu hình. Backend cũng cung cấp API thống kê và cấu hình WebSocket.
 - **Frontend (`frontend/`)**: React, dashboard quản trị Gardenia để quản lý thiết bị và tài khoản người dùng. Dashboard chưa có màn hình thống kê.
-- **Mobile (`mobile/`)**: Ứng dụng Flutter sử dụng BLoC để quản lý trạng thái, GoRouter để điều hướng và GetIt để đăng ký phụ thuộc. Mã nguồn tổ chức theo tính năng (`auth`, `dashboard`, `automation`, `sensor_monitor`, `device_management`, `user_management`, `profile`) với các lớp domain, data và presentation. Các repository hiện được đăng ký chủ yếu là mock để chạy thử giao diện; mobile chưa kết nối API/MQTT thực tế.
+- **Mobile (`mobile/`)**: Ứng dụng Flutter sử dụng BLoC để quản lý trạng thái, GoRouter để điều hướng và GetIt để đăng ký phụ thuộc. Mã nguồn tổ chức theo tính năng (`auth`, `dashboard`, `automation`, `sensor_monitor`, `device_management`, `user_management`, `profile`) với các lớp domain, data và presentation. Ứng dụng gọi REST API của backend để đăng nhập và lấy dữ liệu thực tế; giao tiếp với thiết bị được thực hiện thông qua backend.
 - **Thiết bị IoT**: Gửi dữ liệu cảm biến lên MQTT, nhận lệnh điều khiển/cấu hình và phản hồi trên topic xác nhận.
 
 ### MQTT: topic và QoS
@@ -87,7 +87,7 @@ Sau khi cập nhật cấu hình và triển khai backend, tạo thiết bị th
 
 ## Cài đặt và chạy
 
-> **Thứ tự khởi động:** chuẩn bị MySQL và MQTT broker, cấu hình backend, sau đó chạy backend và frontend. Mobile có thể chạy độc lập với dữ liệu mock.
+> **Thứ tự khởi động:** chuẩn bị MySQL và MQTT broker, cấu hình và chạy backend trước, sau đó chạy frontend và/hoặc mobile. Mobile cần kết nối được tới backend để tải dữ liệu thực tế.
 
 ### 1. Chuẩn bị cấu hình backend
 
@@ -176,7 +176,7 @@ flutter pub get
 flutter run
 ```
 
-Có thể xem các thiết bị Flutter nhận diện bằng `flutter devices`, sau đó chọn thiết bị cụ thể với `flutter run -d <device_id>`. Mobile hiện hoạt động ở chế độ UI với repository mock; đăng nhập, số liệu cảm biến và thao tác thiết bị là dữ liệu thử nghiệm, chưa được gửi đến backend. Vì vậy có thể chạy mobile độc lập, không cần cấu hình MySQL hoặc MQTT.
+Có thể xem các thiết bị Flutter nhận diện bằng `flutter devices`, sau đó chọn thiết bị cụ thể với `flutter run -d <device_id>`. Mobile lấy dữ liệu và thực hiện các thao tác thông qua API backend, vì vậy backend cần chạy và URL API phải truy cập được từ emulator hoặc thiết bị. Backend cũng cần kết nối MySQL và MQTT broker để cung cấp dữ liệu thiết bị.
 
 ## API thiết bị và xác nhận lệnh
 
