@@ -221,10 +221,7 @@ Các endpoint dưới đây yêu cầu bearer token có role `ADMIN`.
 
 ### Cập nhật firmware OTA
 
-Trước khi chạy backend lần đầu sau thay đổi này, áp dụng schema
-[`firmware_release.sql`](backend/src/main/resources/db/manual/firmware_release.sql)
-trên database MySQL. Hibernate đang đặt `ddl-auto=none`, nên bảng không được
-tự tạo. File firmware được lưu ngoài database tại `FIRMWARE_STORAGE_DIR`
+File firmware được lưu ngoài database tại `FIRMWARE_STORAGE_DIR`
 (mặc định `./data/firmware`); khi chạy trong container, mount thư mục này ra
 storage bền vững để firmware không mất khi container bị thay thế.
 
@@ -300,7 +297,7 @@ Lệnh điều khiển có thể dùng `{"action":"ON","duration_seconds":300}` 
 
 Phản hồi gửi lệnh/cấu hình có `command_id` và `command_status: "PENDING"`. Dùng endpoint xác nhận ở bảng trên để kiểm tra trạng thái `PENDING`, `SUCCEEDED`, `FAILED` hoặc `PUBLISH_FAILED`. Thiết bị cần phản hồi trên topic `/ack` với cùng `command_id`; khi xử lý thất bại, gửi `status: "FAILED"` cùng thông điệp chẩn đoán. Backend chờ gửi MQTT tối đa 5 giây mỗi lần và thử lại tối đa 3 lần; nếu không gửi được, API trả `503 Service Unavailable`.
 
-### API thống kê backend (chưa tích hợp vào dashboard)
+### API thống kê backend
 
 - `GET /api/admin/statistics/environmental?deviceId={id}&range={24h|7d|30d}`
 - `GET /api/admin/statistics/water-level?deviceId={id}&range={24h|7d|30d}`
