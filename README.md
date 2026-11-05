@@ -273,7 +273,7 @@ Mobile gửi kết quả BLE qua `POST /api/devices/{id}/ble-status` với `{"re
 
 ### WebSocket
 
-Kết nối STOMP tại `/ws` yêu cầu gửi JWT access token trong native header `Authorization` ở frame `CONNECT` với scheme Bearer; backend xác định user từ claim đã ký, không nhận `userId` do client tự khai báo. Client nhận thông báo riêng bằng cách subscribe `/users/queue/notifications`. Khi owner chia sẻ thiết bị với tài khoản đã tồn tại, backend gửi event JSON dạng `{"type":"device_shared","deviceId":"...","deviceName":"...","message":"..."}` tới tài khoản đó. Đây là thông báo realtime, không được lưu để đọc lại khi client offline.
+Kết nối STOMP tại `/ws` yêu cầu gửi JWT access token trong native header `Authorization` ở frame `CONNECT` với scheme Bearer; backend xác định user từ claim đã ký, không nhận `userId` do client tự khai báo. Khi subscribe `/topic/notification/{deviceId}`, backend chỉ cho phép owner hoặc viewer chưa bị khóa của thiết bị đó. Chủ sở hữu và viewer chưa bị khóa nhận trạng thái bơm tại `/users/queue/pump-status` với JSON dạng `{"deviceId":"AA:BB:CC:DD:EE:FF","status":"ON"}`. Client nhận thông báo chia sẻ thiết bị bằng cách subscribe `/users/queue/notifications`; event có dạng `{"type":"device_shared","deviceId":"...","deviceName":"...","message":"..."}`. Các thông báo này là realtime, không được lưu để đọc lại khi client offline.
 
 Nếu database đang có role tài khoản `owner` hoặc `viewer`, cập nhật dữ liệu trước khi triển khai phiên bản mới:
 
