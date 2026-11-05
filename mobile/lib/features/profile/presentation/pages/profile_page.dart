@@ -103,6 +103,16 @@ class ProfilePage extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            leading: const Icon(
+              Icons.group_outlined,
+              color: AppColors.primary,
+            ),
+            title: const Text('Gia đình và khách'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('${RouteNames.settings}/family'),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('Về ứng dụng'),
             trailing: const Icon(Icons.chevron_right),

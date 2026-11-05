@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../core/network/realtime_client.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../features/auth/presentation/bloc/auth_event.dart';
@@ -13,8 +14,12 @@ import '../features/device_management/presentation/bloc/device_event.dart';
 import '../features/sensor_monitor/presentation/bloc/sensor_bloc.dart';
 import '../features/sensor_monitor/presentation/bloc/sensor_event.dart';
 import '../injection.dart';
+import 'realtime_listener.dart';
 import 'routes/app_router.dart';
 import 'routes/route_names.dart';
+
+final GlobalKey<ScaffoldMessengerState> _messengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 class WateringApp extends StatelessWidget {
   const WateringApp({super.key});
@@ -36,6 +41,7 @@ class WateringApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         routerConfig: appRouter,
+        scaffoldMessengerKey: _messengerKey,
         builder: (context, child) {
           return BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
@@ -51,7 +57,11 @@ class WateringApp extends StatelessWidget {
                 appRouter.go(RouteNames.login);
               }
             },
-            child: child ?? const SizedBox.shrink(),
+            child: RealtimeListener(
+              client: getIt<RealtimeClient>(),
+              messengerKey: _messengerKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
       ),

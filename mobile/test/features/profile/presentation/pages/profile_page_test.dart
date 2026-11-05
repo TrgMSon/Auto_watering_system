@@ -60,6 +60,7 @@ void main() {
 
       // Settings menu checks
       expect(find.text('Quản lý thiết bị'), findsOneWidget);
+      expect(find.text('Gia đình và khách'), findsOneWidget);
       expect(find.text('Cài đặt thông báo'), findsNothing);
       expect(find.text('Về ứng dụng'), findsOneWidget);
       expect(find.text('Đăng xuất'), findsOneWidget);

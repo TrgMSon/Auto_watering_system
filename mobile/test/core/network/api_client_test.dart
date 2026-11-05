@@ -274,6 +274,73 @@ void main() {
       );
     });
 
+    group('when the connection is reset', () {
+      const resetError = 'Connection reset by peer';
+
+      setUp(() {
+        when(() => mockSecureStorage.read(key: 'access_token'))
+            .thenAnswer((_) async => null);
+      });
+
+      test('get() retries once and returns the second response', () async {
+        var calls = 0;
+        when(() => mockHttpClient.send(any())).thenAnswer((_) async {
+          calls++;
+          if (calls == 1) throw http.ClientException(resetError);
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'success': true, 'data': {'id': '1'}}))),
+            200,
+          );
+        });
+
+        final response = await apiClient.get('/ping');
+
+        expect(response['id'], '1');
+        expect(calls, 2);
+      });
+
+      test('get() reports a friendly message when the retry also fails', () async {
+        when(() => mockHttpClient.send(any())).thenThrow(http.ClientException(resetError));
+
+        await expectLater(
+          apiClient.get('/ping'),
+          throwsA(
+            isA<ApiException>()
+                .having((e) => e.statusCode, 'statusCode', 0)
+                .having((e) => e.message, 'message', 'Mất kết nối tới máy chủ. Vui lòng thử lại.'),
+          ),
+        );
+        verify(() => mockHttpClient.send(any())).called(2);
+      });
+
+      test('post() does not retry, so a pump command is never sent twice', () async {
+        when(() => mockHttpClient.send(any())).thenThrow(http.ClientException(resetError));
+
+        await expectLater(
+          apiClient.post('/control', body: {'action': 'ON'}),
+          throwsA(isA<ApiException>()),
+        );
+        verify(() => mockHttpClient.send(any())).called(1);
+      });
+
+      test('get() does not retry after a timeout', () async {
+        final client = ApiClient(
+          client: mockHttpClient,
+          storage: mockSecureStorage,
+          timeout: const Duration(milliseconds: 1),
+        );
+        when(() => mockHttpClient.send(any())).thenAnswer(
+          (_) => Completer<http.StreamedResponse>().future,
+        );
+
+        await expectLater(
+          client.get('/ping'),
+          throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 408)),
+        );
+        verify(() => mockHttpClient.send(any())).called(1);
+      });
+    });
+
     test('saveUser and readUser serialize and deserialize JSON correctly', () async {
       final userMap = {'id': 'user_1', 'email': 'test@example.com'};
       when(() => mockSecureStorage.write(key: 'current_user', value: any(named: 'value')))
