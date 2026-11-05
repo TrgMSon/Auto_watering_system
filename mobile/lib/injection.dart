@@ -8,7 +8,9 @@ import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/domain/usecases/logout_usecase.dart';
 import 'features/auth/domain/usecases/get_current_user_usecase.dart';
+import 'features/auth/domain/usecases/register_usecase.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/auth/presentation/bloc/register_bloc.dart';
 
 import 'features/dashboard/domain/repositories/dashboard_repository.dart';
 import 'features/dashboard/data/repositories/dashboard_repository_impl.dart';
@@ -54,6 +56,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton(() => LoginUseCase(getIt<AuthRepository>()));
   getIt.registerLazySingleton(() => LogoutUseCase(getIt<AuthRepository>()));
   getIt.registerLazySingleton(() => GetCurrentUserUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton(() => RegisterUseCase(getIt<AuthRepository>()));
 
   // UseCases - Dashboard
   getIt.registerLazySingleton(() => GetDashboardSummaryUseCase(getIt<DashboardRepository>()));
@@ -74,6 +77,10 @@ Future<void> configureDependencies() async {
     logoutUseCase: getIt<LogoutUseCase>(),
     getCurrentUserUseCase: getIt<GetCurrentUserUseCase>(),
     sessionExpiredStream: getIt<ApiClient>().sessionExpired,
+  ));
+
+  getIt.registerFactory(() => RegisterBloc(
+    registerUseCase: getIt<RegisterUseCase>(),
   ));
 
   getIt.registerFactory(() => DashboardBloc(

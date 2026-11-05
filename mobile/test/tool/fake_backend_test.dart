@@ -87,6 +87,33 @@ void main() {
       );
     });
 
+    test('registers a new account that can then log in', () async {
+      await authRepository.register(email: 'new@test.com', password: 'password123');
+
+      final user = await authRepository.login(
+        username: 'new@test.com',
+        password: 'password123',
+      );
+
+      expect(user.email, 'new@test.com');
+      expect(user.role, UserRole.user);
+      expect(await dashboardRepository.getDevices(), isEmpty);
+    });
+
+    test('rejects registering an email that already exists', () {
+      expect(
+        authRepository.register(email: 'user@test.com', password: 'password123'),
+        apiExceptionWithStatus(409),
+      );
+    });
+
+    test('rejects registering with a short password', () {
+      expect(
+        authRepository.register(email: 'new@test.com', password: '1234567'),
+        apiExceptionWithStatus(400),
+      );
+    });
+
     test('expire makes the client refresh and retry on its own', () async {
       await loginAsUser();
       await backend.runCommand('expire');

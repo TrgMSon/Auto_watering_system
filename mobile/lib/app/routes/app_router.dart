@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'route_names.dart';
+import '../../features/auth/presentation/bloc/register_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/automation/presentation/pages/automation_page.dart';
 import '../../features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import '../../features/dashboard/presentation/bloc/dashboard_state.dart';
@@ -10,6 +12,7 @@ import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/device_management/presentation/pages/device_list_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/sensor_monitor/presentation/pages/sensor_monitor_page.dart';
+import '../../injection.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -31,6 +34,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.login,
       builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: RouteNames.register,
+      builder: (context, state) => BlocProvider(
+        create: (_) => getIt<RegisterBloc>(),
+        child: const RegisterPage(),
+      ),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {

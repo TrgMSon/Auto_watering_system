@@ -2,7 +2,9 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:watering_app/app/routes/route_names.dart';
 import 'package:watering_app/core/widgets/app_loading_indicator.dart';
 import 'package:watering_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:watering_app/features/auth/presentation/bloc/auth_event.dart';
@@ -99,6 +101,39 @@ void main() {
             username: 'user@test.com',
             password: '123456',
           ))).called(1);
+    });
+
+    testWidgets('fills in the email after registering from the login form',
+        (tester) async {
+      when(() => mockAuthBloc.state).thenReturn(const AuthUnauthenticated());
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => BlocProvider<AuthBloc>.value(
+              value: mockAuthBloc,
+              child: const LoginPage(),
+            ),
+          ),
+          GoRoute(
+            path: RouteNames.register,
+            builder: (context, state) => TextButton(
+              onPressed: () => context.pop('new@test.com'),
+              child: const Text('Hoàn tất đăng ký'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.tap(find.text('Chưa có tài khoản? Đăng ký'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hoàn tất đăng ký'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('new@test.com'), findsOneWidget);
+      expect(find.text('Đăng ký thành công. Vui lòng đăng nhập.'), findsOneWidget);
     });
 
     testWidgets('shows SnackBar on AuthError state', (tester) async {
