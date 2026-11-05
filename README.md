@@ -222,8 +222,8 @@ Các endpoint dưới đây yêu cầu bearer token có role `ADMIN`.
 ### API thống kê
 | Phương thức | Endpoint | Chức năng |
 | --- | --- | --- |
-| `GET` | `/api/admin/statistics/environmental?deviceId={id}&range={24h`\|`7d`\|`30d}` | Thống kê nhiệt độ, độ ẩm không khí, độ ẩm đất |
-| `GET` | `/api/admin/statistics/water-level?deviceId={id}&range={24h`\|`7d`\|`30d}` | Thống kê mực nước trong bể |
+| `GET` | `/api/statistics/environmental?deviceId={id}&range={24h`\|`7d`\|`30d}` | Thống kê nhiệt độ, độ ẩm không khí, độ ẩm đất |
+| `GET` | `/api/statistics/water-level?deviceId={id}&range={24h`\|`7d`\|`30d}` | Thống kê mực nước trong bể |
 
 ### Cập nhật firmware OTA
 

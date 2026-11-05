@@ -16,10 +16,13 @@ import com.project.backend.dto.sensor.EnvironmentalStatsResponse;
 import com.project.backend.dto.sensor.SensorLogRequest;
 import com.project.backend.dto.sensor.WaterLevelStatsResponse;
 import com.project.backend.exception.ConflictException;
+import com.project.backend.exception.NotFoundException;
 import com.project.backend.model.Device;
 import com.project.backend.model.SensorLog;
+import com.project.backend.model.UserDevice;
 import com.project.backend.repository.DeviceRepository;
 import com.project.backend.repository.SensorLogRepository;
+import com.project.backend.repository.UserDeviceRepository;
 import com.project.backend.service.DeviceLifecycleService;
 import com.project.backend.service.SensorDataService;
 
@@ -29,13 +32,16 @@ public class SensorDataServiceImpl implements SensorDataService {
 
     private final SensorLogRepository sensorLogRepository;
     private final DeviceRepository deviceRepository;
+    private final UserDeviceRepository userDeviceRepository;
     private final ObjectMapper objectMapper;
     private final DeviceLifecycleService deviceLifecycleService;
 
     public SensorDataServiceImpl(SensorLogRepository sensorLogRepository, DeviceRepository deviceRepository,
-            ObjectMapper objectMapper, DeviceLifecycleService deviceLifecycleService) {
+            UserDeviceRepository userDeviceRepository, ObjectMapper objectMapper,
+            DeviceLifecycleService deviceLifecycleService) {
         this.sensorLogRepository = sensorLogRepository;
         this.deviceRepository = deviceRepository;
+        this.userDeviceRepository = userDeviceRepository;
         this.objectMapper = objectMapper;
         this.deviceLifecycleService = deviceLifecycleService;
     }
@@ -74,7 +80,9 @@ public class SensorDataServiceImpl implements SensorDataService {
     }
 
     @Override
-    public List<EnvironmentalStatsResponse> getEnvironmentalStats(String deviceId, String range) {
+    public List<EnvironmentalStatsResponse> getEnvironmentalStats(String deviceId, int userId, String range) {
+        requireStatisticsPermission(deviceId, userId);
+
         // 1. Tính toán thời gian bắt đầu dựa vào range
         LocalDateTime startTime = calculateStartTime(range);
 
@@ -99,7 +107,9 @@ public class SensorDataServiceImpl implements SensorDataService {
     }
 
     @Override
-    public List<WaterLevelStatsResponse> getWaterLevelStats(String deviceId, String range) {
+    public List<WaterLevelStatsResponse> getWaterLevelStats(String deviceId, int userId, String range) {
+        requireStatisticsPermission(deviceId, userId);
+
         // 1. Tính toán thời gian bắt đầu từ range (24h, 7d, 30d)
         LocalDateTime startTime = calculateStartTime(range);
 
@@ -120,6 +130,15 @@ public class SensorDataServiceImpl implements SensorDataService {
         }
 
         return responseList;
+    }
+
+    private void requireStatisticsPermission(String deviceId, int userId) {
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(userId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        String permission = association.getPermission();
+        if (!"owner".equalsIgnoreCase(permission) && !"viewer".equalsIgnoreCase(permission)) {
+            throw new NotFoundException("Không tìm thấy thiết bị");
+        }
     }
 
     // Hàm phụ trợ tính mốc thời gian
