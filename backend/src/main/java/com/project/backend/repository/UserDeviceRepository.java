@@ -62,7 +62,10 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Integer>
     List<UserDevice> findViewersByDeviceId(@Param("deviceId") String deviceId);
 
     @Query(value = """
-            SELECT user_id FROM user_device WHERE device_id = ?1
+            SELECT user_id
+            FROM user_device
+            WHERE device_id = ?1
+              AND LOWER(permission) IN ('owner', 'viewer')
             """, nativeQuery = true)
-    List<String> findUserIds(String deviceId);
+    List<String> findAuthorizedUserIds(String deviceId);
 }
