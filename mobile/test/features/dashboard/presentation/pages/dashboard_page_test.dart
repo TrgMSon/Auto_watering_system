@@ -181,7 +181,7 @@ void main() {
       expect(find.text('42.5%'), findsOneWidget);
       expect(find.text('28.0°C'), findsOneWidget);
       expect(find.text('65.2%'), findsOneWidget);
-      expect(find.text('78.4%'), findsOneWidget);
+      expect(find.text('78.4 cm'), findsOneWidget);
 
       // Sensor icons
       expect(find.byIcon(Icons.grass), findsOneWidget);

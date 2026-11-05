@@ -34,6 +34,8 @@ import 'features/device_management/domain/usecases/add_device_usecase.dart';
 import 'features/device_management/domain/usecases/delete_device_usecase.dart';
 import 'features/device_management/presentation/bloc/device_bloc.dart';
 
+import 'features/ble/data/ble_key_repository.dart';
+
 final getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
@@ -51,6 +53,8 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<IAutomationRepository>(
     () => AutomationRepositoryImpl(getIt<ApiClient>()),
   );
+
+  getIt.registerLazySingleton(() => BleKeyRepository(getIt<ApiClient>()));
 
   // UseCases - Auth
   getIt.registerLazySingleton(() => LoginUseCase(getIt<AuthRepository>()));

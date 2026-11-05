@@ -36,7 +36,8 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
     soilMoistureMax = widget.currentConfig.soilMoistureMax;
     tempMin = widget.currentConfig.temperatureMin;
     tempMax = widget.currentConfig.temperatureMax;
-    maxDuration = widget.currentConfig.maxWateringDuration.toDouble();
+    // Dữ liệu cũ có thể lưu theo giây và vượt khoảng của Slider.
+    maxDuration = widget.currentConfig.maxWateringDuration.clamp(1, 10).toDouble();
   }
 
   void _resetToDefaults() {
@@ -47,7 +48,7 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
       soilMoistureMax = 80;
       tempMin = 20;
       tempMax = 35;
-      maxDuration = 120;
+      maxDuration = 2;
     });
   }
 
@@ -149,12 +150,12 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
             const SizedBox(height: 24),
             
             // Max Duration
-            Text('Thời gian bơm tối đa: ${maxDuration.toInt()} giây', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Thời gian bơm tối đa: ${maxDuration.toInt()} phút', style: const TextStyle(fontWeight: FontWeight.bold)),
             Slider(
               value: maxDuration,
-              min: 10,
-              max: 300,
-              divisions: 29,
+              min: 1,
+              max: 10,
+              divisions: 9,
               activeColor: AppColors.primary,
               onChanged: (val) {
                 setState(() {

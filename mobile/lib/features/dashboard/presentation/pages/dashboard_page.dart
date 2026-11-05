@@ -354,7 +354,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         SensorCard(
                           title: 'Mực nước',
-                          value: '${telemetry.waterLevel.toStringAsFixed(1)}%',
+                          value: '${telemetry.waterLevel.toStringAsFixed(1)} cm',
                           icon: Icons.water,
                           color: Colors.blue,
                         ),

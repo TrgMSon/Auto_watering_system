@@ -111,7 +111,7 @@ class _AutomationPageState extends State<AutomationPage> {
                               child: const Icon(Icons.tune, color: AppColors.primary, size: 20),
                             ),
                             title: const Text('Tùy chỉnh ngưỡng tự động'),
-                            subtitle: Text('Đất: ${config.soilMoistureMin.toInt()}% - ${config.soilMoistureMax.toInt()}%\nKhông khí: ${config.airHumidityMin.toInt()}% - ${config.airHumidityMax.toInt()}%\nNhiệt độ: ${config.temperatureMin.toInt()}°C - ${config.temperatureMax.toInt()}°C\nThời gian bơm: ${config.maxWateringDuration}s'),
+                            subtitle: Text('Đất: ${config.soilMoistureMin.toInt()}% - ${config.soilMoistureMax.toInt()}%\nKhông khí: ${config.airHumidityMin.toInt()}% - ${config.airHumidityMax.toInt()}%\nNhiệt độ: ${config.temperatureMin.toInt()}°C - ${config.temperatureMax.toInt()}°C\nThời gian bơm: ${config.maxWateringDuration} phút'),
                             trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                             onTap: () {
                               _showAdvancedConfigDialog(context, config);
