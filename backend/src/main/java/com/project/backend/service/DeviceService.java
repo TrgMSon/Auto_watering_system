@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.project.backend.dto.device.AdminDeviceResponse;
 import com.project.backend.dto.device.DeviceCreatedResponse;
+import com.project.backend.dto.device.DeviceViewerResponse;
 import com.project.backend.dto.device.DeviceCommandRequest;
 import com.project.backend.dto.device.DeviceCommandResponse;
 import com.project.backend.dto.device.CommandAcknowledgmentResponse;
@@ -32,7 +33,9 @@ public interface DeviceService {
 
         void registerDevice(String deviceId, int userId, int userCreateId);
 
-        void addViewer(String deviceId, int ownerId, int viewerId);
+        void addViewer(String deviceId, int ownerId, String viewerEmail);
+
+        List<DeviceViewerResponse> getDeviceViewers(String deviceId, int ownerId);
 
         void removeViewer(String deviceId, int ownerId, int viewerId);
 
