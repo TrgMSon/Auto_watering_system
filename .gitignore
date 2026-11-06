@@ -48,10 +48,8 @@ app.*.map.json
 .widget_preview/
 **/docs/
 mobile/docs/
-!firmware/docs/
+
 firmware/docs/*
-!firmware/docs/hop-dong-BLE-chot-2026-11-04.md
-!firmware/docs/firmware-integration-notes.md
 
 # ==========================================
 # 1. Spring Boot / Java (Backend)
@@ -177,3 +175,4 @@ flutter/.env
 Thumbs.db
 
 **/.agents
+cau-hoi-ble-tra-loi.md

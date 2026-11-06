@@ -7,6 +7,7 @@ import '../bloc/device_bloc.dart';
 import '../bloc/device_event.dart';
 import '../bloc/device_state.dart';
 import '../widgets/device_card.dart';
+import '../widgets/wifi_config_sheet.dart';
 
 class DeviceListPage extends StatefulWidget {
   const DeviceListPage({super.key});
@@ -58,7 +59,10 @@ class _DeviceListPageState extends State<DeviceListPage> {
                   final device = state.devices[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: DeviceCard(device: device),
+                    child: DeviceCard(
+                      device: device,
+                      onTap: () => showWifiConfigSheet(context, device),
+                    ),
                   );
                 },
               ),

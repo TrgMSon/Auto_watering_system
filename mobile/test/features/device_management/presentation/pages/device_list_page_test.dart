@@ -93,5 +93,81 @@ void main() {
       expect(find.byType(DeviceCard), findsOneWidget);
       expect(find.text('Vườn Lan Ban Công'), findsOneWidget);
     });
+
+    group('Wi-Fi form', () {
+      final ssidField = find.widgetWithText(TextFormField, 'Tên Wi-Fi');
+      final passwordField = find.widgetWithText(TextFormField, 'Mật khẩu Wi-Fi');
+      final submitButton = find.widgetWithText(ElevatedButton, 'Gửi tới thiết bị');
+
+      Future<void> openForm(WidgetTester tester) async {
+        when(() => mockDeviceBloc.state).thenReturn(const DeviceLoaded(devices: [testDevice]));
+        await tester.pumpWidget(buildWidget());
+        await tester.tap(find.byType(DeviceCard));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('opens when a device is tapped', (tester) async {
+        await openForm(tester);
+
+        expect(find.text('Cấu hình Wi-Fi'), findsOneWidget);
+        expect(ssidField, findsOneWidget);
+        expect(passwordField, findsOneWidget);
+        expect(find.text('Vườn Lan Ban Công'), findsNWidgets(2));
+      });
+
+      testWidgets('requires a Wi-Fi name and password', (tester) async {
+        await openForm(tester);
+
+        await tester.tap(submitButton);
+        await tester.pump();
+
+        expect(find.text('Vui lòng nhập tên Wi-Fi'), findsOneWidget);
+        expect(find.text('Vui lòng nhập mật khẩu Wi-Fi'), findsOneWidget);
+      });
+
+      testWidgets('rejects a name over 32 bytes and a short password', (tester) async {
+        await openForm(tester);
+
+        await tester.enterText(ssidField, 'đ' * 17);
+        await tester.enterText(passwordField, '1234567');
+        await tester.tap(submitButton);
+        await tester.pump();
+
+        expect(find.text('Tên Wi-Fi quá dài'), findsOneWidget);
+        expect(find.text('Mật khẩu phải có từ 8 đến 63 ký tự'), findsOneWidget);
+      });
+
+      testWidgets('hides the password until the user reveals it', (tester) async {
+        await openForm(tester);
+
+        bool isObscured() => tester
+            .widget<TextField>(
+              find.descendant(of: passwordField, matching: find.byType(TextField)),
+            )
+            .obscureText;
+
+        expect(isObscured(), isTrue);
+
+        await tester.tap(find.byIcon(Icons.visibility_off));
+        await tester.pump();
+
+        expect(isObscured(), isFalse);
+      });
+
+      testWidgets('closes on valid input and says nothing was sent yet', (tester) async {
+        await openForm(tester);
+
+        await tester.enterText(ssidField, 'Nhà Lan');
+        await tester.enterText(passwordField, 'password123');
+        await tester.tap(submitButton);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Cấu hình Wi-Fi'), findsNothing);
+        expect(
+          find.text('Chưa gửi tới thiết bị vì ứng dụng chưa hỗ trợ kết nối BLE.'),
+          findsOneWidget,
+        );
+      });
+    });
   });
 }

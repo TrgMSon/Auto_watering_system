@@ -12,6 +12,9 @@ import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/device_management/presentation/pages/device_list_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/sensor_monitor/presentation/pages/sensor_monitor_page.dart';
+import '../../features/sharing/presentation/bloc/sharing_bloc.dart';
+import '../../features/sharing/presentation/bloc/sharing_event.dart';
+import '../../features/sharing/presentation/pages/family_guests_page.dart';
 import '../../injection.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -87,6 +90,15 @@ final GoRouter appRouter = GoRouter(
                   path: 'devices',
                   parentNavigatorKey: rootNavigatorKey,
                   builder: (context, state) => const DeviceListPage(),
+                ),
+                GoRoute(
+                  path: 'family',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => BlocProvider(
+                    create: (_) =>
+                        getIt<SharingBloc>()..add(const SharingLoadRequested()),
+                    child: const FamilyGuestsPage(),
+                  ),
                 ),
               ],
             ),

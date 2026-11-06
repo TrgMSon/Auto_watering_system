@@ -16,6 +16,7 @@ constexpr uint8_t kRelayIn1Pin = 23;
 constexpr int kSoilDryAdc = 3230;
 constexpr int kSoilWetAdc = 2030;
 
-// Relay polarity, supply voltages and transistor wiring are UNCONFIRMED.
-// Do not configure the relay pin as OUTPUT or drive it before confirmation.
+// GPIO23 -> 1k resistor -> 2N2222 base; emitter GND, collector relay IN1.
+// test_relay_1.ino establishes GPIO HIGH = ON, LOW = OFF through this stage.
+// Startup/reset fail-safe still requires suitable external hardware bias.
 }  // namespace board_config

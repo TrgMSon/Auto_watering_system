@@ -10,4 +10,7 @@ abstract class DashboardRepository {
   Future<List<DeviceModel>> getDevices();
   Future<void> togglePump(String deviceId, bool turnOn, {int duration = 120});
   Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey);
+
+  /// Cập nhật trạng thái bơm nhận từ WebSocket để lần đọc cảm biến sau không ghi đè.
+  void applyPumpStatus(String deviceId, {required bool isOn});
 }

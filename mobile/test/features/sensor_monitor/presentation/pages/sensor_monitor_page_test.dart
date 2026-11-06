@@ -5,16 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:watering_app/core/widgets/app_error_widget.dart';
 import 'package:watering_app/features/sensor_monitor/domain/entities/sensor_reading.dart';
+import 'package:watering_app/features/sensor_monitor/domain/entities/statistics_point.dart';
 import 'package:watering_app/features/sensor_monitor/presentation/bloc/sensor_bloc.dart';
 import 'package:watering_app/features/sensor_monitor/presentation/bloc/sensor_event.dart';
 import 'package:watering_app/features/sensor_monitor/presentation/bloc/sensor_state.dart';
+import 'package:watering_app/features/sensor_monitor/presentation/bloc/statistics_bloc.dart';
 import 'package:watering_app/features/sensor_monitor/presentation/pages/sensor_monitor_page.dart';
 
 class MockSensorBloc extends MockBloc<SensorEvent, SensorState>
     implements SensorBloc {}
 
+class MockStatisticsBloc extends MockBloc<StatisticsEvent, StatisticsState>
+    implements StatisticsBloc {}
+
 void main() {
   late MockSensorBloc mockSensorBloc;
+  late MockStatisticsBloc mockStatisticsBloc;
 
   final testReading = SensorReading(
     id: 1,
@@ -37,12 +43,17 @@ void main() {
 
   setUp(() {
     mockSensorBloc = MockSensorBloc();
+    mockStatisticsBloc = MockStatisticsBloc();
+    when(() => mockStatisticsBloc.state).thenReturn(const StatisticsState());
   });
 
   Widget createWidgetUnderTest(String deviceId) {
     return MaterialApp(
-      home: BlocProvider<SensorBloc>.value(
-        value: mockSensorBloc,
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider<SensorBloc>.value(value: mockSensorBloc),
+          BlocProvider<StatisticsBloc>.value(value: mockStatisticsBloc),
+        ],
         child: SensorMonitorPage(deviceId: deviceId),
       ),
     );
@@ -113,7 +124,70 @@ void main() {
 
       expect(find.text('Mất kết nối máy chủ'), findsOneWidget);
       expect(find.text('Dữ liệu hiện tại'), findsOneWidget);
-      expect(find.text('Biểu đồ 24 giờ qua'), findsOneWidget);
+      expect(find.text('Trung bình theo giờ'), findsOneWidget);
+    });
+
+    testWidgets('loads statistics and reloads when another range is chosen',
+        (tester) async {
+      when(() => mockSensorBloc.state).thenReturn(const SensorLoaded());
+
+      await tester.pumpWidget(createWidgetUnderTest('ESP_001'));
+
+      verify(() => mockStatisticsBloc.add(const StatisticsRequested(
+            deviceId: 'ESP_001',
+            range: StatisticsRange.day,
+          ))).called(1);
+
+      await tester.tap(find.text('7 ngày'));
+      await tester.pump();
+
+      verify(() => mockStatisticsBloc.add(const StatisticsRequested(
+            deviceId: 'ESP_001',
+            range: StatisticsRange.week,
+          ))).called(1);
+    });
+
+    testWidgets('draws a chart per metric and skips one without data', (tester) async {
+      when(() => mockSensorBloc.state).thenReturn(const SensorLoaded());
+      when(() => mockStatisticsBloc.state).thenReturn(StatisticsState(points: [
+        StatisticsPoint(
+          time: DateTime(2026, 11, 5, 10),
+          soilMoisture: 40,
+          waterLevel: 12,
+        ),
+      ]));
+
+      await tester.pumpWidget(createWidgetUnderTest('ESP_001'));
+
+      expect(find.text('Độ ẩm đất (%)'), findsOneWidget);
+      expect(find.text('Nhiệt độ (°C)'), findsNothing);
+      await tester.scrollUntilVisible(find.text('Mực nước (cm)'), 100);
+      expect(find.text('Mực nước (cm)'), findsOneWidget);
+    });
+
+    testWidgets('shows an empty message when the range has no statistics', (tester) async {
+      when(() => mockSensorBloc.state).thenReturn(const SensorLoaded());
+
+      await tester.pumpWidget(createWidgetUnderTest('ESP_001'));
+
+      expect(find.text('Chưa có dữ liệu thống kê trong khoảng này'), findsOneWidget);
+    });
+
+    testWidgets('retries statistics after an error', (tester) async {
+      when(() => mockSensorBloc.state).thenReturn(const SensorLoaded());
+      when(() => mockStatisticsBloc.state)
+          .thenReturn(const StatisticsState(errorMessage: 'Không tìm thấy thiết bị'));
+
+      await tester.pumpWidget(createWidgetUnderTest('ESP_001'));
+      expect(find.text('Không tìm thấy thiết bị'), findsOneWidget);
+
+      await tester.tap(find.text('Thử lại'));
+      await tester.pump();
+
+      verify(() => mockStatisticsBloc.add(const StatisticsRequested(
+            deviceId: 'ESP_001',
+            range: StatisticsRange.day,
+          ))).called(2);
     });
 
     testWidgets('tapping retry on AppErrorWidget retries with current deviceId',
