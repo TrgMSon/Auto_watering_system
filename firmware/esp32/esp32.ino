@@ -5,8 +5,10 @@
 #include "pump.h"
 #include "pump_serial.h"
 #include "irrigation.h"
+#include "preferences_storage.h"
+static configuration::PreferencesStorage configStorage;
 
-constexpr char kFirmwareVersion[] = "0.0.5-cooldown-auto";
+constexpr char kFirmwareVersion[] = "0.0.6-persistent-config";
 static pump::SerialCommands commands;
 static irrigation::System irrigationSystem;
 
@@ -27,11 +29,11 @@ void servicePump() {
 }
 
 void setup() {
-  irrigationSystem.begin();
+  irrigationSystem.begin(&configStorage);
   Serial.begin(115200);
   Serial.print("Smart Plant Watering firmware ");
   Serial.println(kFirmwareVersion);
-  Serial.println("F2.3c: ON / OFF / STATUS / AUTO / MANUAL / RESET_WATERING (newline); boot MANUAL/OFF.");
+  Serial.println("F2.4: CONFIG / SET / RESET_CONFIG / ON / OFF / STATUS / AUTO / MANUAL / RESET_WATERING (newline); boot MANUAL/OFF.");
   printPumpStatus();
   sensors::begin();
 }
@@ -44,6 +46,14 @@ void loop() {
     if (commands.feedLine(static_cast<char>(Serial.read()), line)) {
       const auto result = irrigationSystem.command(line);
       Serial.println(irrigation::name(result));
+      if (line && strcmp(line, "CONFIG") == 0) {
+        const auto& settings = irrigationSystem.configurationStatus();
+        const auto& c = settings.active();
+        Serial.printf("soil_start_pct=%.2f soil_stop_pct=%.2f water_min_pct=%.2f "
+                      "full_distance_cm=%.2f empty_distance_cm=%.2f source=%s schema=1\n",
+                      c.soilStart, c.soilStop, c.waterMin, c.fullCm, c.emptyCm,
+                      settings.persisted() ? "NVS_PERSISTED" : "DEFAULTS_NOT_PERSISTED");
+      }
       printPumpStatus();
     }
     servicePump();
