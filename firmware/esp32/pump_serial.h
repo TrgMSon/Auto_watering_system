@@ -7,10 +7,18 @@ namespace pump {
 class SerialCommands {
  public:
   bool feed(char c, Result& result) {
+    const char* line = nullptr;
+    if (!feedLine(c, line)) return false;
+    result = line ? command(line) : Result::Invalid;
+    return true;
+  }
+  // Production dispatches completed lines through the irrigation safety gate.
+  // nullptr denotes an invalid/overlong line; no pump operation occurs here.
+  bool feedLine(char c, const char*& line) {
     if (c == '\r' || c == '\n') {
       if (size_ == 0 && !overflow_) return false;
       buffer_[size_] = '\0';
-      result = overflow_ ? Result::Invalid : command(buffer_);
+      line = overflow_ ? nullptr : buffer_;
       size_ = 0;
       overflow_ = false;
       return true;

@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "../../esp32/pump.h"
 #include "../../esp32/pump_serial.h"
+#include "../../esp32/watering.h"
 #include <iostream>
 #include <limits>
 
@@ -50,5 +51,23 @@ int main() {
   assert(parser.feed('\n', result) && result == Result::Off && !pump::isOn());
   // Reinitialization also forces OFF, with the latch loaded before pinMode.
   pump::command("ON"); pump::begin(); assert(!pump::isOn());
+  watering::Config config;
+  config.fullDistanceCm = 10; config.emptyDistanceCm = 110;
+  config.calibrationConfirmed = true;
+  watering::Controller shadow(config);
+  sensors::Reading reading;
+  reading.sampledAtMs = fakeNow; reading.soilValid = true; reading.soilPercent = 20;
+  reading.distanceValid = true; reading.distanceCm = 50;
+  const int beforeShadow = writes;
+  assert(shadow.evaluate(reading, fakeNow).desiredPumpOn);
+  assert(writes == beforeShadow && outputLevel == LOW && !pump::isOn());
+  // Shadow unsafe decisions do not override or bypass manual control.
+  assert(pump::command("ON") == Result::On);
+  reading.soilValid = false;
+  const int beforeUnsafe = writes;
+  assert(!shadow.evaluate(reading, fakeNow).desiredPumpOn);
+  assert(writes == beforeUnsafe && pump::isOn());
+  fakeNow += 5000;
+  assert(pump::poll() && outputLevel == LOW);
   std::cout << "PASS: safe init, commands, timeout, rollover, repeated ON, parser failures\n";
 }
