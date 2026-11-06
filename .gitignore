@@ -52,6 +52,13 @@ mobile/docs/
 firmware/docs/*
 !firmware/docs/hop-dong-BLE-chot-2026-11-04.md
 !firmware/docs/firmware-integration-notes.md
+!firmware/docs/F2.1.md
+!firmware/docs/F2.2.md
+!firmware/docs/F2.3a.md
+!firmware/docs/F2.3b.md
+!firmware/docs/F2.3c.md
+!firmware/docs/F2.3c.md
+!firmware/docs/F2.3b.md
 
 # ==========================================
 # 1. Spring Boot / Java (Backend)
