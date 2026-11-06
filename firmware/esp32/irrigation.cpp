@@ -6,16 +6,46 @@
 namespace irrigation {
 watering::Config confirmedConfig() {
   watering::Config config;
-  config.fullDistanceCm = 3.00f;
-  config.emptyDistanceCm = 12.26f;  // Lowest tested safe level, not an empty tank.
+  const configuration::Config defaults;
+  config.startPercent = defaults.soilStart; config.stopPercent = defaults.soilStop;
+  config.minWaterPercent = defaults.waterMin;
+  config.fullDistanceCm = defaults.fullCm;
+  config.emptyDistanceCm = defaults.emptyCm;  // Lowest tested safe level, not an empty tank.
   config.calibrationConfirmed = true;
   return config;
 }
-void System::begin() {
+void System::loadConfiguration(configuration::Storage& storage) {
+  // Boot-only entry point, after begin() establishes GPIO OFF.
+  if (status_.mode != Mode::Manual || pump::isOn()) return;
+  settings_.load(&storage);
+  const auto& c = settings_.active();
+  config_.startPercent=c.soilStart; config_.stopPercent=c.soilStop;
+  config_.minWaterPercent=c.waterMin; config_.fullDistanceCm=c.fullCm;
+  config_.emptyDistanceCm=c.emptyCm; config_.calibrationConfirmed=true;
+  controller_.configure(config_);
+  status_.decision = controller_.safety(reading_, millis());
+  snapshot();
+}
+configuration::Result System::updateConfiguration(const configuration::Config& candidate) {
+  const auto result = settings_.update(candidate, status_.mode == Mode::Manual,
+      !status_.pumpOn && !pump::isOn() && controller_.state() != watering::State::Watering);
+  if (result == configuration::Result::Saved || result == configuration::Result::Unchanged) {
+    const auto& c = settings_.active();
+    config_.startPercent=c.soilStart; config_.stopPercent=c.soilStop;
+    config_.minWaterPercent=c.waterMin; config_.fullDistanceCm=c.fullCm;
+    config_.emptyDistanceCm=c.emptyCm; config_.calibrationConfirmed=true;
+    controller_.configure(config_);
+    status_.decision = controller_.safety(reading_, millis());
+    snapshot();  // No evaluate/reset: preserve locks, attempts and cooldown.
+  }
+  return result;
+}
+void System::begin(configuration::Storage* storage) {
   pump::begin();
   controller_ = watering::Controller(config_);
   reading_ = sensors::Reading{};
   status_ = Status{};  // No mode persistence: every boot MANUAL/OFF.
+  if (storage) loadConfiguration(*storage);
   service();
 }
 void System::update(const sensors::Reading& reading) {
@@ -73,6 +103,19 @@ void System::service() {
   }
 }
 Result System::command(const char* text) {
+  if (text && strcmp(text, "CONFIG") == 0) return Result::Accepted;
+  if (text && (strncmp(text, "SET ", 4) == 0 || strcmp(text, "RESET_CONFIG") == 0)) {
+    configuration::Config candidate;
+    if (strcmp(text, "RESET_CONFIG") != 0 &&
+        !configuration::parseSet(text, settings_.active(), candidate)) return Result::Invalid;
+    switch (updateConfiguration(candidate)) {
+      case configuration::Result::Saved: return Result::ConfigSaved;
+      case configuration::Result::Unchanged: return Result::ConfigUnchanged;
+      case configuration::Result::Busy: return Result::ConfigBusy;
+      case configuration::Result::StorageFailed: return Result::ConfigFailed;
+      case configuration::Result::Invalid: return Result::Invalid;
+    }
+  }
   // Reset cannot execute AUTO or shorten an active interval/cooldown.
   if (text && strcmp(text, "RESET_WATERING") == 0) {
     if (controller_.state() == watering::State::Watering) return Result::AlreadyOn;
@@ -121,6 +164,10 @@ Result System::command(const char* text) {
 const char* name(Mode mode) { return mode == Mode::Auto ? "AUTO" : "MANUAL"; }
 const char* name(Result result) {
   switch (result) {
+    case Result::ConfigSaved: return "CONFIG_SAVED";
+    case Result::ConfigUnchanged: return "CONFIG_UNCHANGED_PERSISTED";
+    case Result::ConfigFailed: return "CONFIG_SAVE_FAILED";
+    case Result::ConfigBusy: return "CONFIG_REJECTED_MANUAL_OFF_REQUIRED";
     case Result::Accepted: return "ACCEPTED";
     case Result::AlreadyOn: return "ALREADY_ON_NO_EXTENSION";
     case Result::Unsafe: return "REJECTED_UNSAFE";

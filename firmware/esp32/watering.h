@@ -37,6 +37,7 @@ class Controller {
   bool runtimeExpired(uint32_t nowMs) const;
   void completed(uint32_t nowMs, const sensors::Reading& reading);
   bool reset();  // Never starts a run; cannot shorten a cooldown.
+  void configure(const Config& config) { config_ = config; }  // Preserve all runtime state.
   bool retryLimited() const { return retryLocked_; }
   State state() const { return state_; }
  private:

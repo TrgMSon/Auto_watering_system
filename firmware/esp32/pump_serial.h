@@ -29,7 +29,7 @@ class SerialCommands {
     return false;
   }
  private:
-  char buffer_[16] = {};
+  char buffer_[64] = {};
   size_t size_ = 0;
   bool overflow_ = false;
 };
