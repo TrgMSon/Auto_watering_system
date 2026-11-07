@@ -2,6 +2,7 @@
 #include "ble_telemetry.h"
 #include "ble_crypto.h"
 #include "ble_command_bridge.h"
+#include "mqtt_commands.h"
 #include "ble_pairing_esp32.h"
 #include "ble_wifi_service.h"
 #include <Arduino.h>
@@ -40,6 +41,7 @@ struct Event {
   bool response = false, prepared = false;
   uint16_t table[Count] = {};
   uint64_t generation = 0;
+  uint64_t pumpIngressEpoch = 0;
   uint8_t peer[6] = {};
   uint8_t authMode = 0;
   uint64_t encryptedWriteGeneration = 0;
@@ -204,6 +206,7 @@ void gattEvent(esp_gatts_cb_event_t kind, esp_gatt_if_t id, esp_ble_gatts_cb_par
       e.kind = Kind::Read; e.connection = p->read.conn_id; e.transaction = p->read.trans_id;
       e.handle = p->read.handle; e.offset = p->read.offset; e.response = p->read.need_rsp; break;
     case ESP_GATTS_WRITE_EVT:
+      e.pumpIngressEpoch = plant_mqtt::commandIngressEpoch();
       e.kind = Kind::Write; e.connection = p->write.conn_id; e.transaction = p->write.trans_id;
       e.handle = p->write.handle; e.offset = p->write.offset; e.length = p->write.len;
       e.response = p->write.need_rsp; e.prepared = p->write.is_prep;
@@ -401,7 +404,7 @@ void process(const Event& e) {
           response(e.connection, e.transaction, ESP_GATT_INVALID_PDU); break;
         }
         if (!session.resultsSubscribed || session.congested || size_t(session.mtu - 3) < ble_commands::kMaxResultBytes ||
-            !ble_command_bridge::reserve(e.generation, e.transaction, auth.command, auth.code, millis())) {
+            !ble_command_bridge::reserve(e.generation, e.transaction, auth.command, auth.code, millis(), e.pumpIngressEpoch)) {
           response(e.connection, e.transaction, ESP_GATT_INSUF_RESOURCE); break;
         }
         // GATT response is deferred until the reserved result is available.

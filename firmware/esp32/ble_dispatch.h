@@ -29,6 +29,8 @@ class Dispatch {
   bool result(Slot& out) const;
   void release(uint32_t ticket);
   void expire(uint32_t now);
+  bool offPending() const;
+  void cancelOn();
  private:
   void invalidate();
   Slot slots_[kSlots];

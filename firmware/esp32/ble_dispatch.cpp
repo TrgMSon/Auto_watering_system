@@ -1,5 +1,13 @@
 #include "ble_dispatch.h"
 namespace ble_commands {
+bool Dispatch::offPending() const {
+  return slots_[0].state == State::Pending;
+}
+void Dispatch::cancelOn() {
+  for (auto& s : slots_) if (s.state == State::Pending && s.command.op == Op::On) {
+    s.state = State::Done; s.code = Code::None;
+  }
+}
 void Dispatch::invalidate() {
   active_ = 0;
   for (auto& s : slots_) if (s.state != State::Admitted) s = Slot{};
