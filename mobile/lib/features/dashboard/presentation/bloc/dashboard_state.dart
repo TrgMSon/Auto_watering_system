@@ -30,6 +30,9 @@ class DashboardLoaded extends DashboardState {
   final String? pumpErrorMessage;
   final bool isRefreshing;
 
+  /// Chế độ tưới tự động của thiết bị đang chọn; null khi chưa tải được.
+  final bool? isAutoMode;
+
   const DashboardLoaded({
     required this.devices,
     this.selectedDevice,
@@ -42,6 +45,7 @@ class DashboardLoaded extends DashboardState {
     this.errorMessage,
     this.pumpErrorMessage,
     this.isRefreshing = false,
+    this.isAutoMode,
   });
 
   DashboardLoaded copyWith({
@@ -61,6 +65,8 @@ class DashboardLoaded extends DashboardState {
     String? pumpErrorMessage,
     bool clearPumpError = false,
     bool? isRefreshing,
+    bool? isAutoMode,
+    bool clearAutoMode = false,
   }) {
     return DashboardLoaded(
       devices: devices ?? this.devices,
@@ -74,6 +80,7 @@ class DashboardLoaded extends DashboardState {
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       pumpErrorMessage: clearPumpError ? null : (pumpErrorMessage ?? this.pumpErrorMessage),
       isRefreshing: isRefreshing ?? this.isRefreshing,
+      isAutoMode: clearAutoMode ? null : (isAutoMode ?? this.isAutoMode),
     );
   }
 
@@ -90,6 +97,7 @@ class DashboardLoaded extends DashboardState {
         errorMessage,
         pumpErrorMessage,
         isRefreshing,
+        isAutoMode,
       ];
 }
 

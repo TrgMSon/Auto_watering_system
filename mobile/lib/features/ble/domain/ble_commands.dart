@@ -17,6 +17,9 @@ sealed class BleCommand {
 
   Map<String, Object> payloadFields();
 
+  /// Thời gian chờ kết quả riêng của lệnh; null thì dùng mặc định 3 giây.
+  Duration? get resultTimeout => null;
+
   List<int> encode({required String nonce, required String secretKey}) {
     final sig = BleSigner.sign(secretKey, signingMessage(nonce));
     return utf8.encode(jsonEncode({...payloadFields(), 'sig': sig}));
@@ -62,6 +65,8 @@ class BlePumpOffCommand extends BleCommand {
   Map<String, Object> payloadFields() => {'cmd': 'PUMP_OFF', 'dur': 0};
 }
 
+/// Firmware hiện tắt `0003` (ghi bị từ chối) và lưu ngưỡng nước theo % chứ không theo cm,
+/// nên chưa dùng lệnh này cho đến khi nhóm chốt lại cấu hình qua BLE.
 class BleConfigCommand extends BleCommand {
   /// Làm tròn trước khi kiểm tra để chữ ký và JSON luôn dùng cùng một giá trị một chữ số thập phân.
   BleConfigCommand({
@@ -131,6 +136,47 @@ class BleConfigCommand extends BleCommand {
       };
 
   static double _oneDecimal(double value) => double.parse(value.toStringAsFixed(1));
+}
+
+/// Gửi tên và mật khẩu Wi-Fi qua `0006`. Firmware chỉ nhận khi điện thoại đã ghép nối (bond)
+/// với ESP32 và liên kết đã mã hóa.
+class BleWifiCommand extends BleCommand {
+  BleWifiCommand({required this.ssid, required this.password}) {
+    final ssidBytes = utf8.encode(ssid).length;
+    final passwordBytes = utf8.encode(password).length;
+    if (ssidBytes < 1 || ssidBytes > 32) {
+      throw ArgumentError.value(ssid, 'ssid', 'Tên Wi-Fi phải từ 1 đến 32 byte');
+    }
+    // Firmware chỉ hỗ trợ WPA2 có mật khẩu, không nhận mạng không mật khẩu.
+    if (passwordBytes < 8 || passwordBytes > 63) {
+      throw ArgumentError('Mật khẩu Wi-Fi phải từ 8 đến 63 byte');
+    }
+    // Firmware từ chối dấu `|` vì chuỗi ký dùng dấu này để ngăn cách.
+    if (ssid.contains('|') || password.contains('|')) {
+      throw ArgumentError('Tên và mật khẩu Wi-Fi không được chứa dấu |');
+    }
+  }
+
+  /// Firmware thử kết nối tối đa 30 giây; cộng thêm thời gian gửi kết quả qua BLE.
+  static const Duration timeout = Duration(seconds: 35);
+
+  final String ssid;
+  final String password;
+
+  @override
+  String get op => 'WIFI';
+
+  @override
+  String get characteristicUuid => BleUuids.wifi;
+
+  @override
+  String signingMessage(String nonce) => '$nonce|WIFI|$ssid|$password';
+
+  @override
+  Map<String, Object> payloadFields() => {'ssid': ssid, 'pass': password};
+
+  @override
+  Duration get resultTimeout => timeout;
 }
 
 class BleTimeSyncCommand extends BleCommand {

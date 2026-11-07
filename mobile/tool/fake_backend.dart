@@ -587,7 +587,7 @@ class FakeBackend {
           'air_humidity_max': 80.0,
           'air_temperature_min': 20.0,
           'air_temperature_max': 35.0,
-          'water_level_min': 0,
+          'water_level_min': 20,
         },
       );
 

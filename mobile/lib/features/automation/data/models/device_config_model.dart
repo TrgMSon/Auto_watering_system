@@ -13,7 +13,7 @@ class DeviceConfigModel {
   /// Thời gian bơm tối đa, tính bằng phút (1 đến 10).
   final int maxWateringDuration;
 
-  /// Ngưỡng mực nước thấp, tính bằng cm.
+  /// Ngưỡng mực nước thấp, tính bằng % bồn như firmware (20 đến 100).
   final int waterLevelMin;
 
   int get maxWateringDurationSeconds => maxWateringDuration * 60;
@@ -28,7 +28,7 @@ class DeviceConfigModel {
     required this.temperatureMin,
     required this.temperatureMax,
     required this.maxWateringDuration,
-    this.waterLevelMin = 0,
+    this.waterLevelMin = 20,
   });
 
   factory DeviceConfigModel.fromJson(Map<String, dynamic> json) {
@@ -42,7 +42,7 @@ class DeviceConfigModel {
       temperatureMin: (json['air_temperature_min'] ?? json['temperature_min'] ?? 20).toDouble(),
       temperatureMax: (json['air_temperature_max'] ?? json['temperature_max'] ?? 35).toDouble(),
       maxWateringDuration: json['max_watering_duration'] ?? 2,
-      waterLevelMin: json['water_level_min'] ?? 0,
+      waterLevelMin: json['water_level_min'] ?? 20,
     );
   }
 

@@ -51,6 +51,17 @@ class DashboardPumpToggled extends DashboardEvent {
   List<Object?> get props => [turnOn, durationSeconds];
 }
 
+/// Chế độ tự động vừa tải từ server hoặc vừa đổi ở tab Tự động hóa.
+class DashboardAutoModeLoaded extends DashboardEvent {
+  final String deviceId;
+  final bool isAutoMode;
+
+  const DashboardAutoModeLoaded({required this.deviceId, required this.isAutoMode});
+
+  @override
+  List<Object?> get props => [deviceId, isAutoMode];
+}
+
 class DashboardResetRequested extends DashboardEvent {
   const DashboardResetRequested();
 }

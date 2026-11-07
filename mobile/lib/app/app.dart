@@ -7,6 +7,7 @@ import '../features/auth/presentation/bloc/auth_event.dart';
 import '../features/auth/presentation/bloc/auth_state.dart';
 import '../features/automation/presentation/bloc/automation_bloc.dart';
 import '../features/automation/presentation/bloc/automation_event.dart';
+import '../features/automation/presentation/bloc/automation_state.dart';
 import '../features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import '../features/dashboard/presentation/bloc/dashboard_event.dart';
 import '../features/device_management/presentation/bloc/device_bloc.dart';
@@ -45,7 +46,21 @@ class WateringApp extends StatelessWidget {
         routerConfig: appRouter,
         scaffoldMessengerKey: _messengerKey,
         builder: (context, child) {
-          return BlocListener<AuthBloc, AuthState>(
+          return BlocListener<AutomationBloc, AutomationState>(
+            // Giữ trạng thái khóa nút bơm ở trang chủ khớp với công tắc tự động.
+            listenWhen: (previous, current) =>
+                current is AutomationLoaded &&
+                (previous is! AutomationLoaded ||
+                    previous.config.autoMode != current.config.autoMode ||
+                    previous.config.deviceId != current.config.deviceId),
+            listener: (context, state) {
+              final config = (state as AutomationLoaded).config;
+              context.read<DashboardBloc>().add(DashboardAutoModeLoaded(
+                    deviceId: config.deviceId,
+                    isAutoMode: config.autoMode,
+                  ));
+            },
+            child: BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
               if (state is AuthUnauthenticated) {
                 context
@@ -66,6 +81,7 @@ class WateringApp extends StatelessWidget {
               client: getIt<RealtimeClient>(),
               messengerKey: _messengerKey,
               child: child ?? const SizedBox.shrink(),
+            ),
             ),
           );
         },

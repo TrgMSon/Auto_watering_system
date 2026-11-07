@@ -64,7 +64,12 @@ final GoRouter appRouter = GoRouter(
               path: RouteNames.analytics,
               builder: (context, state) {
                 final deviceId = _selectSelectedDeviceId(context);
-                return AutomationPage(deviceId: deviceId ?? '');
+                final isPumpOn = context.select<DashboardBloc, bool>((bloc) {
+                  final dashboardState = bloc.state;
+                  return dashboardState is DashboardLoaded &&
+                      (dashboardState.pumpStatus ?? dashboardState.telemetry?.isPumpOn) == true;
+                });
+                return AutomationPage(deviceId: deviceId ?? '', isPumpOn: isPumpOn);
               },
             ),
           ],

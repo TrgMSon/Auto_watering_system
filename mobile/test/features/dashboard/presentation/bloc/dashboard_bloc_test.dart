@@ -690,6 +690,73 @@ void main() {
       );
     });
 
+    group('Theo firmware hiện tại', () {
+      blocTest<DashboardBloc, DashboardState>(
+        'bật bơm không chọn thời gian thì gửi 5 giây',
+        build: () {
+          when(() => mockRepository.togglePump(testDevice1.id, true, duration: any(named: 'duration')))
+              .thenAnswer((_) async {});
+          return DashboardBloc(repository: mockRepository);
+        },
+        seed: () => DashboardLoaded(devices: [testDevice1], selectedDevice: testDevice1),
+        act: (bloc) => bloc.add(const DashboardPumpToggled(true)),
+        verify: (_) {
+          verify(() => mockRepository.togglePump(testDevice1.id, true, duration: 5)).called(1);
+        },
+      );
+
+      test('tải chế độ tự động khi chọn thiết bị', () async {
+        when(() => mockRepository.getDevices()).thenAnswer((_) async => [testDevice1]);
+        when(() => mockRepository.getAutoMode(testDevice1.id)).thenAnswer((_) async => true);
+
+        final bloc = DashboardBloc(repository: mockRepository);
+        bloc.add(const DashboardLoadRequested());
+        await pumpEventQueue();
+
+        expect((bloc.state as DashboardLoaded).isAutoMode, isTrue);
+        await bloc.close();
+      });
+
+      test('không tải được chế độ tự động thì không khóa nút bơm', () async {
+        when(() => mockRepository.getDevices()).thenAnswer((_) async => [testDevice1]);
+        when(() => mockRepository.getAutoMode(testDevice1.id))
+            .thenThrow(Exception('mất mạng'));
+
+        final bloc = DashboardBloc(repository: mockRepository);
+        bloc.add(const DashboardLoadRequested());
+        await pumpEventQueue();
+
+        expect((bloc.state as DashboardLoaded).isAutoMode, isNull);
+        await bloc.close();
+      });
+
+      blocTest<DashboardBloc, DashboardState>(
+        'bỏ qua chế độ tự động của thiết bị không được chọn',
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(devices: [testDevice1, testDevice2], selectedDevice: testDevice1),
+        act: (bloc) => bloc
+          ..add(DashboardAutoModeLoaded(deviceId: testDevice2.id, isAutoMode: true))
+          ..add(DashboardAutoModeLoaded(deviceId: testDevice1.id, isAutoMode: true)),
+        expect: () => [
+          DashboardLoaded(devices: [testDevice1, testDevice2], selectedDevice: testDevice1, isAutoMode: true),
+        ],
+      );
+
+      blocTest<DashboardBloc, DashboardState>(
+        'đổi thiết bị thì xóa chế độ tự động cũ',
+        build: () => DashboardBloc(repository: mockRepository),
+        seed: () => DashboardLoaded(
+          devices: [testDevice1, testDevice2],
+          selectedDevice: testDevice1,
+          isAutoMode: true,
+        ),
+        act: (bloc) => bloc.add(DashboardDeviceSelected(testDevice2)),
+        expect: () => [
+          DashboardLoaded(devices: [testDevice1, testDevice2], selectedDevice: testDevice2),
+        ],
+      );
+    });
+
     group('DashboardResetRequested', () {
       test('cancels active telemetry polling and resets state to DashboardInitial', () async {
         when(() => mockRepository.getDevices())

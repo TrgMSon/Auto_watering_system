@@ -39,6 +39,7 @@ import 'features/device_management/presentation/bloc/device_bloc.dart';
 import 'features/sharing/data/repositories/api_sharing_repository.dart';
 import 'features/sharing/domain/repositories/sharing_repository.dart';
 import 'features/sharing/presentation/bloc/sharing_bloc.dart';
+import 'features/ble/data/ble_key_repository.dart';
 
 final getIt = GetIt.instance;
 

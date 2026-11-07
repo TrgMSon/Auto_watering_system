@@ -37,6 +37,15 @@ class BlePayloadTooLargeException extends BleCommandException {
   const BlePayloadTooLargeException() : super('Lệnh vượt quá kích thước MTU hiện tại.');
 }
 
+/// ESP32 trả lỗi ATT thay vì kết quả qua `0005`. Firmware làm vậy khi không có mã kết quả phù hợp:
+/// đang tự động, đang chờ giữa hai lần tưới, bị khóa, chưa ghép nối, chưa bật Notify
+/// hoặc MTU quá nhỏ. Lớp kết nối BLE thật phải ném lỗi này khi ghi bị từ chối.
+class BleWriteRejectedException extends BleCommandException {
+  const BleWriteRejectedException([
+    super.message = 'Thiết bị không thực hiện lệnh. Kiểm tra chế độ tự động, ghép nối hoặc thử lại sau.',
+  ]);
+}
+
 /// Gửi lệnh theo quy trình đã chốt: bật Notify `0005`, đọc nonce mới, ký, ghi, chờ kết quả.
 /// Mỗi lúc chỉ một lệnh và không bao giờ tự gửi lại.
 class BleCommandService {
@@ -107,7 +116,7 @@ class BleCommandService {
       }
       isAccepting = true;
       await _transport.write(command.characteristicUuid, payload);
-      return await completer.future.timeout(_resultTimeout);
+      return await completer.future.timeout(command.resultTimeout ?? _resultTimeout);
     } on TimeoutException {
       throw const BleCommandTimeoutException();
     } finally {

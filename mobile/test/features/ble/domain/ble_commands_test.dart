@@ -174,6 +174,33 @@ void main() {
     });
   });
 
+  group('Wi-Fi', () {
+    test('chuỗi ký và JSON theo firmware', () {
+      final command = BleWifiCommand(ssid: 'VuonNha', password: 'matkhau123');
+      expect(command.signingMessage(_nonce), '$_nonce|WIFI|VuonNha|matkhau123');
+      expect(_signed(command), 'a12ba07aa2ff323f');
+      expect(utf8.decode(command.encode(nonce: _nonce, secretKey: _key)),
+          '{"ssid":"VuonNha","pass":"matkhau123","sig":"a12ba07aa2ff323f"}');
+      expect(command.resultTimeout, const Duration(seconds: 35));
+    });
+
+    test('từ chối giá trị firmware không nhận', () {
+      expect(() => BleWifiCommand(ssid: '', password: 'matkhau123'), throwsArgumentError);
+      expect(() => BleWifiCommand(ssid: 'a' * 33, password: 'matkhau123'), throwsArgumentError);
+      expect(() => BleWifiCommand(ssid: 'VuonNha', password: 'ngan'), throwsArgumentError);
+      expect(() => BleWifiCommand(ssid: 'VuonNha', password: ''), throwsArgumentError);
+      expect(() => BleWifiCommand(ssid: 'VuonNha', password: 'a' * 64), throwsArgumentError);
+      expect(() => BleWifiCommand(ssid: 'Vuon|Nha', password: 'matkhau123'), throwsArgumentError);
+      expect(() => BleWifiCommand(ssid: 'VuonNha', password: 'mat|khau123'), throwsArgumentError);
+    });
+
+    test('độ dài tính theo byte UTF-8', () {
+      // 11 chữ "ệ" là 33 byte.
+      expect(() => BleWifiCommand(ssid: 'ệ' * 11, password: 'matkhau123'), throwsArgumentError);
+      expect(BleWifiCommand(ssid: 'ệ' * 10, password: 'matkhau123').ssid.length, 10);
+    });
+  });
+
   group('Mã thiết bị', () {
     test('đổi từ tên BLE sang MAC và ngược lại', () {
       expect(BleDeviceId.fromAdvertisingName('WS-383E516FC7A8'), '38:3E:51:6F:C7:A8');
