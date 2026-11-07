@@ -2,6 +2,7 @@ package com.project.backend.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -87,7 +88,6 @@ class DeviceServiceImplTest {
                 request.setId("aa:bb:cc:dd:ee:ff");
                 request.setDeviceName("  Garden pump  ");
                 request.setHardwareVersion("  ESP32  ");
-                request.setFirmwareVersion("  1.0.0  ");
 
                 when(deviceRepository.save(any(Device.class)))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -101,7 +101,7 @@ class DeviceServiceImplTest {
                 assertEquals("AA:BB:CC:DD:EE:FF", savedDevice.getId());
                 assertEquals("Garden pump", savedDevice.getDeviceName());
                 assertEquals("ESP32", savedDevice.getHardwareVersion());
-                assertEquals("1.0.0", savedDevice.getFirmwareVersion());
+                assertNull(savedDevice.getFirmwareVersion());
                 assertEquals("registered", savedDevice.getStatus());
                 assertNotNull(savedDevice.getBlePassKey());
                 assertTrue(savedDevice.getBlePassKey().length() >= 40);

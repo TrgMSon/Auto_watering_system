@@ -16,5 +16,4 @@ public class CreateDeviceRequest {
 
     private String deviceName;
     private String hardwareVersion;
-    private String firmwareVersion;
 }

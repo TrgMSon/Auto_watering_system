@@ -61,6 +61,21 @@ class DeviceLifecycleServiceImplTest {
     }
 
     @Test
+    void activeStatusMessageStoresFirmwareVersionForRegisteredDeviceWithoutActivatingIt() {
+        Device device = device("registered");
+        when(deviceRepository.findById(device.getId())).thenReturn(Optional.of(device));
+
+        lifecycleService.handleMqttStatus(
+                "iot/garden/" + device.getId() + "/status",
+                "{\"status\":\"ACTIVE\",\"firmware_version\":\" 1.2.0 \"}");
+
+        assertEquals("registered", device.getStatus());
+        assertEquals("1.2.0", device.getFirmwareVersion());
+        org.junit.jupiter.api.Assertions.assertNull(device.getLastActiveAt());
+        verify(deviceRepository).save(device);
+    }
+
+    @Test
     void lateHeartbeatMovesActiveDeviceOffline() {
         Device device = device("active");
         when(deviceRepository.findAllByStatusAndLastActiveAtBefore(
