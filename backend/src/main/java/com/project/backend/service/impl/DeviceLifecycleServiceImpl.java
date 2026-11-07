@@ -79,24 +79,28 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        boolean changed = updateFirmwareVersion(device, message.firmwareVersion(), now);
         switch (requestedStatus.get()) {
-            case ACTIVE -> activateFromDevice(device, current, message.firmwareVersion(), now);
+            case ACTIVE -> changed |= activateFromDevice(device, current, now);
             case OFFLINE -> {
                 if (current == DeviceStatus.ACTIVE) {
                     device.setStatus(DeviceStatus.OFFLINE.value());
                     device.setUpdatedAt(now);
-                    deviceRepository.save(device);
+                    changed = true;
                 }
             }
             case MAINTENANCE -> {
                 if (current == DeviceStatus.ACTIVE || current == DeviceStatus.OFFLINE) {
                     device.setStatus(DeviceStatus.MAINTENANCE.value());
                     device.setUpdatedAt(now);
-                    deviceRepository.save(device);
+                    changed = true;
                 }
             }
             default -> logger.warn("Ignoring device status transition {} -> {} for {}",
                     current.value(), requestedStatus.get().value(), deviceId);
+        }
+        if (changed) {
+            deviceRepository.save(device);
         }
     }
 
@@ -120,7 +124,8 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
             logger.warn("Ignoring telemetry from device {} in state {}", deviceId, current.value());
             return false;
         }
-        activateFromDevice(device, current, null, LocalDateTime.now());
+        activateFromDevice(device, current, LocalDateTime.now());
+        deviceRepository.save(device);
         return true;
     }
 
@@ -264,20 +269,29 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
         }
     }
 
-    private void activateFromDevice(
-            Device device, DeviceStatus current, String firmwareVersion, LocalDateTime now) {
+    private boolean activateFromDevice(Device device, DeviceStatus current, LocalDateTime now) {
         if (current != DeviceStatus.PROVISIONED
                 && current != DeviceStatus.ACTIVE
                 && current != DeviceStatus.OFFLINE) {
-            return;
+            return false;
         }
         device.setStatus(DeviceStatus.ACTIVE.value());
         device.setLastActiveAt(now);
         device.setUpdatedAt(now);
-        if (firmwareVersion != null && !firmwareVersion.isBlank()) {
-            device.setFirmwareVersion(firmwareVersion.trim());
+        return true;
+    }
+
+    private boolean updateFirmwareVersion(Device device, String firmwareVersion, LocalDateTime now) {
+        if (firmwareVersion == null || firmwareVersion.isBlank()) {
+            return false;
         }
-        deviceRepository.save(device);
+        String normalizedVersion = firmwareVersion.trim();
+        if (normalizedVersion.equals(device.getFirmwareVersion())) {
+            return false;
+        }
+        device.setFirmwareVersion(normalizedVersion);
+        device.setUpdatedAt(now);
+        return true;
     }
 
     private boolean isRecentlyActive(Device device, LocalDateTime now) {
