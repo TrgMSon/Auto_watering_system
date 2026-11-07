@@ -39,6 +39,7 @@ import 'features/device_management/presentation/bloc/device_bloc.dart';
 import 'features/sharing/data/repositories/api_sharing_repository.dart';
 import 'features/sharing/domain/repositories/sharing_repository.dart';
 import 'features/sharing/presentation/bloc/sharing_bloc.dart';
+import 'features/ble/data/ble_key_repository.dart';
 
 final getIt = GetIt.instance;
 
@@ -48,7 +49,8 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<SharingRepository>(
     () => ApiSharingRepository(getIt<ApiClient>()),
   );
-  getIt.registerLazySingleton<AuthRepository>(() => ApiAuthRepository(getIt<ApiClient>()));
+  getIt.registerLazySingleton<AuthRepository>(
+      () => ApiAuthRepository(getIt<ApiClient>()));
   getIt.registerLazySingleton<DashboardRepository>(
     () => DashboardRepositoryImpl(getIt<ApiClient>()),
   );
@@ -62,62 +64,72 @@ Future<void> configureDependencies() async {
     () => AutomationRepositoryImpl(getIt<ApiClient>()),
   );
 
+  getIt.registerLazySingleton(() => BleKeyRepository(getIt<ApiClient>()));
+
   // UseCases - Auth
   getIt.registerLazySingleton(() => LoginUseCase(getIt<AuthRepository>()));
   getIt.registerLazySingleton(() => LogoutUseCase(getIt<AuthRepository>()));
-  getIt.registerLazySingleton(() => GetCurrentUserUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton(
+      () => GetCurrentUserUseCase(getIt<AuthRepository>()));
   getIt.registerLazySingleton(() => RegisterUseCase(getIt<AuthRepository>()));
 
   // UseCases - Dashboard
-  getIt.registerLazySingleton(() => GetDashboardSummaryUseCase(getIt<DashboardRepository>()));
-  getIt.registerLazySingleton(() => ToggleAutoWateringUseCase(getIt<DashboardRepository>()));
+  getIt.registerLazySingleton(
+      () => GetDashboardSummaryUseCase(getIt<DashboardRepository>()));
+  getIt.registerLazySingleton(
+      () => ToggleAutoWateringUseCase(getIt<DashboardRepository>()));
 
   // UseCases - Sensor
-  getIt.registerLazySingleton(() => GetSensorHistoryUseCase(getIt<SensorRepository>()));
-  getIt.registerLazySingleton(() => GetRealtimeReadingsUseCase(getIt<SensorRepository>()));
+  getIt.registerLazySingleton(
+      () => GetSensorHistoryUseCase(getIt<SensorRepository>()));
+  getIt.registerLazySingleton(
+      () => GetRealtimeReadingsUseCase(getIt<SensorRepository>()));
 
   // UseCases - Device
-  getIt.registerLazySingleton(() => GetDevicesUseCase(getIt<DeviceRepository>()));
-  getIt.registerLazySingleton(() => AddDeviceUseCase(getIt<DeviceRepository>()));
-  getIt.registerLazySingleton(() => DeleteDeviceUseCase(getIt<DeviceRepository>()));
+  getIt.registerLazySingleton(
+      () => GetDevicesUseCase(getIt<DeviceRepository>()));
+  getIt
+      .registerLazySingleton(() => AddDeviceUseCase(getIt<DeviceRepository>()));
+  getIt.registerLazySingleton(
+      () => DeleteDeviceUseCase(getIt<DeviceRepository>()));
 
   // BLoCs
   getIt.registerFactory(() => AuthBloc(
-    loginUseCase: getIt<LoginUseCase>(),
-    logoutUseCase: getIt<LogoutUseCase>(),
-    getCurrentUserUseCase: getIt<GetCurrentUserUseCase>(),
-    sessionExpiredStream: getIt<ApiClient>().sessionExpired,
-  ));
+        loginUseCase: getIt<LoginUseCase>(),
+        logoutUseCase: getIt<LogoutUseCase>(),
+        getCurrentUserUseCase: getIt<GetCurrentUserUseCase>(),
+        sessionExpiredStream: getIt<ApiClient>().sessionExpired,
+      ));
 
   getIt.registerFactory(() => RegisterBloc(
-    registerUseCase: getIt<RegisterUseCase>(),
-  ));
+        registerUseCase: getIt<RegisterUseCase>(),
+      ));
 
   getIt.registerFactory(() => SharingBloc(
-    repository: getIt<SharingRepository>(),
-  ));
+        repository: getIt<SharingRepository>(),
+      ));
 
   getIt.registerFactory(() => DashboardBloc(
-    repository: getIt<DashboardRepository>(),
-  ));
+        repository: getIt<DashboardRepository>(),
+      ));
 
   getIt.registerFactory(() => AutomationBloc(
-    repository: getIt<IAutomationRepository>(),
-  ));
+        repository: getIt<IAutomationRepository>(),
+      ));
 
   getIt.registerFactory(() => SensorBloc(
-    getSensorHistory: getIt<GetSensorHistoryUseCase>(),
-    getRealtimeReadings: getIt<GetRealtimeReadingsUseCase>(),
-  ));
+        getSensorHistory: getIt<GetSensorHistoryUseCase>(),
+        getRealtimeReadings: getIt<GetRealtimeReadingsUseCase>(),
+      ));
 
   getIt.registerFactory(() => StatisticsBloc(
-    repository: getIt<SensorRepository>(),
-  ));
+        repository: getIt<SensorRepository>(),
+      ));
 
   getIt.registerFactory(() => DeviceBloc(
-    getDevices: getIt<GetDevicesUseCase>(),
-    addDevice: getIt<AddDeviceUseCase>(),
-    deleteDevice: getIt<DeleteDeviceUseCase>(),
-    deviceRepository: getIt<DeviceRepository>(),
-  ));
+        getDevices: getIt<GetDevicesUseCase>(),
+        addDevice: getIt<AddDeviceUseCase>(),
+        deleteDevice: getIt<DeleteDeviceUseCase>(),
+        deviceRepository: getIt<DeviceRepository>(),
+      ));
 }

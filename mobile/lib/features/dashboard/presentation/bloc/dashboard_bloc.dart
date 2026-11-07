@@ -7,6 +7,9 @@ import '../../data/models/device_model.dart';
 import '../../data/models/telemetry_model.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
+  /// Firmware tự tắt bơm sau 5 giây và không đọc thời gian gửi xuống.
+  static const int firmwarePumpRunSeconds = 5;
+
   final DashboardRepository repository;
   final DateTime Function() _now;
   StreamSubscription<TelemetryModel?>? _telemetrySubscription;
@@ -25,6 +28,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     on<DashboardPumpToggled>(_onPumpToggled);
     on<DashboardPumpStatusReceived>(_onPumpStatusReceived);
     on<DashboardResetRequested>(_onResetRequested);
+    on<DashboardAutoModeLoaded>(_onAutoModeLoaded);
   }
 
   Future<void> _onLoadRequested(
@@ -106,6 +110,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         selectedDevice: matchedDevice,
         isRefreshing: false,
       ));
+      _loadAutoMode(matchedDevice);
       return;
     }
 
@@ -117,6 +122,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       isTelemetryEmpty: false,
       clearPumpStatus: true,
       clearPumpOffAt: true,
+      clearAutoMode: true,
       isRefreshing: false,
     ));
     _listenToTelemetry(newSelectedDevice);
@@ -134,6 +140,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         isTelemetryEmpty: false,
         clearPumpStatus: true,
         clearPumpOffAt: true,
+        clearAutoMode: true,
       ));
       _listenToTelemetry(event.device);
     }
@@ -204,7 +211,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     final targetDevice = currentState.selectedDevice;
     if (targetDevice == null) return;
 
-    final duration = event.turnOn ? (event.durationSeconds ?? 120) : 0;
+    final duration = event.turnOn ? (event.durationSeconds ?? firmwarePumpRunSeconds) : 0;
     emit(currentState.copyWith(isTogglingPump: true, clearPumpError: true));
     try {
       await repository.togglePump(targetDevice.id, event.turnOn, duration: duration);
@@ -249,7 +256,29 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     ));
   }
 
+  void _onAutoModeLoaded(
+    DashboardAutoModeLoaded event,
+    Emitter<DashboardState> emit,
+  ) {
+    final currentState = state;
+    if (currentState is! DashboardLoaded ||
+        currentState.selectedDevice?.id != event.deviceId) {
+      return;
+    }
+    emit(currentState.copyWith(isAutoMode: event.isAutoMode));
+  }
+
+  /// Lỗi khi tải chỉ bỏ qua: app không khóa nút bơm nếu không biết chế độ.
+  Future<void> _loadAutoMode(DeviceModel device) async {
+    try {
+      final isAutoMode = await repository.getAutoMode(device.id);
+      if (isClosed) return;
+      add(DashboardAutoModeLoaded(deviceId: device.id, isAutoMode: isAutoMode));
+    } catch (_) {}
+  }
+
   void _listenToTelemetry(DeviceModel device) {
+    _loadAutoMode(device);
     _telemetrySubscription?.cancel();
     _telemetrySubscription = repository
         .watchTelemetry(device.id, device.blePassKey)

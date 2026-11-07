@@ -2,10 +2,12 @@ import 'package:equatable/equatable.dart';
 
 class TelemetryModel extends Equatable {
   final String deviceId;
-  final double soilMoisture;
-  final double temperature;
-  final double humidity;
-  final double waterLevel;
+  // Null khi cảm biến lỗi hoặc chưa đo được; firmware không gửi 0 thay cho lỗi.
+  // Firmware hiện luôn gửi mực nước là null vì chưa hiệu chuẩn được đáy bồn.
+  final double? soilMoisture;
+  final double? temperature;
+  final double? humidity;
+  final double? waterLevel;
   final bool? isPumpOn;
   final DateTime recordedAt;
 
@@ -48,8 +50,8 @@ class TelemetryModel extends Equatable {
         recordedAt: recordedAt,
       );
 
-  static double _number(dynamic value) =>
-      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+  static double? _number(dynamic value) =>
+      value is num ? value.toDouble() : double.tryParse('${value ?? ''}');
 
   @override
   List<Object?> get props => [

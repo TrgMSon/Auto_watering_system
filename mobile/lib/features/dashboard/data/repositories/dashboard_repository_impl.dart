@@ -104,6 +104,21 @@ class DashboardRepositoryImpl implements DashboardRepository {
   }
 
   @override
+  Future<bool> getAutoMode(String deviceId) async {
+    try {
+      final config = await _apiClient.get(
+        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/config',
+      );
+      final autoMode = config['auto_mode'];
+      return autoMode == true || autoMode == 1;
+    } on ApiException catch (e) {
+      // Thiết bị chưa có cấu hình thì chưa bật tự động.
+      if (e.statusCode == 404) return false;
+      rethrow;
+    }
+  }
+
+  @override
   void applyPumpStatus(String deviceId, {required bool isOn}) {
     if (!isOn) {
       _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
