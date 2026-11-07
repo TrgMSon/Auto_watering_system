@@ -116,7 +116,6 @@ public class DeviceServiceImpl implements DeviceService {
         device.setId(deviceId);
         device.setDeviceName(trimToNull(request.getDeviceName()));
         device.setHardwareVersion(trimToNull(request.getHardwareVersion()));
-        device.setFirmwareVersion(trimToNull(request.getFirmwareVersion()));
         device.setStatus(DeviceStatus.REGISTERED.value());
         device.setBlePassKey(bleSecret);
         device.setMqttUsername(mqttUsername);

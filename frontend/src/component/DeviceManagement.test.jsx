@@ -153,7 +153,7 @@ test('creates a device and displays its one-time provisioning credentials', asyn
           device_name: 'Máy tưới ban công',
           status: 'registered',
           hardware_version: 'ESP32',
-          firmware_version: '1.0.0',
+          firmware_version: null,
           last_active_at: null,
         }],
       }),
@@ -170,12 +170,11 @@ test('creates a device and displays its one-time provisioning credentials', asyn
   fireEvent.change(screen.getByLabelText('Phiên bản phần cứng'), {
     target: { value: 'ESP32' },
   });
-  fireEvent.change(screen.getByLabelText('Phiên bản firmware'), {
-    target: { value: '1.0.0' },
-  });
+  expect(screen.queryByLabelText('Phiên bản firmware')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Tạo thiết bị' }));
 
   expect(await screen.findByText('dev_AABBCCDDEEFF')).toBeInTheDocument();
+  expect(await screen.findByText(/FW Chưa nhận/)).toBeInTheDocument();
   expect(screen.getByText('mqtt-secret')).toBeInTheDocument();
   expect(screen.getByText('ble-secret')).toBeInTheDocument();
   expect(global.fetch).toHaveBeenNthCalledWith(
@@ -191,7 +190,6 @@ test('creates a device and displays its one-time provisioning credentials', asyn
         id: 'AA:BB:CC:DD:EE:FF',
         deviceName: 'Máy tưới ban công',
         hardwareVersion: 'ESP32',
-        firmwareVersion: '1.0.0',
       }),
     }),
   );

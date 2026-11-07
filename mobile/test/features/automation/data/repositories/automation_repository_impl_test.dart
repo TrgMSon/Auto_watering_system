@@ -29,7 +29,7 @@ void main() {
       expect(config.autoMode, isFalse);
       expect(config.soilMoistureMin, 40);
       expect(config.soilMoistureMax, 80);
-      expect(config.maxWateringDuration, 120);
+      expect(config.maxWateringDuration, 2);
     });
 
     test('still reports other API errors', () {

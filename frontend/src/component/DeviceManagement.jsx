@@ -3,6 +3,7 @@ import './DeviceManagement.css';
 import { authenticatedFetch } from '../authenticatedFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+const DEVICE_REFRESH_INTERVAL_MS = 15_000;
 
 function DeviceManagement({ accessToken }) {
   const [devices, setDevices] = useState([]);
@@ -13,7 +14,6 @@ function DeviceManagement({ accessToken }) {
     id: '',
     deviceName: '',
     hardwareVersion: '',
-    firmwareVersion: '',
   });
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -27,9 +27,11 @@ function DeviceManagement({ accessToken }) {
   const [lifecycleError, setLifecycleError] = useState('');
   const [lifecycleSuccess, setLifecycleSuccess] = useState('');
 
-  const loadDevices = useCallback(async (signal) => {
-    setIsLoadingDevices(true);
-    setDevicesError('');
+  const loadDevices = useCallback(async (signal, backgroundRefresh = false) => {
+    if (!backgroundRefresh) {
+      setIsLoadingDevices(true);
+      setDevicesError('');
+    }
 
     try {
       const response = await authenticatedFetch(`${API_BASE_URL}/api/admin/devices`, {
@@ -49,6 +51,7 @@ function DeviceManagement({ accessToken }) {
       }
 
       setDevices(body.data);
+      setDevicesError('');
     } catch (loadError) {
       if (loadError.name === 'AbortError') return;
       setDevicesError(
@@ -57,14 +60,21 @@ function DeviceManagement({ accessToken }) {
           : loadError.message || 'Không thể tải danh sách thiết bị.',
       );
     } finally {
-      if (!signal?.aborted) setIsLoadingDevices(false);
+      if (!backgroundRefresh && !signal?.aborted) setIsLoadingDevices(false);
     }
   }, [accessToken]);
 
   useEffect(() => {
     const controller = new AbortController();
     loadDevices(controller.signal);
-    return () => controller.abort();
+    const refreshInterval = window.setInterval(
+      () => loadDevices(controller.signal, true),
+      DEVICE_REFRESH_INTERVAL_MS,
+    );
+    return () => {
+      controller.abort();
+      window.clearInterval(refreshInterval);
+    };
   }, [loadDevices]);
 
   async function handleCreateDevice(event) {
@@ -76,7 +86,6 @@ function DeviceManagement({ accessToken }) {
       id: createDevice.id.trim(),
       deviceName: createDevice.deviceName.trim() || null,
       hardwareVersion: createDevice.hardwareVersion.trim() || null,
-      firmwareVersion: createDevice.firmwareVersion.trim() || null,
     };
     setIsCreating(true);
     try {
@@ -105,7 +114,6 @@ function DeviceManagement({ accessToken }) {
         id: '',
         deviceName: '',
         hardwareVersion: '',
-        firmwareVersion: '',
       });
       setShowCreateForm(false);
       await loadDevices();
@@ -265,7 +273,7 @@ function DeviceManagement({ accessToken }) {
         >
           <div className="device-management__create-form-heading">
             <h2>Thông tin thiết bị mới</h2>
-            <p>Địa chỉ MAC là bắt buộc; các trường khác có thể để trống.</p>
+            <p>Địa chỉ MAC là bắt buộc; phiên bản firmware sẽ được thiết bị gửi khi kết nối.</p>
           </div>
           <div className="device-management__create-fields">
             <label className="device-management__field" htmlFor="new-device-mac">
@@ -297,15 +305,6 @@ function DeviceManagement({ accessToken }) {
                 value={createDevice.hardwareVersion}
                 onChange={(event) => setCreateDevice({ ...createDevice, hardwareVersion: event.target.value })}
                 placeholder="ESP32"
-              />
-            </label>
-            <label className="device-management__field" htmlFor="new-device-firmware">
-              Phiên bản firmware
-              <input
-                id="new-device-firmware"
-                value={createDevice.firmwareVersion}
-                onChange={(event) => setCreateDevice({ ...createDevice, firmwareVersion: event.target.value })}
-                placeholder="1.0.0"
               />
             </label>
           </div>
@@ -405,7 +404,7 @@ function DeviceManagement({ accessToken }) {
                     <td><DeviceStatus status={device.status} /></td>
                     <td>
                       <span className="device-management__versions">
-                        HW {device.hardware_version || '—'} · FW {device.firmware_version || '—'}
+                        HW {device.hardware_version || '—'} · FW {device.firmware_version || 'Chưa nhận'}
                       </span>
                     </td>
                     <td>{formatLastActive(device.last_active_at)}</td>

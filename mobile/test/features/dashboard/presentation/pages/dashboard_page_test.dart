@@ -299,7 +299,7 @@ void main() {
   });
 
   group('DashboardPage User Interactions', () {
-    testWidgets('tapping switch when pump is OFF opens bottom sheet and selecting duration dispatches DashboardPumpToggled', (tester) async {
+    testWidgets('tapping switch when pump is OFF dispatches DashboardPumpToggled(true) without a duration picker', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
@@ -315,54 +315,46 @@ void main() {
       await tester.tap(switchFinder);
       await tester.pumpAndSettle();
 
-      expect(find.text('Chọn thời gian bơm'), findsOneWidget);
-      await tester.tap(find.text('2 phút (mặc định)'));
-      await tester.pumpAndSettle();
-
-      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true, durationSeconds: 120))).called(1);
+      expect(find.text('Chọn thời gian bơm'), findsNothing);
+      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true))).called(1);
     });
 
-    testWidgets('selecting 1 minute in bottom sheet dispatches DashboardPumpToggled with 60 seconds', (tester) async {
+    testWidgets('auto mode disables turning the pump on and explains why', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
         telemetry: testTelemetryOff,
+        isAutoMode: true,
       ));
 
       await tester.pumpWidget(buildTestWidget());
       clearInteractions(mockDashboardBloc);
 
-      final switchFinder = find.byType(Switch);
-      await tester.tap(switchFinder);
+      expect(find.text('Đang tưới tự động. Tắt chế độ này để bơm tay.'), findsOneWidget);
+      final switchWidget = tester.widget<Switch>(find.byType(Switch));
+      expect(switchWidget.onChanged, isNull);
+
+      await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
-
-      await tester.tap(find.text('1 phút'));
-      await tester.pumpAndSettle();
-
-      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true, durationSeconds: 60))).called(1);
-    });
-
-    testWidgets('dismissing bottom sheet without selection does not dispatch DashboardPumpToggled', (tester) async {
-      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
-        devices: [testDevice1],
-        selectedDevice: testDevice1,
-        telemetry: testTelemetryOff,
-      ));
-
-      await tester.pumpWidget(buildTestWidget());
-      clearInteractions(mockDashboardBloc);
-
-      final switchFinder = find.byType(Switch);
-      await tester.tap(switchFinder);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Chọn thời gian bơm'), findsOneWidget);
-
-      // Tap outside to dismiss modal bottom sheet
-      await tester.tapAt(const Offset(20, 20));
-      await tester.pumpAndSettle();
-
       verifyNever(() => mockDashboardBloc.add(any()));
+    });
+
+    testWidgets('auto mode still allows turning a running pump off', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOn,
+        pumpStatus: true,
+        isAutoMode: true,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(false))).called(1);
     });
 
     testWidgets('shows SnackBar when pumpErrorMessage is emitted', (tester) async {

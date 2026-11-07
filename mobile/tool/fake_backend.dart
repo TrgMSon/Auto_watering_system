@@ -582,12 +582,12 @@ class FakeBackend {
           'auto_mode': false,
           'soil_moisture_min': 40.0,
           'soil_moisture_max': 80.0,
-          'max_watering_duration': 120,
+          'max_watering_duration': 2,
           'air_humidity_min': 50.0,
           'air_humidity_max': 80.0,
           'air_temperature_min': 20.0,
           'air_temperature_max': 35.0,
-          'water_level_min': 0,
+          'water_level_min': 20,
         },
       );
 

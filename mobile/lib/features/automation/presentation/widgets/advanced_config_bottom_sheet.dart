@@ -21,7 +21,11 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
   late double soilMoistureMax;
   late double tempMin;
   late double tempMax;
-  late double maxDuration;
+  late double waterMin;
+
+  // Firmware chỉ nhận ngưỡng nước từ 20% đến 100% bồn.
+  static const double _waterMinLowest = 20;
+  static const double _waterMinHighest = 100;
 
   @override
   void initState() {
@@ -36,7 +40,10 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
     soilMoistureMax = widget.currentConfig.soilMoistureMax;
     tempMin = widget.currentConfig.temperatureMin;
     tempMax = widget.currentConfig.temperatureMax;
-    maxDuration = widget.currentConfig.maxWateringDuration.toDouble();
+    // Dữ liệu cũ có thể nằm ngoài khoảng firmware nhận và làm hỏng Slider.
+    waterMin = widget.currentConfig.waterLevelMin
+        .toDouble()
+        .clamp(_waterMinLowest, _waterMinHighest);
   }
 
   void _resetToDefaults() {
@@ -47,7 +54,7 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
       soilMoistureMax = 80;
       tempMin = 20;
       tempMax = 35;
-      maxDuration = 120;
+      waterMin = _waterMinLowest;
     });
   }
 
@@ -60,7 +67,7 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
         soilMoistureMax: soilMoistureMax,
         temperatureMin: tempMin,
         temperatureMax: tempMax,
-        maxWateringDuration: maxDuration.toInt(),
+        waterLevelMin: waterMin.round(),
       ))
     );
     Navigator.pop(context);
@@ -148,22 +155,21 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
             ),
             const SizedBox(height: 24),
             
-            // Max Duration
-            Text('Thời gian bơm tối đa: ${maxDuration.toInt()} giây', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Mực nước tối thiểu: ${waterMin.toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
             Slider(
-              value: maxDuration,
-              min: 10,
-              max: 300,
-              divisions: 29,
+              value: waterMin,
+              min: _waterMinLowest,
+              max: _waterMinHighest,
+              divisions: 16,
               activeColor: AppColors.primary,
               onChanged: (val) {
                 setState(() {
-                  maxDuration = val;
+                  waterMin = val;
                 });
               },
             ),
             const Text(
-              'Tính năng an toàn: Tự động ngắt bơm sau khoảng thời gian này để tránh ngập úng nếu cảm biến lỗi.',
+              'Tính năng an toàn: Không bơm khi nước trong bồn thấp hơn mức này để tránh chạy khô.',
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
             

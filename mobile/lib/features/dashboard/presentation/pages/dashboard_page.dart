@@ -25,50 +25,6 @@ class _DashboardPageState extends State<DashboardPage> {
     context.read<DashboardBloc>().add(const DashboardLoadRequested());
   }
 
-  Future<int?> _showPumpDurationSheet(BuildContext context) {
-    const options = [
-      {'label': '1 phút', 'seconds': 60},
-      {'label': '2 phút (mặc định)', 'seconds': 120},
-      {'label': '5 phút', 'seconds': 300},
-      {'label': '10 phút', 'seconds': 600},
-    ];
-
-    return showModalBottomSheet<int>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'Chọn thời gian bơm',
-                    style: Theme.of(sheetContext).textTheme.titleMedium,
-                  ),
-                ),
-                ...options.map((opt) {
-                  final seconds = opt['seconds'] as int;
-                  final label = opt['label'] as String;
-                  return ListTile(
-                    title: Text(label),
-                    onTap: () => Navigator.of(sheetContext).pop(seconds),
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<DashboardBloc, DashboardState>(
@@ -119,6 +75,8 @@ class _DashboardPageState extends State<DashboardPage> {
           final telemetry = state.telemetry;
           final pumpStatus = state.pumpStatus ?? telemetry?.isPumpOn;
           final isOnline = selectedDevice.isOnline;
+          // Firmware chỉ nhận lệnh bật tay ở chế độ thủ công; lệnh tắt luôn được nhận.
+          final blocksManualOn = state.isAutoMode == true && pumpStatus != true;
 
           return Scaffold(
             appBar: AppBar(
@@ -242,6 +200,15 @@ class _DashboardPageState extends State<DashboardPage> {
                                         )
                                       else if (pumpStatus == true && state.pumpOffAt != null)
                                         PumpCountdownText(pumpOffAt: state.pumpOffAt!)
+                                      else if (blocksManualOn)
+                                        Text(
+                                          'Đang tưới tự động. Tắt chế độ này để bơm tay.',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        )
                                       else
                                         Text(
                                           pumpStatus == null
@@ -275,21 +242,10 @@ class _DashboardPageState extends State<DashboardPage> {
                                 )
                               : Switch(
                                   value: pumpStatus ?? false,
-                                  onChanged: isOnline
-                                      ? (value) async {
-                                          if (!value) {
-                                            context
-                                                .read<DashboardBloc>()
-                                                .add(const DashboardPumpToggled(false));
-                                            return;
-                                          }
-                                          final seconds = await _showPumpDurationSheet(context);
-                                          if (seconds != null && context.mounted) {
-                                            context.read<DashboardBloc>().add(
-                                              DashboardPumpToggled(true, durationSeconds: seconds),
-                                            );
-                                          }
-                                        }
+                                  onChanged: isOnline && !blocksManualOn
+                                      ? (value) => context
+                                          .read<DashboardBloc>()
+                                          .add(DashboardPumpToggled(value))
                                       : null,
                                 ),
                         ],
@@ -336,25 +292,25 @@ class _DashboardPageState extends State<DashboardPage> {
                       children: [
                         SensorCard(
                           title: 'Độ ẩm đất',
-                          value: '${telemetry.soilMoisture.toStringAsFixed(1)}%',
+                          value: _formatReading(telemetry.soilMoisture, '%'),
                           icon: Icons.grass,
                           color: AppColors.moisture,
                         ),
                         SensorCard(
                           title: 'Nhiệt độ',
-                          value: '${telemetry.temperature.toStringAsFixed(1)}°C',
+                          value: _formatReading(telemetry.temperature, '°C'),
                           icon: Icons.thermostat,
                           color: AppColors.temperature,
                         ),
                         SensorCard(
                           title: 'Độ ẩm K.Khí',
-                          value: '${telemetry.humidity.toStringAsFixed(1)}%',
+                          value: _formatReading(telemetry.humidity, '%'),
                           icon: Icons.cloud,
                           color: AppColors.humidity,
                         ),
                         SensorCard(
                           title: 'Mực nước',
-                          value: '${telemetry.waterLevel.toStringAsFixed(1)}%',
+                          value: _formatReading(telemetry.waterLevel, '%'),
                           icon: Icons.water,
                           color: Colors.blue,
                         ),
@@ -370,6 +326,10 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 }
+
+/// Cảm biến lỗi hoặc chưa đo được thì hiện "--" thay vì một con số sai.
+String _formatReading(double? value, String unit) =>
+    value == null ? '--' : '${value.toStringAsFixed(1)}$unit';
 
 class SensorCard extends StatelessWidget {
   final String title;
