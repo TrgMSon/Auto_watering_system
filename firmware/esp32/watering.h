@@ -6,7 +6,7 @@ enum class State { Idle, Watering, Cooldown, Locked };
 enum class Reason {
   Dry, Hysteresis, Wet, Idle, Timeout, Locked,
   InvalidConfig, CalibrationUnknown, SoilInvalid, DistanceInvalid, Stale, LowWater,
-  ManualStop, ActuatorStopped, Cooldown, RetryLimit, Reset
+  ManualStop, ActuatorStopped, SafetyLeaseExpired, Cooldown, RetryLimit, Reset
 };
 struct Config {
   float startPercent = 30;
@@ -32,7 +32,8 @@ class Controller {
   Decision evaluate(const sensors::Reading& reading, uint32_t nowMs, bool automatic = true);
   // The same safety gate is used for manual and automatic activation.
   Decision safety(const sensors::Reading& reading, uint32_t nowMs) const;
-  void started(uint32_t nowMs);  // Called after a successful manual activation.
+  void started(uint32_t nowMs, uint32_t durationMs = 5000);
+  void latchRun(uint32_t nowMs, uint32_t durationMs);  // Called after a successful manual activation.
   void interrupted();  // Preserve existing lock; latch an interrupted run.
   bool runtimeExpired(uint32_t nowMs) const;
   void completed(uint32_t nowMs, const sensors::Reading& reading);
@@ -44,6 +45,7 @@ class Controller {
   Config config_;
   State state_ = State::Idle;
   uint32_t startedMs_ = 0;
+  uint32_t durationMs_ = 5000;
   uint32_t cooldownStartedMs_ = 0;
   unsigned attempts_ = 0;
   bool automaticRun_ = false;

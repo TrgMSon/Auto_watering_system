@@ -126,6 +126,7 @@ app.*.map.json
 build/
 sdkconfig.old
 
+mqtt_service.d
 # Arduino IDE / C++ temporary files
 *.hex
 *.bin

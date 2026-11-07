@@ -7,14 +7,15 @@ uint32_t fakeNow = 0;
 int outputLevel = -1, writes = 0, outputModes = 0;
 struct Fake : configuration::Storage {
   std::vector<uint8_t> data;
-  bool fail = false; int saves = 0;
-  bool read(uint8_t* b, size_t n) override {
-    if (data.size() != n) return false;
-    memcpy(b, data.data(), n); return true;
+  bool fail = false, readFail = false, corruptWrite = false; int saves = 0;
+  bool read(uint8_t* b, size_t capacity, size_t& size) override {
+    size = 0;
+    if (readFail || data.empty() || data.size() > capacity) return false;
+    size = data.size(); memcpy(b, data.data(), size); return true;
   }
   bool write(const uint8_t* b, size_t n) override {
     ++saves; if (fail) return false;
-    data.assign(b,b+n); return true;
+    data.assign(b,b+n); if (corruptWrite) data[10] ^= 1; return true;
   }
 };
 sensors::Reading sample(float soil = 20, float distance = 5) {
@@ -23,6 +24,102 @@ sensors::Reading sample(float soil = 20, float distance = 5) {
 }
 int main() {
   using irrigation::Result;
+  // Independent schema-1 fixture: five original floats and original FNV checksum.
+  const uint8_t legacy[] = {
+    0x43,0x46,0x47,0x34,0x01,0,0,0,0,0,0xc8,0x41,0,0,0x96,0x42,
+    0,0,0xc8,0x41,0,0,0x20,0x40,0,0,0x40,0x41,0x5d,0x16,0x53,0x57};
+  Fake migration; migration.data.assign(legacy, legacy + sizeof(legacy));
+  irrigation::System migrated; migrated.begin(&migration);
+  auto old = migrated.configurationStatus().active();
+  assert(old.soilStart == 25 && old.soilStop == 75 && old.waterMin == 25 &&
+      old.fullCm == 2.5f && old.emptyCm == 12 && old.maxRunSeconds == 120);
+  assert(migration.saves == 0 && migrated.configurationStatus().persistedSchema() == 1);
+  assert(migrated.status().mode == irrigation::Mode::Manual && outputLevel == LOW);
+  assert(migrated.updateConfiguration(old) == configuration::Result::Saved);
+  assert(migration.saves == 1 && migration.data.size() == 36 &&
+      migrated.configurationStatus().persistedSchema() == 2);
+  assert(configuration::get32(migration.data.data()+4) == 2);
+  assert(configuration::get32(migration.data.data()+28) == 120);
+  assert(memcmp(migration.data.data()+8, legacy+8, 20) == 0);
+  // Every byte, including schema/duration/checksum, is protected from corruption.
+  const auto validRecord = migration.data;
+  for (size_t i = 0; i < validRecord.size(); ++i) {
+    auto damaged = validRecord; damaged[i] ^= 1;
+    auto unchanged = old; unchanged.soilStart = 26;
+    const auto sentinel = unchanged;
+    assert(!configuration::decode(damaged.data(), damaged.size(), unchanged));
+    assert(configuration::equal(unchanged, sentinel));
+  }
+  assert(migrated.updateConfiguration(old) == configuration::Result::Unchanged && migration.saves == 1);
+  for (uint32_t duration : {60u, 120u, 600u}) {
+    auto c = old; c.maxRunSeconds = duration;
+    assert(migrated.updateConfiguration(c) != configuration::Result::Invalid);
+    migrated.begin(&migration);
+    assert(migrated.configurationStatus().active().maxRunSeconds == duration);
+    assert(migrated.status().mode == irrigation::Mode::Manual && !migrated.status().pumpOn);
+  }
+  for (uint32_t duration : {0u, 1u, 59u, 601u, UINT32_MAX}) {
+    auto c = old; c.maxRunSeconds = duration; const auto saved = migration.data;
+    assert(migrated.updateConfiguration(c) == configuration::Result::Invalid);
+    assert(migration.data == saved && migrated.configurationStatus().active().maxRunSeconds == 600);
+    // Valid checksum cannot authorize an invalid complete record.
+    configuration::encode(c, migration.data.data());
+    migrated.begin(&migration);
+    assert(!migrated.configurationStatus().persisted() &&
+        migrated.configurationStatus().active().maxRunSeconds == 120);
+    migration.data = saved; migrated.begin(&migration);
+  }
+  // Reject legacy corruption even when length matches; decode never partially applies.
+  for (unsigned fault = 0; fault < 4; ++fault) {
+    migration.data.assign(legacy, legacy + sizeof(legacy));
+    if (fault == 0) migration.data[0] ^= 1;
+    if (fault == 1) migration.data[10] ^= 1;
+    if (fault == 2) migration.data.push_back(0);
+    if (fault == 3) migration.data.resize(37);
+    const int saves = migration.saves; migrated.begin(&migration);
+    assert(!migrated.configurationStatus().persisted() && migration.saves == saves);
+  }
+  migration.data.assign(legacy, legacy + sizeof(legacy)); migrated.begin(&migration);
+  migration.fail = true;
+  assert(migrated.updateConfiguration(old) == configuration::Result::StorageFailed);
+  assert(configuration::equal(migrated.configurationStatus().active(), old));
+  assert(migration.data.size() == 32); migration.fail = false;
+  assert(migrated.updateConfiguration(old) == configuration::Result::Saved);
+  auto changed = old; changed.maxRunSeconds = 600;
+  migration.readFail = true;
+  assert(migrated.updateConfiguration(changed) == configuration::Result::StorageFailed);
+  assert(configuration::equal(migrated.configurationStatus().active(), old));
+  migration.readFail = false;
+  assert(migrated.updateConfiguration(old) == configuration::Result::Saved); // Repair flash after uncertain save.
+  migration.corruptWrite = true;
+  assert(migrated.updateConfiguration(changed) == configuration::Result::StorageFailed);
+  assert(configuration::equal(migrated.configurationStatus().active(), old));
+  migration.corruptWrite = false;
+  assert(migrated.updateConfiguration(changed) == configuration::Result::Saved);
+  migrated.update(sample()); migrated.command("ON");
+  assert(migrated.updateConfiguration(old) == configuration::Result::Busy);
+  fakeNow += 4999; migrated.update(sample()); assert(migrated.status().pumpOn);
+  fakeNow += 1; migrated.update(sample()); assert(!migrated.status().pumpOn);
+  const auto cooldown = migrated.status().decision;
+  assert(migrated.updateConfiguration(old) == configuration::Result::Saved);
+  assert(migrated.status().decision.state == cooldown.state &&
+      migrated.status().decision.cooldownRemainingMs == cooldown.cooldownRemainingMs &&
+      migrated.status().decision.wateringAttempts == cooldown.wateringAttempts);
+  // A duration-only update cannot clear the third-attempt retry lock.
+  migrated.begin(&migration); migrated.update(sample()); migrated.command("AUTO");
+  for (unsigned attempt = 0; attempt < 3; ++attempt) {
+    fakeNow += 5000; migrated.update(sample());
+    if (attempt < 2) { fakeNow += 30000; migrated.update(sample()); }
+  }
+  migrated.command("MANUAL");
+  const auto locked = migrated.status().decision;
+  assert(locked.state == watering::State::Locked && locked.wateringAttempts == 3);
+  changed = migrated.configurationStatus().active(); changed.maxRunSeconds = 600;
+  assert(migrated.updateConfiguration(changed) == configuration::Result::Saved);
+  assert(migrated.status().decision.state == locked.state &&
+      migrated.status().decision.wateringAttempts == locked.wateringAttempts);
+  migrated.service();
+  assert(migrated.status().decision.reason == watering::Reason::RetryLimit);
   Fake store; irrigation::System s; s.begin(&store);
   assert(configuration::valid(configuration::Config{}));
   assert(!s.configurationStatus().persisted() && store.saves == 0);
@@ -83,7 +180,7 @@ int main() {
     if (fault==0) store.data.clear();
     if (fault==1) store.data.pop_back();
     if (fault==2) store.data[10]^=1;
-    if (fault==3) { store.data[4]=2; uint32_t h=configuration::checksum(store.data.data()); memcpy(store.data.data()+28,&h,4); }
+    if (fault==3) { store.data[4]=3; configuration::put32(store.data.data()+32, configuration::checksum(store.data.data(),32)); }
     if (fault==4) { configuration::Config c; c.waterMin=0; configuration::encode(c,store.data.data()); }
     reboot.begin(&store);
     assert(!reboot.configurationStatus().persisted());
