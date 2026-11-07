@@ -39,16 +39,19 @@ Decision Controller::safety(const sensors::Reading& r, uint32_t now) const {
   else if (!d.waterValid || d.waterPercent < config_.minWaterPercent) d.reason = Reason::LowWater;
   return d;
 }
-void Controller::started(uint32_t now) {
+void Controller::latchRun(uint32_t now, uint32_t durationMs) {
+  startedMs_ = now; durationMs_ = durationMs;
+}
+void Controller::started(uint32_t now, uint32_t durationMs) {
   if (state_ == State::Idle) {
-    state_ = State::Watering; startedMs_ = now; automaticRun_ = false;
+    state_ = State::Watering; latchRun(now, durationMs); automaticRun_ = false;
   }
 }
 void Controller::interrupted() {
   if (state_ == State::Watering || state_ == State::Cooldown) state_ = State::Locked;
 }
 bool Controller::runtimeExpired(uint32_t now) const {
-  return state_ == State::Watering && static_cast<uint32_t>(now - startedMs_) >= 5000;
+  return state_ == State::Watering && static_cast<uint32_t>(now - startedMs_) >= durationMs_;
 }
 void Controller::completed(uint32_t now, const sensors::Reading& reading) {
   if (state_ != State::Watering) return;
@@ -102,7 +105,7 @@ Decision Controller::evaluate(const sensors::Reading& r, uint32_t now, bool auto
         d.reason = Reason::Cooldown;
       } else if (automatic && r.soilPercent < config_.startPercent) {
         if (attempts_ >= 3) { state_ = State::Locked; retryLocked_ = true; d.reason = Reason::RetryLimit; }
-        else { state_ = State::Watering; startedMs_ = now; automaticRun_ = true; ++attempts_; d.reason = Reason::Dry; }
+        else { state_ = State::Watering; latchRun(now, 5000); automaticRun_ = true; ++attempts_; d.reason = Reason::Dry; }
       } else {
         state_ = State::Idle;
         if (r.soilPercent >= config_.stopPercent) attempts_ = 0;
@@ -116,7 +119,7 @@ Decision Controller::evaluate(const sensors::Reading& r, uint32_t now, bool auto
       d.reason = Reason::Hysteresis;
     } else if (automatic && r.soilPercent < config_.startPercent) {
       if (attempts_ >= 3) { state_ = State::Locked; retryLocked_ = true; d.reason = Reason::RetryLimit; }
-      else { state_ = State::Watering; startedMs_ = now; automaticRun_ = true; ++attempts_; d.reason = Reason::Dry; }
+      else { state_ = State::Watering; latchRun(now, 5000); automaticRun_ = true; ++attempts_; d.reason = Reason::Dry; }
     }
   }
   d.state = state_;
@@ -151,6 +154,7 @@ const char* name(Reason reason) {
     case Reason::Stale: return "STALE";
     case Reason::LowWater: return "LOW_WATER";
     case Reason::ManualStop: return "MANUAL_STOP";
+    case Reason::SafetyLeaseExpired: return "SAFETY_LEASE_EXPIRED";
     case Reason::ActuatorStopped: return "ACTUATOR_STOPPED";
     case Reason::Cooldown: return "COOLDOWN";
     case Reason::RetryLimit: return "RETRY_LIMIT_RESET_REQUIRED";

@@ -10,9 +10,11 @@ namespace configuration {
 struct Config {
   float soilStart = 30, soilStop = 70, waterMin = 20;
   float fullCm = 3.00f, emptyCm = 12.26f;
+  uint32_t maxRunSeconds = 120;  // Configuration only; pump cutoff remains 5 seconds.
 };
 inline bool valid(const Config& c) {
-  return isfinite(c.soilStart) && isfinite(c.soilStop) && isfinite(c.waterMin) &&
+  return c.maxRunSeconds >= 60 && c.maxRunSeconds <= 600 &&
+      isfinite(c.soilStart) && isfinite(c.soilStop) && isfinite(c.waterMin) &&
       isfinite(c.fullCm) && isfinite(c.emptyCm) &&
       c.soilStart >= 0 && c.soilStop <= 100 && c.soilStart < c.soilStop &&
       c.waterMin >= 20 && c.waterMin <= 100 &&
@@ -22,63 +24,92 @@ inline bool valid(const Config& c) {
 }
 inline bool equal(const Config& a, const Config& b) {
   return a.soilStart == b.soilStart && a.soilStop == b.soilStop &&
-      a.waterMin == b.waterMin && a.fullCm == b.fullCm && a.emptyCm == b.emptyCm;
+      a.waterMin == b.waterMin && a.fullCm == b.fullCm && a.emptyCm == b.emptyCm &&
+      a.maxRunSeconds == b.maxRunSeconds;
 }
-// Single 32-byte blob: magic, schema, five IEEE float32 values, FNV-1a checksum.
-constexpr size_t kRecordSize = 32;
+// Explicit little-endian records; schema 1 retains its exact original layout.
+constexpr size_t kLegacyRecordSize = 32;
+constexpr size_t kRecordSize = 36;
 static_assert(sizeof(float) == 4, "Storage requires float32");
-inline uint32_t checksum(const uint8_t* bytes) {
+inline uint32_t checksum(const uint8_t* bytes, size_t size) {
   uint32_t hash = 2166136261u;
-  for (size_t i = 0; i < 28; ++i) hash = (hash ^ bytes[i]) * 16777619u;
+  for (size_t i = 0; i < size; ++i) hash = (hash ^ bytes[i]) * 16777619u;
   return hash;
 }
-inline void encode(const Config& c, uint8_t* bytes) {
-  const uint32_t magic = 0x34474643, version = 1;
-  memcpy(bytes, &magic, 4); memcpy(bytes + 4, &version, 4);
-  const float values[] = {c.soilStart, c.soilStop, c.waterMin, c.fullCm, c.emptyCm};
-  memcpy(bytes + 8, values, 20);
-  const uint32_t hash = checksum(bytes); memcpy(bytes + 28, &hash, 4);
+inline void put32(uint8_t* bytes, uint32_t value) {
+  for (unsigned i = 0; i < 4; ++i) bytes[i] = static_cast<uint8_t>(value >> (8 * i));
 }
-inline bool decode(const uint8_t* bytes, Config& c) {
-  uint32_t magic, version, hash;
-  memcpy(&magic, bytes, 4); memcpy(&version, bytes + 4, 4); memcpy(&hash, bytes + 28, 4);
-  if (magic != 0x34474643 || version != 1 || hash != checksum(bytes)) return false;
-  float v[5]; memcpy(v, bytes + 8, 20);
+inline uint32_t get32(const uint8_t* bytes) {
+  uint32_t value = 0;
+  for (unsigned i = 0; i < 4; ++i) value |= uint32_t(bytes[i]) << (8 * i);
+  return value;
+}
+inline void encode(const Config& c, uint8_t* bytes) {
+  put32(bytes, 0x34474643); put32(bytes + 4, 2);
+  const float values[] = {c.soilStart, c.soilStop, c.waterMin, c.fullCm, c.emptyCm};
+  for (unsigned i = 0; i < 5; ++i) {
+    uint32_t bits; memcpy(&bits, &values[i], 4); put32(bytes + 8 + i * 4, bits);
+  }
+  put32(bytes + 28, c.maxRunSeconds);
+  put32(bytes + 32, checksum(bytes, 32));
+}
+inline bool decode(const uint8_t* bytes, size_t size, Config& c) {
+  if (!bytes || (size != kLegacyRecordSize && size != kRecordSize)) return false;
+  const uint32_t version = get32(bytes + 4);
+  if (get32(bytes) != 0x34474643 ||
+      !((version == 1 && size == kLegacyRecordSize) || (version == 2 && size == kRecordSize)) ||
+      get32(bytes + size - 4) != checksum(bytes, size - 4)) return false;
+  float v[5];
+  for (unsigned i = 0; i < 5; ++i) {
+    const uint32_t bits = get32(bytes + 8 + i * 4); memcpy(&v[i], &bits, 4);
+  }
   Config candidate; candidate.soilStart=v[0]; candidate.soilStop=v[1];
   candidate.waterMin=v[2]; candidate.fullCm=v[3]; candidate.emptyCm=v[4];
+  if (version == 2) candidate.maxRunSeconds = get32(bytes + 28);
   if (!valid(candidate)) return false;
   c = candidate; return true;
 }
 class Storage {
  public:
   virtual ~Storage() {}
-  virtual bool read(uint8_t* bytes, size_t size) = 0;
+  virtual bool read(uint8_t* bytes, size_t capacity, size_t& actualSize) = 0;
   virtual bool write(const uint8_t* bytes, size_t size) = 0;
 };
 enum class Result { Saved, Unchanged, Invalid, Busy, StorageFailed };
 class Manager {
  public:
   void load(Storage* storage) {
-    storage_ = storage; active_ = Config{}; persisted_ = false;
-    uint8_t bytes[kRecordSize]; Config candidate;
-    if (storage_ && storage_->read(bytes, sizeof(bytes)) && decode(bytes, candidate)) {
-      active_ = candidate; persisted_ = true;
+    storage_ = storage; active_ = Config{}; persistedSchema_ = 0;
+    uint8_t bytes[kRecordSize]; Config candidate; size_t size = 0;
+    if (storage_ && storage_->read(bytes, sizeof(bytes), size) && decode(bytes, size, candidate)) {
+      active_ = candidate; persistedSchema_ = get32(bytes + 4);
     }
   }
   Result update(const Config& candidate, bool manual, bool pumpOff) {
     if (!manual || !pumpOff) return Result::Busy;
     if (!valid(candidate)) return Result::Invalid;
-    if (persisted_ && equal(candidate, active_)) return Result::Unchanged;
+    if (persistedSchema_ == 2 && equal(candidate, active_)) return Result::Unchanged;
     uint8_t bytes[kRecordSize]; encode(candidate, bytes);
-    if (!storage_ || !storage_->write(bytes, sizeof(bytes))) return Result::StorageFailed;
-    active_ = candidate; persisted_ = true; return Result::Saved;
+    if (!storage_ || !storage_->write(bytes, sizeof(bytes))) {
+      persistedSchema_ = 0;  // A failed write need not leave flash unchanged.
+      return Result::StorageFailed;
+    }
+    uint8_t verified[kRecordSize]; size_t size = 0; Config decoded;
+    if (!storage_->read(verified, sizeof(verified), size) || size != sizeof(bytes) ||
+        memcmp(bytes, verified, sizeof(bytes)) != 0 || !decode(verified, size, decoded)) {
+      // Flash may have changed: do not skip a later explicit repair save.
+      persistedSchema_ = 0;
+      return Result::StorageFailed;
+    }
+    active_ = decoded; persistedSchema_ = 2; return Result::Saved;
   }
   const Config& active() const { return active_; }
-  bool persisted() const { return persisted_; }
+  bool persisted() const { return persistedSchema_ != 0; }
+  uint32_t persistedSchema() const { return persistedSchema_; }
  private:
   Config active_;
   Storage* storage_ = nullptr;
-  bool persisted_ = false;
+  uint32_t persistedSchema_ = 0;
 };
 inline bool parseSet(const char* text, const Config& active, Config& candidate) {
   if (!text || strncmp(text, "SET ", 4)) return false;
