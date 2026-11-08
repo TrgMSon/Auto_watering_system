@@ -1,3 +1,4 @@
+#include "mode_fixture.h"
 #include "Arduino.h"
 #include "../../esp32/irrigation.h"
 #include "../../esp32/pump.h"
@@ -14,7 +15,7 @@ sensors::Reading sample(float soil = 20, float distance = 5) {
   r.distanceValid = true; r.distanceCm = distance;
   return r;
 }
-void check(const irrigation::System& s, State state, unsigned attempts) {
+void check(const test_mode::FreshSystem& s, State state, unsigned attempts) {
   assert(s.status().decision.state == state);
   assert(s.status().decision.wateringAttempts == attempts);
   const bool on = state == State::Watering;
@@ -23,7 +24,7 @@ void check(const irrigation::System& s, State state, unsigned attempts) {
   assert(s.status().decision.desiredPumpOn == on);
 }
 int main() {
-  irrigation::System s;
+  test_mode::FreshSystem s;
   s.begin(); check(s, State::Idle, 0);
   assert(s.status().mode == irrigation::Mode::Manual);
   s.update(sample()); s.command("AUTO"); check(s, State::Watering, 1);

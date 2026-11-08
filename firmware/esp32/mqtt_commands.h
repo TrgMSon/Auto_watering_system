@@ -5,10 +5,19 @@
 namespace plant_mqtt {
 constexpr size_t kCommandBytes = 512;
 constexpr uint32_t kDedupRetentionMs = 60000;
-struct PumpCommand { char id[65] = {}; bool on = false; uint32_t seconds = 0; };
+struct PumpCommand {
+  char id[65] = {}; bool on = false; uint32_t seconds = 0;
+  bool isConfig = false, automatic = false, valuesValid = true;
+  // soil min/max, water %, duration minutes, then four air_* values.
+  // Air fields participate in duplicate comparison but do not control watering.
+  double values[8] = {};
+  bool off() const { return !isConfig && !on; }
+};
 // Strict, bounded ASCII subset of the backend's literal JSON. Unknown fields,
 // escapes, duplicate fields and numeric alternatives are rejected, never coerced.
 bool parsePump(const char* bytes, size_t size, const char* identity, PumpCommand& out);
+bool parseConfiguration(const char* bytes, size_t size, const char* identity, PumpCommand& out);
+const char* applyConfiguration(irrigation::System& system, const PumpCommand& command);
 class Commands {
  public:
   struct Record {
@@ -33,6 +42,7 @@ class Commands {
   bool offPending() const;
   int claim(uint32_t now);
   void complete(int slot, irrigation::Result result, const char* detail = nullptr);
+  void completeConfiguration(int slot, const char* message);
   bool ack(uint32_t now, int& slot, char* bytes, size_t capacity, const char* identity);
   void attempted(int slot, uint32_t now, bool inFlight = false);
   void accepted(int slot, uint32_t now);

@@ -32,7 +32,7 @@ bool reserve(uint64_t generation, uint32_t transaction, const ble_commands::Comm
     ble_commands::Code code, uint32_t now, uint64_t ingressEpoch) {
   Lock lock; (void)lock;
   reconcileMqtt();
-  if (command.op == ble_commands::Op::On && ingressEpoch != UINT64_MAX && ingressEpoch != offEpoch) return false;
+  if ((command.op == ble_commands::Op::On || command.op == ble_commands::Op::Config) && ingressEpoch != UINT64_MAX && ingressEpoch != offEpoch) return false;
   const bool reserved = dispatch.reserve(generation, transaction, command, code, now);
   if (reserved && command.op == ble_commands::Op::Off && code == ble_commands::Code::Ok) {
     ++offEpoch;
@@ -64,8 +64,13 @@ void serviceOwner(irrigation::System& system, ble_commands::Clock* clock) {
     if (mqttSlot >= 0) mqttRequest = mqtt.record(mqttSlot).command;
   }
   if (mqttSlot >= 0) {
+    if (mqttRequest.isConfig) {
+      const char* message = plant_mqtt::applyConfiguration(system, mqttRequest);
+      Lock lock; (void)lock; mqtt.completeConfiguration(mqttSlot, message); return;
+    }
     const auto outcome = mqttRequest.on ? system.startManual(mqttRequest.seconds) : system.stopManual();
-    const char* detail = outcome == irrigation::Result::Unsafe ? watering::name(system.status().decision.reason) : nullptr;
+    const char* detail = !mqttRequest.on && system.status().modeStorageError ? "OFF_APPLIED_MODE_SAVE_FAILED" :
+        outcome == irrigation::Result::Unsafe ? watering::name(system.status().decision.reason) : nullptr;
     Lock lock; (void)lock; mqtt.complete(mqttSlot, outcome, detail); return;
   }
   if (!bleClaim) return;
@@ -89,9 +94,9 @@ static bool queueLocked(const PumpCommand& c, uint32_t now, uint64_t ingressEpoc
   ble_command_bridge::reconcileMqtt();
   ble_command_bridge::mqtt.reclaim(now);
   const bool known = ble_command_bridge::mqtt.contains(c.id);
-  if (!known && c.on && ingressEpoch != UINT64_MAX && ingressEpoch != ble_command_bridge::offEpoch) return false;
+  if (!known && !c.off() && ingressEpoch != UINT64_MAX && ingressEpoch != ble_command_bridge::offEpoch) return false;
   const bool accepted = ble_command_bridge::mqtt.submit(c, now);
-  if (accepted && !known && !c.on) ++ble_command_bridge::offEpoch;
+  if (accepted && !known && c.off()) ++ble_command_bridge::offEpoch;
   if (accepted && ble_command_bridge::mqtt.offPending()) ble_command_bridge::dispatch.cancelOn();
   return accepted;
 }

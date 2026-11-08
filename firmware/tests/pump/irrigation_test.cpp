@@ -1,3 +1,4 @@
+#include "mode_fixture.h"
 #include "Arduino.h"
 #include "../../esp32/irrigation.h"
 #include "../../esp32/pump.h"
@@ -15,7 +16,7 @@ sensors::Reading sample(float soil = 20, float distance = 5) {
   r.distanceValid = true; r.distanceCm = distance;
   return r;  // DHT failure deliberately does not inhibit either mode.
 }
-void check(const irrigation::System& system, bool on, State state) {
+void check(const test_mode::FreshSystem& system, bool on, State state) {
   assert(system.status().pumpOn == on);
   assert(outputLevel == (on ? HIGH : LOW));
   assert(pump::isOn() == on);
@@ -23,7 +24,7 @@ void check(const irrigation::System& system, bool on, State state) {
   assert(system.status().decision.desiredPumpOn == on);
 }
 int main() {
-  irrigation::System system;
+  test_mode::FreshSystem system;
   system.begin(); check(system, false, State::Idle);
   assert(system.status().mode == Mode::Manual);
   assert(system.command("ON") == Result::Unsafe);
@@ -84,7 +85,7 @@ int main() {
     if (mode == 1) config.emptyDistanceCm = config.fullDistanceCm;
     if (mode == 2) config.fullDistanceCm = NAN;
     if (mode == 3) config.emptyDistanceCm = INFINITY;
-    irrigation::System uncalibrated(config); uncalibrated.begin(); uncalibrated.update(sample());
+    test_mode::FreshSystem uncalibrated(config); uncalibrated.begin(); uncalibrated.update(sample());
     assert(uncalibrated.command("ON") == Result::Unsafe);
     uncalibrated.command("AUTO"); check(uncalibrated, false, State::Idle);
     assert(!uncalibrated.status().decision.waterValid);
@@ -96,7 +97,7 @@ int main() {
   auto boundaryConfig = irrigation::confirmedConfig();
   boundaryConfig.fullDistanceCm = 10; boundaryConfig.emptyDistanceCm = 110;
   for (float distance : {89.0f, 90.0f, 91.0f}) {
-    irrigation::System boundary(boundaryConfig); boundary.begin();
+    test_mode::FreshSystem boundary(boundaryConfig); boundary.begin();
     boundary.update(sample(20, distance));
     assert((boundary.command("ON") == Result::Accepted) == (distance <= 90));
     boundary.command("OFF");

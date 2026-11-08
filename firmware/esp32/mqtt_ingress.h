@@ -1,6 +1,22 @@
 #pragma once
 #include "mqtt_commands.h"
 namespace plant_mqtt {
+// Externally locked. Capture early SUBACKs even if callback precedes subscribe()
+// returning its ID. Match each exact ID independently, never infer from CONNACK.
+class Subscriptions {
+ public:
+  void reset(){for(auto& id:ids_)id=-1;for(auto& e:events_)e=Event{};next_=0;}
+  void requested(unsigned topic,int id){ids_[topic]=id;}
+  void received(int id,bool granted){events_[next_++%4]=Event{id,granted};}
+  int state(unsigned topic)const{
+    if(ids_[topic]<0)return 0;
+    for(const auto& e:events_)if(e.id==ids_[topic])return e.granted?1:-1;
+    return 0;
+  }
+ private:
+  struct Event {int id;bool granted;Event(int value=-1,bool ok=false):id(value),granted(ok){}};
+  int ids_[2]={-1,-1};Event events_[4];unsigned next_=0;
+};
 // One SDK message assembly, four completed envelopes. External serialization.
 class Ingress {
  public:

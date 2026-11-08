@@ -15,9 +15,11 @@
 namespace plant_mqtt {
 namespace {
 portMUX_TYPE mux=portMUX_INITIALIZER_UNLOCKED;
-sensors::Reading latest;bool observed=false,started=false;
+::telemetry_snapshot::Snapshot latest;bool observed=false,started=false;
 Config config;Topics topics;
-Ingress ingress;
+Ingress ingress,configIngress;
+Subscriptions subscriptions;
+int fragmentTopic=-1; // MQTT delivers one contiguous fragmented message at a time.
 // Single MQTT worker scratch space; callbacks never access it. Keep payloads
 // off the worker stack and separate from the callback-owned ingress FIFO.
 struct WorkerBatch {
@@ -26,7 +28,7 @@ struct WorkerBatch {
   uint64_t epochs[4],parsedEpochs[4];
   PumpCommand commands[4];
 } workerBatch;
-char commandTopic[64]={},ackTopic[64]={};
+char commandTopic[64]={},configTopic[64]={},ackTopic[64]={};
 struct Lock{Lock(){portENTER_CRITICAL(&mux);}~Lock(){portEXIT_CRITICAL(&mux);}};
 class EspClient:public Client {
  public:
@@ -43,7 +45,7 @@ class EspClient:public Client {
     return true;
   }
   void stop()override{
-    {Lock lock; ingress.reset(); connectionGeneration_=commandConnection(false);}
+    {Lock lock; ingress.reset();configIngress.reset();fragmentTopic=-1; connectionGeneration_=commandConnection(false);}
     if(handle_&&!unhealthy_){
       if(esp_mqtt_client_stop(handle_)!=ESP_OK||esp_mqtt_client_destroy(handle_)!=ESP_OK)unhealthy_=true;
       else handle_=nullptr;
@@ -59,19 +61,23 @@ class EspClient:public Client {
     if(!usable())return;
     if(!subscribeStarted_.exchange(true)){
       const int id=esp_mqtt_client_subscribe(handle_,commandTopic,1);
-      subscribeId_.store(id);
+      {Lock lock;subscriptions.requested(0,id);}
+      const int configId=esp_mqtt_client_subscribe(handle_,configTopic,1);
+      {Lock lock;subscriptions.requested(1,configId);}
       subscribeAt_=millis();
-      if(id<0)failed_.store(true);
+      if(id<0||configId<0)failed_.store(true);
       return;
     }
     if(!subscribed_.load()){
-      const int sub=subackId_.load();
-      if(sub>=0){
-        if(sub!=subscribeId_.load()||!subackGranted_.load()){failed_.store(true);return;}
+      int pumpState,configState;
+      {Lock lock;pumpState=subscriptions.state(0);configState=subscriptions.state(1);}
+      if(pumpState<0||configState<0){failed_.store(true);return;}
+      if(pumpState==1&&configState==1){
         subscribed_.store(true);
       }else {
-        if(uint32_t(millis()-subscribeAt_)>=5000)failed_.store(true);
-        return;
+        if(uint32_t(millis()-subscribeAt_)>=5000){failed_.store(true);return;}
+        // Do not hold pump/OFF work behind a slow config SUBACK.
+        if(pumpState!=1)return;
       }
     }
     // Copy at most four envelopes while locked. Parsing and batch submission
@@ -88,6 +94,19 @@ class EspClient:public Client {
     size_t parsed=0;
     for(size_t i=0;i<count;++i)
       if(parsePump(workerBatch.payloads[i],workerBatch.sizes[i],topics.identity,workerBatch.commands[parsed]))
+        workerBatch.parsedEpochs[parsed++]=workerBatch.epochs[i];
+    queueCommandBatch(workerBatch.commands,workerBatch.parsedEpochs,parsed,millis(),generation);
+    // Separate bounded FIFO: config traffic cannot consume the pump/OFF ingress.
+    count=0;
+    {
+      Lock lock;
+      if(!connected_.load())return;
+      generation=connectionGeneration_;
+      while(count<4&&configIngress.pop(workerBatch.payloads[count],workerBatch.sizes[count],&workerBatch.epochs[count]))++count;
+    }
+    parsed=0;
+    for(size_t i=0;i<count;++i)
+      if(parseConfiguration(workerBatch.payloads[i],workerBatch.sizes[i],topics.identity,workerBatch.commands[parsed]))
         workerBatch.parsedEpochs[parsed++]=workerBatch.epochs[i];
     queueCommandBatch(workerBatch.commands,workerBatch.parsedEpochs,parsed,millis(),generation);
     if(ackFlight_>=0){
@@ -107,9 +126,11 @@ class EspClient:public Client {
   }
   bool status()override{
     if(!usable()||esp_mqtt_client_get_outbox_size(handle_)!=0)return false;
-    return esp_mqtt_client_publish(handle_,topics.status,kActive,0,1,1)>=0;
+    char bytes[kActiveCapacity];
+    const size_t size = activeStatus(bytes, sizeof(bytes));
+    return size && esp_mqtt_client_publish(handle_,topics.status,bytes,int(size),1,1)>=0;
   }
-  bool sample(const sensors::Reading& r,bool have,uint32_t)override{
+  bool sample(const ::telemetry_snapshot::Snapshot& r,bool have,uint32_t)override{
     // Status publish may have blocked: freshness uses the actual serialization time.
     char bytes[256];size_t n=telemetry(topics,r,have,millis(),bytes,sizeof(bytes));
     return n&&usable()&&esp_mqtt_client_publish(handle_,topics.telemetry,bytes,int(n),0,0)>=0;
@@ -124,31 +145,41 @@ class EspClient:public Client {
     auto& self=*static_cast<EspClient*>(arg);
     auto* e=static_cast<esp_mqtt_event_t*>(data);
     if(id==MQTT_EVENT_CONNECTED){
-      Lock lock;ingress.reset();self.connectionGeneration_=commandConnection(true);
-      self.subscribeStarted_.store(false);self.subscribed_.store(false);self.subscribeId_.store(-1);
-      self.subackId_.store(-1);self.subackGranted_.store(false);
+      Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(true);
+      self.subscribeStarted_.store(false);self.subscribed_.store(false);
       for(auto& published:self.pubacks_)published=-1;
       self.pubackIndex_=0;
       self.connected_.store(true);
     }
     else if(id==MQTT_EVENT_DISCONNECTED||id==MQTT_EVENT_ERROR){
-      Lock lock;ingress.reset();self.connectionGeneration_=commandConnection(false);
+      Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(false);
       self.subscribed_.store(false);self.connected_.store(false);self.failed_.store(true);
     }
     else if(id==MQTT_EVENT_SUBSCRIBED&&e){
       // SDK reports subscription failures using error_handle/return codes; require
       // exact matching message ID and granted QoS, never treat CONNACK as SUBACK.
-      self.subackGranted_.store(e->data_len==1&&e->data&&
-          (static_cast<unsigned char>(e->data[0])==0||static_cast<unsigned char>(e->data[0])==1));
-      self.subackId_.store(e->msg_id);
+      const bool granted=e->data_len==1&&e->data&&
+          (static_cast<unsigned char>(e->data[0])==0||static_cast<unsigned char>(e->data[0])==1);
+      Lock lock;subscriptions.received(e->msg_id,granted);
     }
     else if(id==MQTT_EVENT_PUBLISHED&&e){
       Lock lock;self.pubacks_[self.pubackIndex_++%8]=e->msg_id;
     }
     else if(id==MQTT_EVENT_DATA&&e){
       Lock lock;
-      if(self.connected_.load()&&self.subackGranted_.load()&&self.subackId_.load()>=0)
-        ingress.fragment(e->topic,e->topic_len,e->data,e->data_len,e->total_data_len,e->current_data_offset,e->retain,commandTopic,commandIngressEpoch());
+      if(!self.connected_.load())return;
+      if(e->current_data_offset==0){
+        fragmentTopic=-1;
+        if(e->topic&&e->topic_len>0){
+          if(size_t(e->topic_len)==strlen(commandTopic)&&!memcmp(e->topic,commandTopic,e->topic_len))fragmentTopic=0;
+          else if(size_t(e->topic_len)==strlen(configTopic)&&!memcmp(e->topic,configTopic,e->topic_len))fragmentTopic=1;
+        }
+      }
+      if(fragmentTopic>=0&&subscriptions.state(unsigned(fragmentTopic))==1){
+        Ingress& target=fragmentTopic?configIngress:ingress;
+        target.fragment(e->topic,e->topic_len,e->data,e->data_len,e->total_data_len,e->current_data_offset,e->retain,
+            fragmentTopic?configTopic:commandTopic,commandIngressEpoch());
+      }
     }
   }
   esp_mqtt_client_handle_t handle_=nullptr;
@@ -156,11 +187,8 @@ class EspClient:public Client {
   uint64_t connectionGeneration_=0; // Protected by ingress mux, copied with envelopes.
   std::atomic<bool> connected_{false},failed_{false};
   std::atomic<bool> subscribeStarted_{false},subscribed_{false};
-  std::atomic<int> subscribeId_{-1};
-  std::atomic<int> subackId_{-1};
   int pubacks_[8]={-1,-1,-1,-1,-1,-1,-1,-1};
   unsigned pubackIndex_=0;
-  std::atomic<bool> subackGranted_{false};
   uint32_t subscribeAt_=0,ackAt_=0;
   int ackFlight_=-1,ackSlot_=-1;
 };
@@ -172,9 +200,10 @@ void worker(void*){
       (kTlsNativeDates||prepareMqttTrust(config.ca));
   EspClient client;Runtime runtime(millis);
   snprintf(commandTopic,sizeof(commandTopic),"iot/garden/%s/cmd",topics.identity);
+  snprintf(configTopic,sizeof(configTopic),"iot/garden/%s/config",topics.identity);
   snprintf(ackTopic,sizeof(ackTopic),"iot/garden/%s/ack",topics.identity);
   for(;;){
-    sensors::Reading copy;bool have;
+    ::telemetry_snapshot::Snapshot copy;bool have;
     {Lock lock;copy=latest;have=observed;}
     const time_t utc=time(nullptr);
     const bool clock=utc>=ble_commands::kUnixMin&&utc<=ble_commands::kUnixMax;
@@ -190,6 +219,6 @@ bool begin(){
   started=true;
   return xTaskCreate(worker,"mqtt-telemetry",6144,nullptr,1,nullptr)==pdPASS;
 }
-void publish(const sensors::Reading& reading){Lock lock;latest=reading;observed=true;}
+void publish(const ::telemetry_snapshot::Snapshot& snapshot){Lock lock;latest=snapshot;observed=true;}
 }
 #endif
