@@ -178,7 +178,7 @@ class EspClient:public Client {
       if(fragmentTopic>=0&&subscriptions.state(unsigned(fragmentTopic))==1){
         Ingress& target=fragmentTopic?configIngress:ingress;
         target.fragment(e->topic,e->topic_len,e->data,e->data_len,e->total_data_len,e->current_data_offset,e->retain,
-            fragmentTopic?configTopic:commandTopic,commandIngressEpoch());
+            fragmentTopic?configTopic:commandTopic,commandIngressEpoch(),fragmentTopic==1);
       }
     }
   }

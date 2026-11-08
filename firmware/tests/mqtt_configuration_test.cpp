@@ -179,6 +179,10 @@ void transport(){
     assert(configs.pop(bytes,n)&&parsed(std::string(bytes,n)).valuesValid);
   }
   assert(!configs.fragment(topic,int(strlen(topic)),text.data(),int(text.size()),int(text.size()),0,true,topic));
+  assert(configs.fragment(topic,int(strlen(topic)),text.data(),int(text.size()),int(text.size()),0,true,topic,0,true));
+  char retainedBytes[kCommandBytes];size_t retainedSize;
+  assert(configs.pop(retainedBytes,retainedSize)&&parsed(std::string(retainedBytes,retainedSize)).valuesValid);
+  assert(!configs.fragment(topic,int(strlen(topic)),text.data(),int(text.size()),int(text.size()),0,true,topic));
   for(unsigned i=0;i<4;++i)assert(configs.fragment(topic,int(strlen(topic)),text.data(),int(text.size()),int(text.size()),0,false,topic));
   assert(!configs.fragment(topic,int(strlen(topic)),text.data(),int(text.size()),int(text.size()),0,false,topic));
   // Full config ingress does not consume even one slot of the independent pump FIFO.

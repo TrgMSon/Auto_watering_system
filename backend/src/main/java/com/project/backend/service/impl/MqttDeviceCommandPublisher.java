@@ -81,7 +81,7 @@ public class MqttDeviceCommandPublisher {
 
     public String publishPumpControl(String deviceId, String state, Integer durationSeconds) {
         Map<String, Object> payload = buildPumpControlPayload(deviceId, state, durationSeconds);
-        return publish(deviceId, commandTopicTemplate, payload);
+        return publish(deviceId, commandTopicTemplate, payload, false);
     }
 
     Map<String, Object> buildPumpControlPayload(String deviceId, String state) {
@@ -114,7 +114,7 @@ public class MqttDeviceCommandPublisher {
 
     public String publishConfiguration(String deviceId, Map<String, Object> config) {
         Map<String, Object> payload = buildConfigurationPayload(deviceId, config);
-        return publish(deviceId, configTopicTemplate, payload);
+        return publish(deviceId, configTopicTemplate, payload, true);
     }
 
     Map<String, Object> buildConfigurationPayload(String deviceId, Map<String, Object> config) {
@@ -126,7 +126,8 @@ public class MqttDeviceCommandPublisher {
         return payload;
     }
 
-    private String publish(String deviceId, String topicTemplate, Map<String, Object> payload) {
+    private String publish(
+            String deviceId, String topicTemplate, Map<String, Object> payload, boolean retained) {
         if (brokerUrl == null || brokerUrl.isBlank()) {
             throw new DeviceCommandException("MQTT chưa được cấu hình trên máy chủ");
         }
@@ -165,7 +166,7 @@ public class MqttDeviceCommandPublisher {
         }
         for (int attempt = 1; attempt <= MAX_PUBLISH_ATTEMPTS; attempt++) {
             try {
-                mqttGateway.sendToMqtt(messagePayload, topic);
+                mqttGateway.sendToMqtt(messagePayload, topic, retained);
                 return commandId;
             } catch (MessagingException ex) {
                 lastFailure = ex;
