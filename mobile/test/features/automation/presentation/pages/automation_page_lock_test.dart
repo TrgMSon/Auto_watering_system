@@ -20,7 +20,6 @@ DeviceConfigModel _config({required bool autoMode}) => DeviceConfigModel(
       airHumidityMax: 80,
       temperatureMin: 20,
       temperatureMax: 35,
-      maxWateringDuration: 2,
       waterLevelMin: 25,
     );
 

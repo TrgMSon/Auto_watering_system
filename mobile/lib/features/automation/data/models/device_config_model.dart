@@ -10,13 +10,8 @@ class DeviceConfigModel {
   final double temperatureMin;
   final double temperatureMax;
 
-  /// Thời gian bơm tối đa, tính bằng phút (1 đến 10).
-  final int maxWateringDuration;
-
   /// Ngưỡng mực nước thấp, tính bằng % bồn như firmware (20 đến 100).
   final int waterLevelMin;
-
-  int get maxWateringDurationSeconds => maxWateringDuration * 60;
 
   const DeviceConfigModel({
     required this.deviceId,
@@ -27,7 +22,6 @@ class DeviceConfigModel {
     required this.airHumidityMax,
     required this.temperatureMin,
     required this.temperatureMax,
-    required this.maxWateringDuration,
     this.waterLevelMin = 20,
   });
 
@@ -41,18 +35,11 @@ class DeviceConfigModel {
       airHumidityMax: (json['air_humidity_max'] ?? 80).toDouble(),
       temperatureMin: (json['air_temperature_min'] ?? json['temperature_min'] ?? 20).toDouble(),
       temperatureMax: (json['air_temperature_max'] ?? json['temperature_max'] ?? 35).toDouble(),
-      maxWateringDuration: json['max_watering_duration'] ?? 2,
       waterLevelMin: json['water_level_min'] ?? 20,
     );
   }
 
-  /// Đưa giá trị cũ về khoảng backend và firmware nhận, để lưu không bị lỗi 400.
-  /// Thời gian lớn hơn 10 là dữ liệu cũ lưu theo giây (ví dụ 120), nên quy về phút.
-  static int normalizeDurationMinutes(int value) {
-    final minutes = value > 10 ? (value / 60).round() : value;
-    return minutes.clamp(1, 10);
-  }
-
+  /// Đưa ngưỡng cũ về khoảng backend và firmware nhận, để lưu không bị lỗi 400.
   static int normalizeWaterLevelMin(int value) => value.clamp(20, 100);
 
   Map<String, dynamic> toJson() {
@@ -64,7 +51,6 @@ class DeviceConfigModel {
       'air_humidity_max': airHumidityMax,
       'air_temperature_min': temperatureMin,
       'air_temperature_max': temperatureMax,
-      'max_watering_duration': normalizeDurationMinutes(maxWateringDuration),
       'water_level_min': normalizeWaterLevelMin(waterLevelMin),
     };
   }
@@ -77,7 +63,6 @@ class DeviceConfigModel {
     double? airHumidityMax,
     double? temperatureMin,
     double? temperatureMax,
-    int? maxWateringDuration,
     int? waterLevelMin,
   }) {
     return DeviceConfigModel(
@@ -89,7 +74,6 @@ class DeviceConfigModel {
       airHumidityMax: airHumidityMax ?? this.airHumidityMax,
       temperatureMin: temperatureMin ?? this.temperatureMin,
       temperatureMax: temperatureMax ?? this.temperatureMax,
-      maxWateringDuration: maxWateringDuration ?? this.maxWateringDuration,
       waterLevelMin: waterLevelMin ?? this.waterLevelMin,
     );
   }

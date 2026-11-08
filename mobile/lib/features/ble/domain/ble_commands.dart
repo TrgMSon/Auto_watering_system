@@ -89,12 +89,15 @@ class BleConfigCommand extends BleCommand {
     }
   }
 
-  /// App và backend lưu thời gian theo phút, BLE gửi theo giây.
+  /// Thời gian tưới cố định trong firmware, không còn cấu hình trên app hay server.
+  /// Lệnh `0003` vẫn bắt buộc có `max_dur`, nên gửi giá trị mặc định của firmware.
+  static const int firmwareMaxDurationSeconds = 120;
+
   factory BleConfigCommand.fromDeviceConfig(DeviceConfigModel config) => BleConfigCommand(
         soilMin: config.soilMoistureMin,
         soilMax: config.soilMoistureMax,
         autoMode: config.autoMode,
-        maxDurationSeconds: config.maxWateringDurationSeconds,
+        maxDurationSeconds: firmwareMaxDurationSeconds,
         minWaterPercent: config.waterLevelMin.toDouble(),
       );
 

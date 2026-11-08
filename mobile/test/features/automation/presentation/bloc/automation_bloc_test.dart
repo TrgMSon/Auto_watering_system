@@ -24,7 +24,6 @@ void main() {
     airHumidityMax: 80.0,
     temperatureMin: 20.0,
     temperatureMax: 35.0,
-    maxWateringDuration: 120,
     waterLevelMin: 10,
   );
 
@@ -69,7 +68,6 @@ void main() {
         airHumidityMax: 85.0,
         temperatureMin: 18.0,
         temperatureMax: 33.0,
-        maxWateringDuration: 90,
       );
       const savedConfig = DeviceConfigModel(
         deviceId: 'ESP_001',
@@ -80,7 +78,6 @@ void main() {
         airHumidityMax: 80.0,
         temperatureMin: 20.0,
         temperatureMax: 35.0,
-        maxWateringDuration: 120,
       );
       const newSchedule = ScheduleModel(
         deviceId: 'ESP_001',

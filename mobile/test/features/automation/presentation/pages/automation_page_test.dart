@@ -26,7 +26,6 @@ void main() {
     airHumidityMax: 80.0,
     temperatureMin: 20.0,
     temperatureMax: 35.0,
-    maxWateringDuration: 120,
     waterLevelMin: 15,
   );
 
