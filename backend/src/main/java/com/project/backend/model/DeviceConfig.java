@@ -25,9 +25,6 @@ public class DeviceConfig {
     @Column(name = "soil_moisture_max")
     private float soilMoistureMax;
 
-    @Column(name = "max_watering_duration")
-    private int maxWateringDuration;
-
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -50,13 +47,12 @@ public class DeviceConfig {
     }
 
     public DeviceConfig(String deviceId, int autoMode, float soilMoistureMin, float soiMoistureMax,
-            int maxWateringDuration, LocalDateTime updatedAt, float airHumidityMin, float airHumidityMax,
+            LocalDateTime updatedAt, float airHumidityMin, float airHumidityMax,
             float airTemperatureMin, float airTemperatureMax, int waterLevelMin) {
         this.deviceId = deviceId;
         this.autoMode = autoMode;
         this.soilMoistureMin = soilMoistureMin;
         this.soilMoistureMax = soiMoistureMax;
-        this.maxWateringDuration = maxWateringDuration;
         this.updatedAt = updatedAt;
         this.airHumidityMax = airHumidityMax;
         this.airHumidityMin = airHumidityMin;

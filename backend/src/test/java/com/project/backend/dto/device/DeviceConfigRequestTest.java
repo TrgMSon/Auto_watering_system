@@ -15,26 +15,23 @@ class DeviceConfigRequestTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
-    void acceptsFirmwareSupportedWaterLevelAndDurationBoundaries() {
+    void acceptsWaterLevelBoundaries() {
         DeviceConfigRequest request = validRequest();
         request.setWaterLevelMin(20);
-        request.setMaxWateringDuration(1);
         assertTrue(validator.validate(request).isEmpty());
 
         request.setWaterLevelMin(100);
-        request.setMaxWateringDuration(10);
         assertTrue(validator.validate(request).isEmpty());
     }
 
     @Test
-    void rejectsWaterLevelAndDurationOutsideFirmwareRanges() {
+    void rejectsWaterLevelOutsideFirmwareRange() {
         DeviceConfigRequest request = validRequest();
         request.setWaterLevelMin(19);
-        request.setMaxWateringDuration(11);
 
         Set<ConstraintViolation<DeviceConfigRequest>> violations = validator.validate(request);
 
-        assertEquals(2, violations.size());
+        assertEquals(1, violations.size());
     }
 
     private DeviceConfigRequest validRequest() {
@@ -42,7 +39,6 @@ class DeviceConfigRequestTest {
         request.setAutoMode(true);
         request.setSoilMoistureMin(30f);
         request.setSoilMoistureMax(70f);
-        request.setMaxWateringDuration(5);
         request.setAirHumidityMin(40f);
         request.setAirHumidityMax(80f);
         request.setAirTemperatureMin(10f);

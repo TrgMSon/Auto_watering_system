@@ -314,12 +314,11 @@ public class DeviceServiceImpl implements DeviceService {
                 "Nhiệt độ tối thiểu phải nhỏ hơn hoặc bằng tối đa");
 
         DeviceConfig config = deviceConfigRepository.findById(deviceId)
-                .orElseGet(() -> new DeviceConfig(deviceId, 0, 0, 0, 1,
+                .orElseGet(() -> new DeviceConfig(deviceId, 0, 0, 0,
                         LocalDateTime.now(), 0, 0, 0, 0, 0));
         config.setAutoMode(request.getAutoMode() ? 1 : 0);
         config.setSoilMoistureMin(request.getSoilMoistureMin());
         config.setSoilMoistureMax(request.getSoilMoistureMax());
-        config.setMaxWateringDuration(request.getMaxWateringDuration());
         config.setAirHumidityMin(request.getAirHumidityMin());
         config.setAirHumidityMax(request.getAirHumidityMax());
         config.setAirTemperatureMin(request.getAirTemperatureMin());
@@ -504,7 +503,6 @@ public class DeviceServiceImpl implements DeviceService {
                 config.getAutoMode() != 0,
                 config.getSoilMoistureMin(),
                 config.getSoilMoistureMax(),
-                config.getMaxWateringDuration(),
                 config.getAirHumidityMin(),
                 config.getAirHumidityMax(),
                 config.getAirTemperatureMin(),
@@ -530,7 +528,6 @@ public class DeviceServiceImpl implements DeviceService {
         payload.put("auto_mode", config.getAutoMode() != 0);
         payload.put("soil_moisture_min", config.getSoilMoistureMin());
         payload.put("soil_moisture_max", config.getSoilMoistureMax());
-        payload.put("max_watering_duration_minutes", config.getMaxWateringDuration());
         payload.put("air_humidity_min", config.getAirHumidityMin());
         payload.put("air_humidity_max", config.getAirHumidityMax());
         payload.put("air_temperature_min", config.getAirTemperatureMin());

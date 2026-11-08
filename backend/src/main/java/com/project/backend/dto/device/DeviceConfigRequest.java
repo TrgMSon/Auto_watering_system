@@ -28,12 +28,6 @@ public class DeviceConfigRequest {
     private Float soilMoistureMax;
 
     @NotNull
-    @Min(1)
-    @Max(10)
-    @JsonProperty("max_watering_duration")
-    private Integer maxWateringDuration;
-
-    @NotNull
     @DecimalMin("0")
     @DecimalMax("100")
     @JsonProperty("air_humidity_min")
