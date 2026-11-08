@@ -59,7 +59,7 @@ flowchart LR
 | Trạng thái / LWT | `iot/garden/{device_id}/status` | 1 |
 | Xác nhận lệnh/cấu hình | `iot/garden/{device_id}/ack` | 1 |
 
-Thiết bị gửi xác nhận sau khi xử lý lệnh hoặc cấu hình. Backend chờ xác nhận; trạng thái lệnh được giữ trong bộ nhớ tối đa 24 giờ và bị xóa khi backend khởi động lại. Thiết bị nên gửi telemetry mỗi 10–30 giây.
+Backend publish cấu hình với cờ retained để broker giữ cấu hình mới nhất; ESP32 nhận lại cấu hình đó khi kết nối/subcribe lại, kể cả khi thiết bị offline lúc người dùng lưu. Lệnh máy bơm không retained, tránh phát lại lệnh cũ. Thiết bị gửi xác nhận sau khi xử lý lệnh hoặc cấu hình. Backend chờ xác nhận; trạng thái lệnh được giữ trong bộ nhớ tối đa 24 giờ và bị xóa khi backend khởi động lại. Thiết bị nên gửi telemetry mỗi 10–30 giây.
 
 ### MQTT: quản lý tài khoản trên EMQX Cloud
 

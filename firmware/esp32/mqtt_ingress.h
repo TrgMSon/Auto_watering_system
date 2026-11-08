@@ -21,13 +21,13 @@ class Subscriptions {
 class Ingress {
  public:
   void reset(){active_=false;used_=0;head_=count_=0;}
-  bool fragment(const char* topic,int topicSize,const char* data,int size,int total,int offset,bool retained,const char* expected,uint64_t epoch=0){
+  bool fragment(const char* topic,int topicSize,const char* data,int size,int total,int offset,bool retained,const char* expected,uint64_t epoch=0,bool allowRetained=false){
     if(offset==0){
       active_=false;used_=0;
-      if(retained||!topic||topicSize<=0||size_t(topicSize)!=strlen(expected)||memcmp(topic,expected,size_t(topicSize))||total<=0||size_t(total)>kCommandBytes)return false;
+      if((retained&&!allowRetained)||!topic||topicSize<=0||size_t(topicSize)!=strlen(expected)||memcmp(topic,expected,size_t(topicSize))||total<=0||size_t(total)>kCommandBytes)return false;
       total_=size_t(total);active_=true;assemblyEpoch_=epoch;
     }
-    if(!active_||retained||offset<0||size<0||!data||size_t(offset)!=used_||total<=0||size_t(total)!=total_||size_t(size)>total_-used_){active_=false;return false;}
+    if(!active_||(retained&&!allowRetained)||offset<0||size<0||!data||size_t(offset)!=used_||total<=0||size_t(total)!=total_||size_t(size)>total_-used_){active_=false;return false;}
     if(offset&&topicSize&&(topicSize<0||!topic||size_t(topicSize)!=strlen(expected)||memcmp(topic,expected,size_t(topicSize)))){active_=false;return false;}
     memcpy(assembly_+used_,data,size_t(size));used_+=size_t(size);
     if(used_!=total_)return true;
