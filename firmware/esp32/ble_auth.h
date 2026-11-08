@@ -5,16 +5,14 @@
 namespace ble_commands {
 constexpr size_t kPayloadMax = 128, kKeyMax = 128;
 constexpr uint32_t kNonceTtlMs = 30000;
-enum class Op { Unknown, On, Off, Time };
-// Ordinary authenticated WRITE endpoints; WIFI uses a separate encrypted bit.
-constexpr bool authenticatedWrite(unsigned suffix) { return suffix == 2 || suffix == 7; }
+enum class Op { Unknown, On, Off, Time, Config };
+// CONFIG uses the existing authenticated Write With Response policy.
+constexpr bool authenticatedWrite(unsigned suffix) { return suffix == 2 || suffix == 3 || suffix == 7; }
 constexpr bool encryptedWifiWrite(unsigned suffix) { return suffix == 6; }
 enum class Code { None, Ok, BadSig, NonceExpired, BadJson, OutOfRange,
-  LowWater, Maintenance, SensorError, PumpBusy, InvalidTime, WifiOk, WifiFail };
+  LowWater, Maintenance, SensorError, PumpBusy, InvalidTime, WifiOk, WifiFail, StorageError };
 const char* name(Op op);
 const char* name(Code code);
-struct Command { Op op = Op::Unknown; uint32_t seconds = 0, unixSeconds = 0; char signature[17] = {}; };
-Code parse(const char* bytes, size_t size, Command& command, Op endpoint = Op::Unknown);
 struct Crypto {
   virtual ~Crypto() {}
   virtual bool random(uint8_t (&bytes)[8]) = 0;
@@ -26,19 +24,27 @@ struct KeySource {
   // UTF-8 bytes of the whole secret string, never Base64-decoded. Boot-only.
   virtual bool load(uint8_t* out, size_t capacity, size_t& size) const = 0;
 };
+// Exact tenths of operational calibrated percent; not volume percent.
+struct ConfigRequest {
+  uint32_t minPercentTenths = 0, maxPercentTenths = 0;
+  uint32_t autoMode = 0, maxDurationSeconds = 0, minWaterPercentTenths = 0;
+  char signature[17] = {};
+};
+struct Command { Op op = Op::Unknown; uint32_t seconds = 0, unixSeconds = 0; ConfigRequest config; char signature[17] = {}; };
 struct Authentication {
   Command command;
   Code code = Code::None;
   bool missingKey = false;
 };
-// BLE-only units; no conversion to configuration::Config or owner command.
-struct ConfigRequest {
-  uint32_t minPercentTenths = 0, maxPercentTenths = 0;
-  uint32_t autoMode = 0, maxDurationSeconds = 0, minWaterCmTenths = 0;
-  char signature[17] = {};
-};
-// Compact maximum is 96 bytes; allow bounded whitespace, independently of pump/TIME.
+Code parse(const char* bytes, size_t size, Command& command, Op endpoint = Op::Unknown);
+// Compact maximum is 90 bytes; allow bounded whitespace, independently of pump/TIME.
 constexpr size_t kConfigPayloadMax = 192, kConfigCanonicalCapacity = 64;
+// One ATT Write Request only. MTU 185 supports at most 182 bytes of CONFIG.
+constexpr bool configWriteFits(size_t size, uint16_t mtu, bool prepared = false,
+    bool withResponse = true, uint16_t offset = 0) {
+  return !prepared && withResponse && !offset && size && size <= kConfigPayloadMax &&
+      mtu >= 3 && size <= size_t(mtu - 3);
+}
 Code validateConfig(const ConfigRequest& request);
 Code parseConfig(const char* bytes, size_t size, ConfigRequest& request);
 // Returns 0 on invalid request/nonce or insufficient output space. No truncation.

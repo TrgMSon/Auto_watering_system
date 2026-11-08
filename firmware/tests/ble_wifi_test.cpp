@@ -84,7 +84,7 @@ int main(){
  // Shared nonce lifecycle across all four command families.
  const std::string pump="{\"cmd\":\"PUMP_OFF\",\"dur\":0,\"sig\":\"238041d3721ef169\"}";
  const std::string time="{\"unix\":1793800000,\"sig\":\"26b87998f4bc4778\"}";
- const std::string config="{\"min\":30.0,\"max\":70.0,\"auto\":1,\"max_dur\":600,\"min_water\":5.0,\"sig\":\"1e4b0b9e4f4d0ea5\"}";
+ const std::string config="{\"min\":30.0,\"max\":70.0,\"auto\":1,\"max_dur\":120,\"min_water\":20.0,\"sig\":\"a4426d27c5dddb70\"}";
  for(unsigned other=0;other<3;++other){auto call=[&](){return other==0?auth.authenticate(pump.data(),pump.size(),0).code:other==1?auth.authenticate(time.data(),time.size(),0,Op::Time).code:auth.authenticateConfig(config.data(),config.size(),0).code;};
   nonce(auth);assert(auth.authenticateWifi(p.data(),p.size(),0,security,2,185).code==Code::Ok);assert(call()==Code::NonceExpired);
   nonce(auth);assert(call()==Code::Ok);assert(auth.authenticateWifi(p.data(),p.size(),0,security,2,185).code==Code::NonceExpired);
@@ -123,6 +123,6 @@ int main(){
  {Radio radio;Store store;Attempt attempt;assert(attempt.reserve(2,accepted,true,false,185,0));attempt.service(0,2,radio,store,security);
   Dispatch dispatch;auto gen=dispatch.connect(1);Command on;on.op=Op::On;on.seconds=5;for(unsigned i=0;i<3;++i)assert(dispatch.reserve(gen,i,on,Code::Ok,0));Command off;off.op=Op::Off;assert(dispatch.reserve(gen,4,off,Code::Ok,0));Dispatch::Slot slot;assert(dispatch.claim(slot)&&slot.command.op==Op::Off);}
  char result[64];assert(Attempt::resultJson(Code::WifiOk,result,sizeof(result))&&std::string(result)=="{\"op\":\"WIFI\",\"code\":\"WIFI_OK\"}");assert(!Attempt::resultJson(Code::Ok,result,sizeof(result)));
- assert(!authenticatedWrite(6)&&!authenticatedWrite(3));
+ assert(!authenticatedWrite(6)&&authenticatedWrite(3));
  std::cout<<"PASS: WIFI parser/auth/security/generation/MTU/UTF-8, shared nonce, bounded attempt/deadline/storage failure/OFF isolation (fakes only)\n";
 }

@@ -47,6 +47,6 @@ int main(){
  assert(binding.complete(a)==1);assert(!binding.complete(a));assert(binding.begin(a,2));
  assert(!binding.complete(b));binding.cancel(2);assert(!binding.complete(a));
  assert(binding.begin(a,2));binding.disconnect(2);assert(!binding.capture(a));assert(binding.complete(a)==2);
- assert(!ble_commands::authenticatedWrite(3)&&!ble_commands::authenticatedWrite(6));
+ assert(ble_commands::authenticatedWrite(3)&&!ble_commands::authenticatedWrite(6));
  std::cout<<"PASS: pairing window/rollover/USB admission/bond policy/setup failure, peer+procedure generation and unconfirmed encryption fail closed\n";
 }
