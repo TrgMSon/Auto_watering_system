@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "board_config.h"
+#include "firmware_version.h"
 #include "sensors.h"
 #include "pump.h"
 #include "pump_serial.h"
@@ -20,7 +21,6 @@ static guard_test::Harness guardTest;
 #endif
 static configuration::PreferencesStorage configStorage;
 
-constexpr char kFirmwareVersion[] = "0.0.6-persistent-config";
 static pump::SerialCommands commands;
 static irrigation::System irrigationSystem;
 
@@ -34,6 +34,8 @@ void printPumpStatus() {
                 status.soilValid, status.decision.waterPercent, status.decision.waterValid,
                 watering::name(status.decision.reason), static_cast<unsigned long>(status.remainingMs),
                 static_cast<unsigned long>(status.decision.cooldownRemainingMs), status.decision.wateringAttempts);
+  Serial.printf("desired_mode=%s pending_boot_auto=%u mode_persisted=%u mode_storage_error=%u\n",
+      irrigation::name(status.desiredMode), status.pendingBootAuto, status.modePersisted, status.modeStorageError);
 }
 
 void servicePump() {
@@ -41,6 +43,10 @@ void servicePump() {
   ble_command_bridge::serviceOwner(irrigationSystem, &bleClock);
 #endif
   irrigationSystem.service();
+  static bool lastModeStorageError = false;
+  if (irrigationSystem.status().modeStorageError && !lastModeStorageError)
+    Serial.println("MODE_STORAGE_ERROR: runtime MANUAL/OFF; flash mode unconfirmed, reboot may restore old AUTO");
+  lastModeStorageError = irrigationSystem.status().modeStorageError;
 #if !defined(F31D_GUARD_TEST) || F31D_GUARD_TEST != 1
   static uint32_t lastSnapshotMs = 0, lastSampleMs = 0;
   static bool lastActuatorOn = false;
@@ -49,15 +55,16 @@ void servicePump() {
   const auto& reading = irrigationSystem.reading();
   if (actuatorOn != lastActuatorOn || reading.sampledAtMs != lastSampleMs ||
       static_cast<uint32_t>(now - lastSnapshotMs) >= 100) {
-    plant_ble::publish(reading, actuatorOn, now);
-    plant_mqtt::publish(reading);
+    const auto snapshot = irrigationSystem.telemetrySnapshot(now);
+    plant_ble::publish(snapshot);
+    plant_mqtt::publish(snapshot);
     lastSnapshotMs = now; lastSampleMs = reading.sampledAtMs; lastActuatorOn = actuatorOn;
   }
 #endif
 }
 
 void setup() {
-  irrigationSystem.begin(&configStorage);
+  irrigationSystem.begin(&configStorage, &configStorage);
   Serial.begin(115200);
   Serial.print("Smart Plant Watering firmware ");
   Serial.println(kFirmwareVersion);

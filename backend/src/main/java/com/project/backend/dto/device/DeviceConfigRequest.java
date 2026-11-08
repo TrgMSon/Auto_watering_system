@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -28,6 +29,7 @@ public class DeviceConfigRequest {
 
     @NotNull
     @Min(1)
+    @Max(10)
     @JsonProperty("max_watering_duration")
     private Integer maxWateringDuration;
 
@@ -52,7 +54,8 @@ public class DeviceConfigRequest {
     private Float airTemperatureMax;
 
     @NotNull
-    @Min(0)
+    @Min(20)
+    @Max(100)
     @JsonProperty("water_level_min")
     private Integer waterLevelMin;
 }

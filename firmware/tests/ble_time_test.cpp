@@ -46,7 +46,7 @@ sensors::Reading sample() { sensors::Reading r; r.sampledAtMs=fakeNow; r.soilVal
 }
 int main() {
  assert(authenticatedWrite(2) && authenticatedWrite(7));
- assert(!authenticatedWrite(3) && !authenticatedWrite(6)); // Same policy used by native GATT table.
+ assert(authenticatedWrite(3) && !authenticatedWrite(6)); // Same policy used by native GATT table.
  CryptoImpl crypto; Keys keys; Authenticator auth(crypto); Wall wall; auth.loadKey(&keys);
  assert(sign(crypto,"84a9f21b3c0e5a1d|TIME|1793800000")=="26b87998f4bc4778");
  nonce(auth); auto valid=timePayload("1793800000","26b87998f4bc4778");

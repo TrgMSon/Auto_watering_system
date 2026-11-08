@@ -1,5 +1,13 @@
 #include "ble_dispatch.h"
 namespace ble_commands {
+bool Dispatch::offPending() const {
+  return slots_[0].state == State::Pending;
+}
+void Dispatch::cancelOn() {
+  for (auto& s : slots_) if (s.state == State::Pending && (s.command.op == Op::On || s.command.op == Op::Config)) {
+    s.state = State::Done; s.code = Code::None;
+  }
+}
 void Dispatch::invalidate() {
   active_ = 0;
   for (auto& s : slots_) if (s.state != State::Admitted) s = Slot{};
@@ -25,7 +33,7 @@ bool Dispatch::reserve(uint64_t generation, uint32_t transaction, const Command&
     s.ticket = ticket_; s.code = authentication;
     s.state = authentication == Code::Ok ? State::Pending : State::Done;
     if (command.op == Op::Off && s.state == State::Pending) {
-      for (unsigned j = 1; j < kSlots; ++j) if (slots_[j].state == State::Pending && slots_[j].command.op == Op::On) {
+      for (unsigned j = 1; j < kSlots; ++j) if (slots_[j].state == State::Pending && (slots_[j].command.op == Op::On || slots_[j].command.op == Op::Config)) {
         slots_[j].state = State::Done; slots_[j].code = Code::None; // Superseded, no wire code.
       }
     }
@@ -64,6 +72,22 @@ void Dispatch::expire(uint32_t now) {
   }
 }
 Code execute(irrigation::System& system, const Command& command, Clock* clock) {
+  if (command.op == Op::Config) {
+    const auto& r = command.config;
+    if (validateConfig(r) != Code::Ok) return Code::OutOfRange;
+    auto candidate = system.configurationStatus().active();
+    candidate.soilStart = r.minPercentTenths / 10.0f;
+    candidate.soilStop = r.maxPercentTenths / 10.0f;
+    candidate.waterMin = r.minWaterPercentTenths / 10.0f;
+    candidate.maxRunSeconds = r.maxDurationSeconds;
+    switch (system.applyRemoteConfiguration(candidate, r.autoMode != 0)) {
+      case irrigation::RemoteConfigResult::Ok: return Code::Ok;
+      case irrigation::RemoteConfigResult::Invalid: return Code::OutOfRange;
+      case irrigation::RemoteConfigResult::PumpRunning: return Code::PumpBusy;
+      case irrigation::RemoteConfigResult::StorageError: return Code::StorageError;
+    }
+    return Code::None;
+  }
   if (command.op == Op::Time) {
     if (!validUnix(command.unixSeconds)) return Code::InvalidTime;
     return clock && clock->setUtc(command.unixSeconds) ? Code::Ok : Code::None;

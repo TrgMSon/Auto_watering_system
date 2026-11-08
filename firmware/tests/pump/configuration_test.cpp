@@ -1,3 +1,4 @@
+#include "mode_fixture.h"
 #include "Arduino.h"
 #include "../../esp32/irrigation.h"
 #include "../../esp32/pump_serial.h"
@@ -29,7 +30,7 @@ int main() {
     0x43,0x46,0x47,0x34,0x01,0,0,0,0,0,0xc8,0x41,0,0,0x96,0x42,
     0,0,0xc8,0x41,0,0,0x20,0x40,0,0,0x40,0x41,0x5d,0x16,0x53,0x57};
   Fake migration; migration.data.assign(legacy, legacy + sizeof(legacy));
-  irrigation::System migrated; migrated.begin(&migration);
+  test_mode::FreshSystem migrated; migrated.begin(&migration);
   auto old = migrated.configurationStatus().active();
   assert(old.soilStart == 25 && old.soilStop == 75 && old.waterMin == 25 &&
       old.fullCm == 2.5f && old.emptyCm == 12 && old.maxRunSeconds == 120);
@@ -120,7 +121,7 @@ int main() {
       migrated.status().decision.wateringAttempts == locked.wateringAttempts);
   migrated.service();
   assert(migrated.status().decision.reason == watering::Reason::RetryLimit);
-  Fake store; irrigation::System s; s.begin(&store);
+  Fake store; test_mode::FreshSystem s; s.begin(&store);
   assert(configuration::valid(configuration::Config{}));
   assert(!s.configurationStatus().persisted() && store.saves == 0);
   assert(s.status().mode == irrigation::Mode::Manual && outputLevel == LOW);
@@ -138,7 +139,7 @@ int main() {
     assert(s.command(good) == Result::ConfigSaved);
   assert(store.saves == 5);
   assert(s.command("SET EMPTY_CM 12") == Result::ConfigUnchanged && store.saves == 5);
-  irrigation::System reboot; reboot.begin(&store);
+  test_mode::FreshSystem reboot; reboot.begin(&store);
   assert(reboot.configurationStatus().active().soilStart == 35);
   assert(reboot.configurationStatus().persisted() && outputLevel == LOW);
   store.fail = true;

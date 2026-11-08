@@ -1,3 +1,4 @@
+#include "pump/mode_fixture.h"
 #include "pump/Arduino.h"
 #include "../esp32/ble_auth.h"
 #include "../esp32/ble_dispatch.h"
@@ -170,7 +171,7 @@ int main() {
   assert(invalidOff.claim(slot) && slot.command.op == Op::On); // Unauthenticated OFF cannot cancel ON.
 
   pump::testGuardEnable(true);
-  irrigation::System system; system.begin(); system.update(sample());
+  test_mode::FreshSystem system; system.begin(); system.update(sample());
   assert(execute(system, on(6)) == Code::OutOfRange && outputLevel == LOW);
   assert(execute(system, on(121)) == Code::OutOfRange && outputLevel == LOW);
   assert(execute(system, on()) == Code::Ok && outputLevel == HIGH);

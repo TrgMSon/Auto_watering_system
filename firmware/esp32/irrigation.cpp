@@ -27,6 +27,16 @@ void System::loadConfiguration(configuration::Storage& storage) {
   snapshot();
 }
 configuration::Result System::updateConfiguration(const configuration::Config& candidate) {
+  // A pending restored AUTO is not a manual configuration session. Explicit
+  // MANUAL (or the MQTT safe intermediate) must cancel it before a SET/save.
+  if (status_.pendingBootAuto) return configuration::Result::Busy;
+  if (status_.mode != Mode::Manual || status_.pumpOn || pump::isOn() ||
+      controller_.state() == watering::State::Watering) return configuration::Result::Busy;
+  if (!configuration::valid(candidate)) return configuration::Result::Invalid;
+  // Serial SET/RESET_CONFIG and typed owner callers need the same safe baseline
+  // after an earlier OFF persistence failure, not just MQTT CONFIG.
+  if ((!modes_.confirmed() || modes_.automatic()) && !changeDesiredMode(Mode::Manual))
+    return configuration::Result::StorageFailed;
   const auto result = settings_.update(candidate, status_.mode == Mode::Manual,
       !status_.pumpOn && !pump::isOn() && controller_.state() != watering::State::Watering);
   if (result == configuration::Result::Saved || result == configuration::Result::Unchanged) {
@@ -40,16 +50,79 @@ configuration::Result System::updateConfiguration(const configuration::Config& c
   }
   return result;
 }
-void System::begin(configuration::Storage* storage) {
+RemoteConfigResult System::applyRemoteConfiguration(const configuration::Config& candidate, bool automatic) {
+  // Owner only. Validate before any mutation, including a temporary mode change.
+  if (!configuration::valid(candidate)) return RemoteConfigResult::Invalid;
+  if (status_.pumpOn || pump::isOn() || controller_.state() == watering::State::Watering)
+    return RemoteConfigResult::PumpRunning;
+  // Identical persisted config + mode needs no intermediate flash write.
+  const bool unchanged = settings_.persistedSchema() == 2 &&
+      configuration::equal(candidate, settings_.active());
+  if (unchanged && modes_.confirmed() && modes_.automatic() == automatic) {
+    // A boot-pending AUTO still requires a fresh acquisition, even for a no-op.
+    service();
+    return RemoteConfigResult::Ok;
+  }
+  // Confirm a safe persisted intermediate before touching the config key.
+  // No reset: cooldown, locks and attempts remain intact.
+  if (!changeDesiredMode(Mode::Manual)) return RemoteConfigResult::StorageError;
+  const bool calibrationConfirmed = config_.calibrationConfirmed;
+  const auto saved = updateConfiguration(candidate);
+  if (saved != configuration::Result::Saved && saved != configuration::Result::Unchanged) {
+    // Partial failure intentionally stays MANUAL/OFF; never restore old AUTO.
+    return RemoteConfigResult::StorageError;
+  }
+  // Remote settings do not confirm a calibration; retain the owner's evidence.
+  config_.calibrationConfirmed = calibrationConfirmed;
+  controller_.configure(config_);
+  if (automatic && !changeDesiredMode(Mode::Auto)) return RemoteConfigResult::StorageError;
+  service();  // AUTO may start only through the existing controller and guard.
+  return RemoteConfigResult::Ok;
+}
+bool System::changeDesiredMode(Mode requested) {
+  // Owner only. OFF and boot-pending cancellation always precede blocking NVS.
+  const bool confirmedAuto = modes_.confirmed() && modes_.automatic();
+  if (requested == Mode::Manual || status_.mode != Mode::Auto || !confirmedAuto) {
+    status_.mode = Mode::Manual;
+    status_.pendingBootAuto = false;
+    stop(watering::Reason::ManualStop);
+  }
+  status_.desiredMode = requested;
+  const bool confirmed = modes_.save(requested == Mode::Auto);
+  status_.modePersisted = confirmed;
+  status_.modeStorageError = !confirmed;
+  if (!confirmed) {
+    // A write may have reached flash, but runtime must not re-enter AUTO.
+    status_.mode = Mode::Manual; status_.pendingBootAuto = false;
+    return false;
+  }
+  status_.mode = requested;
+  status_.pendingBootAuto = false;
+  return true;
+}
+void System::begin(configuration::Storage* storage, desired_mode::Storage* modes) {
   pump::begin(qualification_);
+  bootMs_ = millis();
   controller_ = watering::Controller(config_);
   reading_ = sensors::Reading{};
-  status_ = Status{};  // No mode persistence: every boot MANUAL/OFF.
+  status_ = Status{};  // Applied MANUAL/OFF until a boot-local safe acquisition.
+  settings_.load(nullptr);  // Do not retain a previous begin() storage pointer.
   if (storage) loadConfiguration(*storage);
+  modes_.load(modes);
+  status_.modePersisted = modes_.confirmed();
+  status_.desiredMode = modes_.automatic() ? Mode::Auto : Mode::Manual;
+  status_.pendingBootAuto = modes_.automatic();
   service();
 }
 void System::update(const sensors::Reading& reading) {
   reading_ = reading;
+  // update() is called only for a new sensors::poll acquisition in production.
+  // Reject old timestamps as well as stale/invalid/low-water/calibration data.
+  if (status_.pendingBootAuto && int32_t(reading.sampledAtMs - bootMs_) >= 0 &&
+      controller_.safety(reading_, millis()).reason == watering::Reason::Idle) {
+    status_.pendingBootAuto = false;
+    status_.mode = Mode::Auto;
+  }
   service();
 }
 void System::snapshot() {
@@ -136,35 +209,32 @@ Result System::command(const char* text) {
     if (controller_.state() == watering::State::Watering) return Result::AlreadyOn;
     if (controller_.state() == watering::State::Cooldown) return Result::Cooldown;
     if (controller_.safety(reading_, millis()).reason != watering::Reason::Idle) return Result::Unsafe;
-    status_.mode = Mode::Manual;
-    pump::command("OFF");
+    const bool persisted = changeDesiredMode(Mode::Manual);
     controller_.reset();
     status_.decision = controller_.safety(reading_, millis());
     status_.decision.reason = watering::Reason::Reset;
     snapshot();
-    return Result::Accepted;
+    return persisted ? Result::Accepted : Result::ModeStorageFailed;
   }
   // Emergency commands bypass service/start and never wait for a new acquisition.
   if (text && (strcmp(text, "OFF") == 0 || strcmp(text, "MANUAL") == 0)) {
     return stopManual();
   }
-  service();
-  if (!text) return Result::Invalid;
-  if (strcmp(text, "STATUS") == 0) return Result::Accepted;
-  if (strcmp(text, "AUTO") == 0) {
-    if (status_.mode != Mode::Auto) {
-      // Mode changes cannot transfer an active manual run into AUTO.
-      if (status_.pumpOn) stop(watering::Reason::ManualStop);
-      status_.mode = Mode::Auto;
-    }
+  if (text && strcmp(text, "AUTO") == 0) {
+    // Persist before service can start a new AUTO run; no NVS after GPIO ON.
+    if (!changeDesiredMode(Mode::Auto)) return Result::ModeStorageFailed;
     service();
     return Result::Accepted;
   }
+  service();
+  if (!text) return Result::Invalid;
+  if (strcmp(text, "STATUS") == 0) return Result::Accepted;
   return Result::Invalid;
 }
 Result System::stopManual() {
-  status_.mode = Mode::Manual;
-  stop(watering::Reason::ManualStop);
+  changeDesiredMode(Mode::Manual);
+  // GPIO OFF succeeded even if desired-mode persistence is unconfirmed. The
+  // public diagnostic carries that distinction without changing BLE codes.
   return Result::Accepted;
 }
 Result System::startManual(uint32_t durationSeconds) {
@@ -187,9 +257,22 @@ Result System::startManual(uint32_t durationSeconds) {
   service();
   return status_.pumpOn ? Result::Accepted : Result::Unsafe;
 }
+telemetry_snapshot::Snapshot System::telemetrySnapshot(uint32_t now) const {
+  telemetry_snapshot::Snapshot snapshot;
+  snapshot.reading = reading_;
+  // Reuse exactly the active controller's calibration and conversion, including
+  // invalid/unconfirmed handling. LOW_WATER is not an invalid sensor reading.
+  const auto decision = controller_.safety(reading_, now);
+  snapshot.waterPercent = decision.waterPercent;
+  snapshot.waterValid = decision.waterValid;
+  snapshot.actuatorOn = pump::isOn();
+  snapshot.publishedAtMs = now;
+  return snapshot;
+}
 const char* name(Mode mode) { return mode == Mode::Auto ? "AUTO" : "MANUAL"; }
 const char* name(Result result) {
   switch (result) {
+    case Result::ModeStorageFailed: return "MODE_SAVE_FAILED_RUNTIME_MANUAL_OFF";
     case Result::GuardUnavailable: return "GUARD_UNAVAILABLE";
     case Result::InvalidDuration: return "INVALID_DURATION";
     case Result::ExceedsConfiguredMaximum: return "EXCEEDS_CONFIGURED_MAXIMUM";

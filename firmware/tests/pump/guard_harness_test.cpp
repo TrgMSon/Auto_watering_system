@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "mode_fixture.h"
 #include "../../esp32/guard_test_harness.h"
 #include <iostream>
 uint32_t fakeNow = 0;
@@ -12,7 +13,7 @@ int main() {
   pump::testGuardEnable(true);
   for (bool wrap : {false, true}) {
     fakeNow = wrap ? UINT32_MAX - 100 : 0;
-    irrigation::System s; s.begin(); guard_test::Harness h;
+    test_mode::FreshSystem s; s.begin(); guard_test::Harness h;
     assert(h.start(s) == irrigation::Result::Invalid);
     assert(h.activate(s));
     assert(h.start(s) == irrigation::Result::Unsafe && !h.starving());

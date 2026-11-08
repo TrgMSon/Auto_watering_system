@@ -1,3 +1,4 @@
+#include "mode_fixture.h"
 #include "Arduino.h"
 #include "../../esp32/irrigation.h"
 #include <iostream>
@@ -21,14 +22,14 @@ sensors::Reading sample() {
   return r;  // DHT invalid must remain monitoring-only.
 }
 int main() {
-  irrigation::System production; production.begin(); production.update(sample());
+  test_mode::FreshSystem production; production.begin(); production.update(sample());
   assert(pump::QualificationPolicy{}.ceilingSeconds() == 5);
   assert(production.startManual(6) == Result::QualificationLimit);
   assert(pump::start(6) == pump::Result::QualificationLimit); // Independent actuator gate.
   for (uint32_t invalid : {0u, 601u, UINT32_MAX})
     assert(production.startManual(invalid) == Result::InvalidDuration);
   Store store;
-  irrigation::System s(irrigation::confirmedConfig(), pump::QualificationPolicy::forTests(600));
+  test_mode::FreshSystem s(irrigation::confirmedConfig(), pump::QualificationPolicy::forTests(600));
   s.begin(&store); s.update(sample());
   assert(s.startManual(121) == Result::ExceedsConfiguredMaximum);
   auto config = s.configurationStatus().active(); config.maxRunSeconds = 600;

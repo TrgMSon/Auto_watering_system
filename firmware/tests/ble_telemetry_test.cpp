@@ -1,9 +1,15 @@
 ﻿#include "../esp32/ble_telemetry.h"
 #include <cassert>
+#include "telemetry_water_fixture.h"
 #include <iostream>
 #include <limits>
 #include <string>
 using namespace ble_telemetry;
+// Legacy fixtures have no confirmed water conversion; retain their null checks.
+Packet serialize(const sensors::Reading& reading,bool pump,uint32_t now){
+  Snapshot snapshot;snapshot.reading=reading;snapshot.actuatorOn=pump;
+  return ble_telemetry::serialize(snapshot,now);
+}
 sensors::Reading reading(uint32_t now) {
   sensors::Reading r; r.sampledAtMs = now;
   r.soilValid = r.dhtValid = r.distanceValid = true;
@@ -11,6 +17,7 @@ sensors::Reading reading(uint32_t now) {
   r.distanceCm = 25.4f; return r;
 }
 int main() {
+  water_test::verify();
   auto r = reading(100);
   auto p = serialize(r, false, 100);
   assert(std::string(p.bytes) == "{\"soil\":42.5,\"temp\":31.8,\"hum\":68.0,\"water\":null,\"pump\":0}");

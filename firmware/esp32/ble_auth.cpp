@@ -59,7 +59,7 @@ class Parser {
   const char* p_; const char* end_;
 };
 }
-const char* name(Op op) { return op == Op::On ? "PUMP_ON" : op == Op::Off ? "PUMP_OFF" : op == Op::Time ? "TIME" : nullptr; }
+const char* name(Op op) { return op == Op::On ? "PUMP_ON" : op == Op::Off ? "PUMP_OFF" : op == Op::Time ? "TIME" : op == Op::Config ? "CONFIG" : nullptr; }
 const char* name(Code code) {
   switch (code) {
     case Code::Ok: return "OK"; case Code::BadSig: return "BAD_SIG";
@@ -67,6 +67,7 @@ const char* name(Code code) {
     case Code::OutOfRange: return "OUT_OF_RANGE"; case Code::LowWater: return "LOW_WATER";
     case Code::Maintenance: return "MAINTENANCE"; case Code::SensorError: return "SENSOR_ERROR";
     case Code::PumpBusy: return "PUMP_BUSY"; case Code::InvalidTime: return "INVALID_TIME";
+    case Code::StorageError: return "STORAGE_ERROR";
     case Code::WifiOk: return "WIFI_OK"; case Code::WifiFail: return "WIFI_FAIL";
     default: return nullptr;
   }
@@ -114,6 +115,7 @@ Code parse(const char* bytes, size_t size, Command& command, Op endpoint) {
 }
 Code validateConfig(const ConfigRequest& r) {
   return r.minPercentTenths < r.maxPercentTenths && r.maxPercentTenths <= 1000 &&
+      r.minWaterPercentTenths >= 200 && r.minWaterPercentTenths <= 1000 &&
       r.autoMode <= 1 && r.maxDurationSeconds >= 60 && r.maxDurationSeconds <= 600 ?
       Code::Ok : Code::OutOfRange;
 }
@@ -143,7 +145,7 @@ Code parseConfig(const char* bytes, size_t size, ConfigRequest& request) {
       if (!badSig) memcpy(r.signature, signature, 17);
     } else {
       uint32_t* value = bit == 1 ? &r.minPercentTenths : bit == 2 ? &r.maxPercentTenths :
-          bit == 4 ? &r.autoMode : bit == 8 ? &r.maxDurationSeconds : &r.minWaterCmTenths;
+          bit == 4 ? &r.autoMode : bit == 8 ? &r.maxDurationSeconds : &r.minWaterPercentTenths;
       if (!(bit == 4 || bit == 8 ? p.integer(*value, range) : p.tenths(*value, range))) return Code::BadJson;
     }
     if (p.take('}')) {
@@ -167,7 +169,7 @@ size_t configCanonical(const char* nonce, const ConfigRequest& r, char* out, siz
       static_cast<unsigned long>(r.minPercentTenths/10), static_cast<unsigned long>(r.minPercentTenths%10),
       static_cast<unsigned long>(r.maxPercentTenths/10), static_cast<unsigned long>(r.maxPercentTenths%10),
       static_cast<unsigned long>(r.autoMode), static_cast<unsigned long>(r.maxDurationSeconds),
-      static_cast<unsigned long>(r.minWaterCmTenths/10), static_cast<unsigned long>(r.minWaterCmTenths%10));
+      static_cast<unsigned long>(r.minWaterPercentTenths/10), static_cast<unsigned long>(r.minWaterPercentTenths%10));
   if (n <= 0 || size_t(n) >= capacity) { out[0] = 0; return 0; }
   return size_t(n);
 }
