@@ -46,6 +46,15 @@ class DeviceConfigModel {
     );
   }
 
+  /// Đưa giá trị cũ về khoảng backend và firmware nhận, để lưu không bị lỗi 400.
+  /// Thời gian lớn hơn 10 là dữ liệu cũ lưu theo giây (ví dụ 120), nên quy về phút.
+  static int normalizeDurationMinutes(int value) {
+    final minutes = value > 10 ? (value / 60).round() : value;
+    return minutes.clamp(1, 10);
+  }
+
+  static int normalizeWaterLevelMin(int value) => value.clamp(20, 100);
+
   Map<String, dynamic> toJson() {
     return {
       'auto_mode': autoMode,
@@ -55,8 +64,8 @@ class DeviceConfigModel {
       'air_humidity_max': airHumidityMax,
       'air_temperature_min': temperatureMin,
       'air_temperature_max': temperatureMax,
-      'max_watering_duration': maxWateringDuration,
-      'water_level_min': waterLevelMin,
+      'max_watering_duration': normalizeDurationMinutes(maxWateringDuration),
+      'water_level_min': normalizeWaterLevelMin(waterLevelMin),
     };
   }
 

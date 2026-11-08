@@ -7,7 +7,7 @@ import 'package:watering_app/features/ble/domain/ble_command_service.dart';
 import 'package:watering_app/features/ble/domain/ble_protocol.dart';
 import 'package:watering_app/features/ble/domain/ble_transport.dart';
 
-/// ESP32 giả để chạy thử luồng BLE, làm theo firmware nhánh `firmware/esp32` (07/11).
+/// ESP32 giả để chạy thử luồng BLE, làm theo firmware nhánh `main` (08/11).
 /// Cố ý tự kiểm tra chữ ký bằng code riêng, để lỗi ở phía app không bị che khuất.
 class FakeEsp32 implements BleTransport {
   FakeEsp32({
@@ -45,8 +45,10 @@ class FakeEsp32 implements BleTransport {
   int maxRunSeconds = 120;
   double minWaterPercent = 20;
 
-  /// Mực nước nội bộ theo % bồn; gói `0001` vẫn gửi `water` là null như firmware.
+  /// Mực nước theo % bồn, gửi trong trường `water` của `0001`.
   double? waterPercent = 60;
+  double soilMin = 30;
+  double soilMax = 70;
   bool isSoilValid = true;
 
   /// Điện thoại đã ghép nối và liên kết đã mã hóa; bắt buộc với `0006`.
@@ -88,8 +90,7 @@ class FakeEsp32 implements BleTransport {
       BleUuids.pump => _handlePump(value),
       BleUuids.time => ('TIME', _handleTime(value)),
       BleUuids.wifi => ('WIFI', _handleWifi(value)),
-      // Firmware hiện tắt quyền ghi trên `0003`.
-      BleUuids.config => throw const BleWriteRejectedException('Firmware chưa mở 0003'),
+      BleUuids.config => ('CONFIG', _handleConfig(value)),
       _ => throw UnsupportedError('Không ghi được $characteristicUuid'),
     };
     // Firmware trả lỗi ATT khi kết quả không có mã trong hợp đồng.
@@ -123,7 +124,7 @@ class FakeEsp32 implements BleTransport {
         'soil': isSoilValid ? 42.5 : null,
         'temp': 31.8,
         'hum': 68.0,
-        'water': null,
+        'water': waterPercent,
         'pump': isPumpOn ? 1 : 0,
       }));
 
@@ -155,6 +156,38 @@ class FakeEsp32 implements BleTransport {
     if (water < minWaterPercent) return (cmd, 'LOW_WATER');
     isPumpOn = true;
     return (cmd, 'OK');
+  }
+
+  /// Theo `ble_commands::execute` với lệnh CONFIG trong firmware.
+  String _handleConfig(List<int> value) {
+    final json = _decode(value);
+    final min = json?['min'];
+    final max = json?['max'];
+    final auto = json?['auto'];
+    final maxDur = json?['max_dur'];
+    final minWater = json?['min_water'];
+    final sig = json?['sig'];
+    if (min is! double || max is! double || auto is! int || maxDur is! int) return 'BAD_JSON';
+    if (minWater is! double || sig is! String) return 'BAD_JSON';
+
+    final authError = _authenticate(
+      sig,
+      (nonce) => '$nonce|CONFIG|${min.toStringAsFixed(1)}|${max.toStringAsFixed(1)}'
+          '|$auto|$maxDur|${minWater.toStringAsFixed(1)}',
+    );
+    if (authError != null) return authError;
+
+    final isValid = min >= 0 && min < max && max <= 100 && (auto == 0 || auto == 1) &&
+        maxDur >= 60 && maxDur <= 600 && minWater >= 20 && minWater <= 100;
+    if (!isValid) return 'OUT_OF_RANGE';
+    if (isPumpOn) return 'PUMP_BUSY';
+
+    soilMin = min;
+    soilMax = max;
+    isAutoMode = auto == 1;
+    maxRunSeconds = maxDur;
+    minWaterPercent = minWater;
+    return 'OK';
   }
 
   String _handleTime(List<int> value) {

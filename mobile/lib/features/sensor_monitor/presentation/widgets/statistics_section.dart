@@ -79,7 +79,7 @@ class StatisticsSection extends StatelessWidget {
         _buildChart(state.points, 'Độ ẩm đất', '%', AppColors.moisture, (p) => p.soilMoisture),
         _buildChart(state.points, 'Nhiệt độ', '°C', AppColors.temperature, (p) => p.temperature),
         _buildChart(state.points, 'Độ ẩm không khí', '%', AppColors.humidity, (p) => p.humidity),
-        _buildChart(state.points, 'Mực nước', 'cm', AppColors.waterLevel, (p) => p.waterLevel),
+        _buildChart(state.points, 'Mực nước', '%', AppColors.waterLevel, (p) => p.waterLevel),
       ],
     );
   }

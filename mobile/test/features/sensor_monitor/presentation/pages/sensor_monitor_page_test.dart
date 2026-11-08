@@ -161,8 +161,8 @@ void main() {
 
       expect(find.text('Độ ẩm đất (%)'), findsOneWidget);
       expect(find.text('Nhiệt độ (°C)'), findsNothing);
-      await tester.scrollUntilVisible(find.text('Mực nước (cm)'), 100);
-      expect(find.text('Mực nước (cm)'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Mực nước (%)'), 100);
+      expect(find.text('Mực nước (%)'), findsOneWidget);
     });
 
     testWidgets('shows an empty message when the range has no statistics', (tester) async {

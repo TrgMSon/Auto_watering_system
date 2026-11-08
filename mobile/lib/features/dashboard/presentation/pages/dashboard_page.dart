@@ -10,6 +10,9 @@ import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
 import '../../data/models/device_model.dart';
+import '../../data/models/telemetry_model.dart';
+import '../../../ble/domain/ble_messages.dart';
+import '../../../ble/presentation/bloc/ble_session_cubit.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -72,9 +75,18 @@ class _DashboardPageState extends State<DashboardPage> {
           }
           
           final selectedDevice = state.selectedDevice ?? state.devices.first;
-          final telemetry = state.telemetry;
-          final pumpStatus = state.pumpStatus ?? telemetry?.isPumpOn;
           final isOnline = selectedDevice.isOnline;
+          final ble = context.watch<BleSessionCubit>().state;
+          final isBleConnected = ble.isConnectedTo(selectedDevice.id);
+          // Quy ước nhóm: thiết bị online thì điều khiển qua server, offline thì qua BLE.
+          final useBle = isBleConnected && !isOnline;
+          final bleSample = useBle ? ble.sample : null;
+          final telemetry = bleSample != null
+              ? _telemetryFromBle(selectedDevice.id, bleSample)
+              : (useBle ? null : state.telemetry);
+          final pumpStatus = useBle ? bleSample?.isPumpOn : (state.pumpStatus ?? telemetry?.isPumpOn);
+          final isTogglingPump = useBle ? ble.isSending : state.isTogglingPump;
+          final canControl = isOnline || isBleConnected;
           // Firmware chỉ nhận lệnh bật tay ở chế độ thủ công; lệnh tắt luôn được nhận.
           final blocksManualOn = state.isAutoMode == true && pumpStatus != true;
 
@@ -108,15 +120,16 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               actions: [
+                _BleConnectButton(deviceId: selectedDevice.id, ble: ble),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: const EdgeInsets.only(right: 16.0),
                   child: Row(
                     children: [
                       Icon(
-                        state.isBleConnected
+                        isBleConnected
                             ? Icons.bluetooth_connected
                             : (isOnline ? Icons.wifi : Icons.wifi_off),
-                        color: state.isBleConnected
+                        color: isBleConnected
                             ? Colors.blueAccent
                             : (isOnline ? Colors.greenAccent : Colors.grey),
                         size: 20,
@@ -180,7 +193,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      if (!isOnline)
+                                      if (!canControl)
                                         Text(
                                           'Thiết bị đang offline',
                                           maxLines: 1,
@@ -189,7 +202,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                             color: AppColors.textSecondary,
                                           ),
                                         )
-                                      else if (state.isTogglingPump)
+                                      else if (isTogglingPump)
                                         Text(
                                           'Đang chờ thiết bị xác nhận...',
                                           maxLines: 1,
@@ -198,7 +211,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                             color: AppColors.textSecondary,
                                           ),
                                         )
-                                      else if (pumpStatus == true && state.pumpOffAt != null)
+                                      else if (!useBle && pumpStatus == true && state.pumpOffAt != null)
                                         PumpCountdownText(pumpOffAt: state.pumpOffAt!)
                                       else if (blocksManualOn)
                                         Text(
@@ -231,7 +244,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          state.isTogglingPump
+                          isTogglingPump
                               ? const SizedBox(
                                   width: 48,
                                   height: 48,
@@ -242,10 +255,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                 )
                               : Switch(
                                   value: pumpStatus ?? false,
-                                  onChanged: isOnline && !blocksManualOn
-                                      ? (value) => context
-                                          .read<DashboardBloc>()
-                                          .add(DashboardPumpToggled(value))
+                                  onChanged: canControl && !blocksManualOn
+                                      ? (value) => useBle
+                                          ? _togglePumpViaBle(context, value)
+                                          : context
+                                              .read<DashboardBloc>()
+                                              .add(DashboardPumpToggled(value))
                                       : null,
                                 ),
                         ],
@@ -267,7 +282,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                   const SizedBox(height: 16),
                   
-                  if (state.isTelemetryEmpty)
+                  if (!useBle && state.isTelemetryEmpty)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(32.0),
@@ -324,6 +339,61 @@ class _DashboardPageState extends State<DashboardPage> {
         return const SizedBox.shrink();
       },
     );
+  }
+}
+
+Future<void> _togglePumpViaBle(BuildContext context, bool turnOn) async {
+  final error = await context.read<BleSessionCubit>().setPump(turnOn);
+  if (error == null || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(error), backgroundColor: Theme.of(context).colorScheme.error),
+  );
+}
+
+TelemetryModel _telemetryFromBle(String deviceId, BleSensorSample sample) => TelemetryModel(
+      deviceId: deviceId,
+      soilMoisture: sample.soilMoisture,
+      temperature: sample.temperature,
+      humidity: sample.humidity,
+      waterLevel: sample.waterLevelPercent,
+      isPumpOn: sample.isPumpOn,
+      recordedAt: DateTime.now(),
+    );
+
+/// Nút kết nối hoặc ngắt Bluetooth với thiết bị đang chọn.
+class _BleConnectButton extends StatelessWidget {
+  const _BleConnectButton({required this.deviceId, required this.ble});
+
+  final String deviceId;
+  final BleSessionState ble;
+
+  @override
+  Widget build(BuildContext context) {
+    final isConnecting = ble.status == BleSessionStatus.connecting && ble.deviceId == deviceId;
+    if (isConnecting) {
+      return const Padding(
+        padding: EdgeInsets.all(14),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+        ),
+      );
+    }
+    final isConnected = ble.isConnectedTo(deviceId);
+    return IconButton(
+      tooltip: isConnected ? 'Ngắt Bluetooth' : 'Kết nối Bluetooth',
+      icon: Icon(isConnected ? Icons.bluetooth_connected : Icons.bluetooth),
+      onPressed: () => isConnected ? context.read<BleSessionCubit>().disconnect() : _connect(context),
+    );
+  }
+
+  Future<void> _connect(BuildContext context) async {
+    final cubit = context.read<BleSessionCubit>();
+    await cubit.connect(deviceId);
+    final error = cubit.state.errorMessage;
+    if (error == null || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 }
 

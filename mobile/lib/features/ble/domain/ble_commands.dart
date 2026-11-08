@@ -65,8 +65,8 @@ class BlePumpOffCommand extends BleCommand {
   Map<String, Object> payloadFields() => {'cmd': 'PUMP_OFF', 'dur': 0};
 }
 
-/// Firmware hiện tắt `0003` (ghi bị từ chối) và lưu ngưỡng nước theo % chứ không theo cm,
-/// nên chưa dùng lệnh này cho đến khi nhóm chốt lại cấu hình qua BLE.
+/// Cấu hình qua `0003`. Firmware trả `PUMP_BUSY` khi bơm đang chạy và
+/// `STORAGE_ERROR` khi không lưu được vào bộ nhớ.
 class BleConfigCommand extends BleCommand {
   /// Làm tròn trước khi kiểm tra để chữ ký và JSON luôn dùng cùng một giá trị một chữ số thập phân.
   BleConfigCommand({
@@ -74,18 +74,18 @@ class BleConfigCommand extends BleCommand {
     required double soilMax,
     required this.autoMode,
     required this.maxDurationSeconds,
-    required double minWaterCm,
+    required double minWaterPercent,
   })  : soilMin = _oneDecimal(soilMin),
         soilMax = _oneDecimal(soilMax),
-        minWaterCm = _oneDecimal(minWaterCm) {
+        minWaterPercent = _oneDecimal(minWaterPercent) {
     if (this.soilMin < 0 || this.soilMin >= this.soilMax || this.soilMax > 100) {
       throw ArgumentError('Cần 0 <= min < max <= 100');
     }
     if (maxDurationSeconds < minDurationLimit || maxDurationSeconds > maxDurationLimit) {
       throw ArgumentError.value(maxDurationSeconds, 'maxDurationSeconds', 'Phải từ 60 đến 600 giây');
     }
-    if (this.minWaterCm < 0) {
-      throw ArgumentError.value(minWaterCm, 'minWaterCm', 'Không được âm');
+    if (this.minWaterPercent < minWaterLowest || this.minWaterPercent > 100) {
+      throw ArgumentError.value(minWaterPercent, 'minWaterPercent', 'Phải từ 20 đến 100%');
     }
   }
 
@@ -95,17 +95,20 @@ class BleConfigCommand extends BleCommand {
         soilMax: config.soilMoistureMax,
         autoMode: config.autoMode,
         maxDurationSeconds: config.maxWateringDurationSeconds,
-        minWaterCm: config.waterLevelMin.toDouble(),
+        minWaterPercent: config.waterLevelMin.toDouble(),
       );
 
   static const int minDurationLimit = 60;
   static const int maxDurationLimit = 600;
+  static const double minWaterLowest = 20;
 
   final double soilMin;
   final double soilMax;
   final bool autoMode;
   final int maxDurationSeconds;
-  final double minWaterCm;
+
+  /// Ngưỡng mực nước thấp theo % bồn, giống cách firmware tính.
+  final double minWaterPercent;
 
   int get _autoFlag => autoMode ? 1 : 0;
 
@@ -123,7 +126,7 @@ class BleConfigCommand extends BleCommand {
         soilMax.toStringAsFixed(1),
         _autoFlag,
         maxDurationSeconds,
-        minWaterCm.toStringAsFixed(1),
+        minWaterPercent.toStringAsFixed(1),
       ].join('|');
 
   @override
@@ -132,7 +135,7 @@ class BleConfigCommand extends BleCommand {
         'max': soilMax,
         'auto': _autoFlag,
         'max_dur': maxDurationSeconds,
-        'min_water': minWaterCm,
+        'min_water': minWaterPercent,
       };
 
   static double _oneDecimal(double value) => double.parse(value.toStringAsFixed(1));

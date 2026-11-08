@@ -8,6 +8,7 @@ import '../features/auth/presentation/bloc/auth_state.dart';
 import '../features/automation/presentation/bloc/automation_bloc.dart';
 import '../features/automation/presentation/bloc/automation_event.dart';
 import '../features/automation/presentation/bloc/automation_state.dart';
+import '../features/ble/presentation/bloc/ble_session_cubit.dart';
 import '../features/dashboard/presentation/bloc/dashboard_bloc.dart';
 import '../features/dashboard/presentation/bloc/dashboard_event.dart';
 import '../features/device_management/presentation/bloc/device_bloc.dart';
@@ -38,6 +39,7 @@ class WateringApp extends StatelessWidget {
         BlocProvider(create: (_) => getIt<StatisticsBloc>()),
         BlocProvider(create: (_) => getIt<DeviceBloc>()),
         BlocProvider(create: (_) => getIt<AutomationBloc>()),
+        BlocProvider(create: (_) => getIt<BleSessionCubit>()),
       ],
       child: MaterialApp.router(
         title: 'Smart Watering',
@@ -74,6 +76,7 @@ class WateringApp extends StatelessWidget {
                     .read<AutomationBloc>()
                     .add(const AutomationResetRequested());
                 context.read<DeviceBloc>().add(const DeviceResetRequested());
+                context.read<BleSessionCubit>().disconnect();
                 appRouter.go(RouteNames.login);
               }
             },
