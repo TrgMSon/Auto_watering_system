@@ -1,5 +1,5 @@
 #pragma once
-#include "sensors.h"
+#include "telemetry_snapshot.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,11 +16,7 @@ constexpr uint32_t kPublicationMaxAgeMs = 250;
 struct Packet { char bytes[kCapacity] = {}; uint16_t size = 0; };
 // Internal mailbox data, never sent on the wire. Retain acquisition time so
 // freshness does not depend on the owner continuing to publish.
-struct Snapshot {
-  sensors::Reading reading;
-  bool actuatorOn = false;
-  uint32_t publishedAtMs = 0;
-};
+using Snapshot = telemetry_snapshot::Snapshot;
 inline void number(char (&out)[16], float value, bool valid, float low, float high) {
   if (!valid || !isfinite(value) || value < low || value > high) {
     memcpy(out, "null", 5);
@@ -28,25 +24,26 @@ inline void number(char (&out)[16], float value, bool valid, float low, float hi
     snprintf(out, sizeof(out), "%.1f", static_cast<double>(value));
   }
 }
-inline Packet serialize(const sensors::Reading& r, bool actuatorOn, uint32_t now) {
+inline Packet serialize(const Snapshot& snapshot, uint32_t now) {
+  const auto& r = snapshot.reading;
   const bool fresh = static_cast<uint32_t>(now - r.sampledAtMs) <= kFreshnessMs;
-  char soil[16], temp[16], hum[16];
+  char soil[16], temp[16], hum[16], water[16];
   number(soil, r.soilPercent, fresh && r.soilValid, 0, 100);
   number(temp, r.temperatureC, fresh && r.dhtValid, 0, 50);
   number(hum, r.humidityPercent, fresh && r.dhtValid, 0, 100);
+  number(water, snapshot.waterPercent, fresh && snapshot.waterValid && r.distanceValid, 0, 100);
   Packet p;
-  // No confirmed tank-bottom datum exists (F3 audit). Distance and water %
-  // must not be mislabeled as water-column cm. Unavailable height is null.
+  // Calibrated operational %, not water-column cm or actual tank volume %.
   const int n = snprintf(p.bytes, sizeof(p.bytes),
-      "{\"soil\":%s,\"temp\":%s,\"hum\":%s,\"water\":null,\"pump\":%u}",
-      soil, temp, hum, actuatorOn ? 1u : 0u);
+      "{\"soil\":%s,\"temp\":%s,\"hum\":%s,\"water\":%s,\"pump\":%u}",
+      soil, temp, hum, water, snapshot.actuatorOn ? 1u : 0u);
   if (n > 0 && static_cast<size_t>(n) < sizeof(p.bytes)) p.size = static_cast<uint16_t>(n);
   else p.bytes[0] = 0;  // Never publish truncated JSON.
   return p;
 }
 inline Packet serve(const Snapshot& snapshot, uint32_t now) {
   if (static_cast<uint32_t>(now - snapshot.publishedAtMs) > kPublicationMaxAgeMs) return Packet{};
-  return serialize(snapshot.reading, snapshot.actuatorOn, now);
+  return serialize(snapshot, now);
 }
 inline bool identity(const uint8_t (&mac)[6], char (&id)[18], char (&name)[16]) {
   bool any = false, allFF = true;

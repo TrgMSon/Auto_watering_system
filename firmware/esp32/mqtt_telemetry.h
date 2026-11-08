@@ -1,10 +1,18 @@
 #pragma once
 #include "ble_telemetry.h"
 #include "ble_clock.h"
+#include "firmware_version.h"
 namespace plant_mqtt {
 constexpr uint32_t kCadenceMs=10000;
 constexpr char kOffline[]="{\"status\":\"OFFLINE\"}";
-constexpr char kActive[]="{\"status\":\"ACTIVE\"}";
+constexpr size_t kActiveCapacity = sizeof("{\"status\":\"ACTIVE\",\"firmware_version\":\"\"}") + sizeof(kFirmwareVersion) - 1;
+inline size_t activeStatus(char* out, size_t capacity) {
+  if (!out || !capacity) return 0;
+  const int n = snprintf(out, capacity,
+      "{\"status\":\"ACTIVE\",\"firmware_version\":\"%s\"}", kFirmwareVersion);
+  if (n <= 0 || size_t(n) >= capacity) { out[0] = 0; return 0; }
+  return size_t(n);
+}
 struct Config {
   char host[254]={},ca[4096]={},username[64]={},password[128]={};
   uint16_t port=0;
@@ -26,20 +34,22 @@ struct Topics {
     snprintf(status,sizeof(status),"iot/garden/%s/status",identity);return true;
   }
 };
-inline size_t telemetry(const Topics& topics,const sensors::Reading& reading,bool observed,
+inline size_t telemetry(const Topics& topics,const ::telemetry_snapshot::Snapshot& snapshot,bool observed,
     uint32_t now,char* out,size_t capacity){
   if(!out||!capacity)return 0;
   out[0]=0;if(!topics.identity[0])return 0;
+  const auto& reading=snapshot.reading;
   const bool fresh=observed&&uint32_t(now-reading.sampledAtMs)<=ble_telemetry::kFreshnessMs;
-  char soil[16],temp[16],hum[16];
+  char soil[16],temp[16],hum[16],water[16];
   ble_telemetry::number(soil,reading.soilPercent,fresh&&reading.soilValid,0,100);
   ble_telemetry::number(temp,reading.temperatureC,fresh&&reading.dhtValid,0,50);
   ble_telemetry::number(hum,reading.humidityPercent,fresh&&reading.dhtValid,0,100);
-  // Absolute water column unknown. recordedAt omitted: backend uses local server
+  ble_telemetry::number(water,snapshot.waterPercent,fresh&&snapshot.waterValid&&reading.distanceValid,0,100);
+  // Calibrated operational %, not absolute height/volume. recordedAt omitted: server
   // receipt time; its LocalDateTime DTO has no verified UTC offset contract.
   const int n=snprintf(out,capacity,
-      "{\"deviceId\":\"%s\",\"soilMoisture\":%s,\"temperature\":%s,\"humidity\":%s,\"waterLevel\":null}",
-      topics.identity,soil,temp,hum);
+      "{\"deviceId\":\"%s\",\"soilMoisture\":%s,\"temperature\":%s,\"humidity\":%s,\"waterLevel\":%s}",
+      topics.identity,soil,temp,hum,water);
   if(n<=0||size_t(n)>=capacity){out[0]=0;return 0;}return size_t(n);
 }
 // Small worker policy seam; no wire protocol implementation. Only the MQTT
@@ -51,13 +61,13 @@ struct Client {
   virtual bool connected()const=0;
   virtual bool failed()const=0;
   virtual bool status()=0;
-  virtual bool sample(const sensors::Reading&,bool,uint32_t)=0;
+  virtual bool sample(const ::telemetry_snapshot::Snapshot&,bool,uint32_t)=0;
 };
 enum class State { Unavailable, Offline, Connecting, Online, Backoff };
 class Runtime {
  public:
   explicit Runtime(uint32_t (*monotonic)()=nullptr):monotonic_(monotonic){}
-  void service(uint32_t now,bool ready,bool wifi,bool clock,const sensors::Reading& r,bool observed,Client& client){
+  void service(uint32_t now,bool ready,bool wifi,bool clock,const ::telemetry_snapshot::Snapshot& r,bool observed,Client& client){
     if(fault_)return;
     if(!ready||!clock||!wifi){
       if(running_){client.stop();running_=false;}

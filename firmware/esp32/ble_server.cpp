@@ -46,10 +46,10 @@ struct Event {
   uint8_t authMode = 0;
   uint64_t encryptedWriteGeneration = 0;
   uint32_t wifiPayloadTicket = 0;
-  char payload[ble_commands::kPayloadMax] = {};
+  char payload[ble_commands::kConfigPayloadMax] = {};
 };
 std::atomic<bool> eventOverflow{false};
-std::atomic<uint16_t> sensorCccdHandle{0}, resultsCccdHandle{0}, pumpHandle{0}, timeHandle{0},wifiHandle{0};
+std::atomic<uint16_t> sensorCccdHandle{0}, resultsCccdHandle{0}, pumpHandle{0}, configHandle{0}, timeHandle{0},wifiHandle{0};
 ble_pairing::State pairing;
 ble_pairing::EspSdk pairingSdk;
 ble_pairing::Binding securityBinding;
@@ -117,12 +117,12 @@ void prepareProfile() {
   for (unsigned i = 0; i < 7; ++i) {
     attribute(declarations[i], ESP_UUID_LEN_16, reinterpret_cast<uint8_t*>(&declarationUuid),
         ESP_GATT_PERM_READ, 1, 1, &properties[i], true);
-    // WIFI only uses encrypted WRITE (no ordinary WRITE bit); CONFIG stays disabled.
+    // WIFI only uses encrypted WRITE (no ordinary WRITE bit); CONFIG uses ordinary authenticated WRITE.
     const uint16_t permission = (i == 0 || i == 3) ? ESP_GATT_PERM_READ :
         ble_commands::encryptedWifiWrite(i + 1) ? ESP_GATT_PERM_WRITE_ENCRYPTED : ble_commands::authenticatedWrite(i + 1) ? ESP_GATT_PERM_WRITE : 0;
     attribute(values[i], ESP_UUID_LEN_128, uuids[i + 1], permission,
         // Let the worker see over-limit writes (up to stack's ATT limit), so
-        // rejecting them still consumes the nonce. Only 128 bytes are copied.
+        // rejecting them still consumes the nonce. Copy capacity is bounded by endpoint (128 pump/TIME, 192 CONFIG).
         (ble_commands::encryptedWifiWrite(i + 1) || ble_commands::authenticatedWrite(i + 1)) ? ESP_GATT_MAX_ATTR_LEN : i == 3 ? 16 : ble_telemetry::kCapacity, 0, empty, false);
   }
   for (unsigned index : {unsigned(SensorCccd), unsigned(ResultsCccd)})
@@ -213,7 +213,8 @@ void gattEvent(esp_gatts_cb_event_t kind, esp_gatt_if_t id, esp_ble_gatts_cb_par
       // Copy CCCD or bounded authenticated command bytes only; other endpoint data is discarded.
       if (e.length == 2 && (e.handle == sensorCccdHandle.load() || e.handle == resultsCccdHandle.load()))
         e.value = p->write.value[0] | (uint16_t(p->write.value[1]) << 8);
-      if ((e.handle == pumpHandle.load() || e.handle == timeHandle.load()) && !e.prepared && e.length <= ble_commands::kPayloadMax)
+      if ((e.handle == pumpHandle.load() || e.handle == timeHandle.load() || e.handle == configHandle.load()) && !e.prepared &&
+          e.length <= (e.handle == configHandle.load() ? ble_commands::kConfigPayloadMax : ble_commands::kPayloadMax))
         memcpy(e.payload, p->write.value, e.length);
       if(e.handle==wifiHandle.load()){
         // Exact-IDF source guarantees encrypted permission BEFORE this callback.
@@ -295,7 +296,7 @@ void process(const Event& e) {
       if (e.status != ESP_GATT_OK || e.length != Count) { ++failures; break; }
       memcpy(handles, e.table, sizeof(handles));
       sensorCccdHandle.store(handles[SensorCccd]); resultsCccdHandle.store(handles[ResultsCccd]);
-      pumpHandle.store(handles[Pump]); timeHandle.store(handles[Time]); wifiHandle.store(handles[Wifi]);
+      pumpHandle.store(handles[Pump]); configHandle.store(handles[Config]); timeHandle.store(handles[Time]); wifiHandle.store(handles[Wifi]);
       checked(esp_ble_gatts_start_service(handles[Service])); break;
     case Kind::Started: serviceReady = e.status == ESP_GATT_OK; if (!serviceReady) ++failures; break;
     case Kind::Connected:
@@ -389,15 +390,22 @@ void process(const Event& e) {
         // ACK the bounded handoff now, never wait up to 30 seconds for connection.
         response(e.connection,e.transaction,ESP_GATT_OK);break;
       }
-      if ((e.handle == handles[Pump] || e.handle == handles[Time]) && session.matches(e.connection)) {
+      if ((e.handle == handles[Pump] || e.handle == handles[Time] || e.handle == handles[Config]) && session.matches(e.connection)) {
         // Consume even when this WRITE cannot enter the authenticated path.
-        if (e.prepared || !e.response || e.offset || !e.length ||
-            e.length > ble_commands::kPayloadMax || e.length > session.mtu - 3) {
+        if (e.handle == handles[Config] ?
+            !ble_commands::configWriteFits(e.length, session.mtu, e.prepared, e.response, e.offset) :
+            (e.prepared || !e.response || e.offset || !e.length ||
+             e.length > ble_commands::kPayloadMax || e.length > session.mtu - 3)) {
           authentication.consume();
           if (e.response) response(e.connection, e.transaction, e.prepared ? ESP_GATT_REQ_NOT_SUPPORTED : ESP_GATT_INVALID_ATTR_LEN);
           break;
         }
-        const auto auth = authentication.authenticate(e.payload, e.length, millis(),
+        ble_commands::Authentication auth;
+        if (e.handle == handles[Config]) {
+          const auto config = authentication.authenticateConfig(e.payload, e.length, millis());
+          auth.command.op = ble_commands::Op::Config; auth.command.config = config.request;
+          auth.code = config.code; auth.missingKey = config.missingKey;
+        } else auth = authentication.authenticate(e.payload, e.length, millis(),
             e.handle == handles[Time] ? ble_commands::Op::Time : ble_commands::Op::Unknown);
         if (auth.missingKey) { response(e.connection, e.transaction, ESP_GATT_INSUF_AUTHENTICATION); break; }
         if (auth.command.op == ble_commands::Op::Unknown) {
@@ -583,10 +591,8 @@ bool requestPairing(bool open,bool manual,bool pumpOn){
   Event event;event.kind=Kind::PairWindow;event.value=open?1:0;event.transaction=millis();
   return xQueueSend(events,&event,0)==pdTRUE;
 }
-void publish(const sensors::Reading& reading, bool actuatorOn, uint32_t now) {
+void publish(const telemetry_snapshot::Snapshot& snapshot) {
   if (!mailbox) return;
-  ble_telemetry::Snapshot snapshot;
-  snapshot.reading = reading; snapshot.actuatorOn = actuatorOn; snapshot.publishedAtMs = now;
   xQueueOverwrite(mailbox, &snapshot);
 }
 }
