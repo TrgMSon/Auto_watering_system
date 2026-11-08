@@ -8,6 +8,7 @@ constexpr uint32_t kDedupRetentionMs = 60000;
 struct PumpCommand {
   char id[65] = {}; bool on = false; uint32_t seconds = 0;
   bool isConfig = false, automatic = false, valuesValid = true;
+  bool hasDuration = false; // Omitted config duration preserves the active owner setting.
   // soil min/max, water %, duration minutes, then four air_* values.
   // Air fields participate in duplicate comparison but do not control watering.
   double values[8] = {};

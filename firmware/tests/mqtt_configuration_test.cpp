@@ -2,6 +2,7 @@
 #include "pump/Arduino.h"
 #include "../esp32/mqtt_ingress.h"
 #include "../esp32/ble_command_bridge.h"
+#include "mqtt_backend_fixture.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -32,6 +33,53 @@ std::string wire(const std::string& id,const std::string& minimum="30.0",const s
     ",\"air_humidity_min\":50.0,\"air_humidity_max\":80.0,\"air_temperature_min\":20.0,\"air_temperature_max\":35.0,\"min_water_level_alert\":"+water+"}}";
 }
 PumpCommand parsed(const std::string& text){PumpCommand c;assert(parseConfiguration(text.data(),text.size(),identity,c));return c;}
+void backendCompatibility(){
+  auto c=parsed(kBackendConfig);assert(c.valuesValid&&!c.hasDuration);
+  Storage storage;test_mode::FreshSystem system;system.begin(&storage);system.update(sample());
+  auto local=system.configurationStatus().active();local.maxRunSeconds=197;
+  assert(system.updateConfiguration(local)==configuration::Result::Saved);
+  assert(!strcmp(applyConfiguration(system,c),"OK"));
+  assert(system.configurationStatus().active().maxRunSeconds==197);
+  // Omission is resolved again against the current owner setting, never a parse default.
+  system.stopManual();local=system.configurationStatus().active();local.maxRunSeconds=241;
+  assert(system.updateConfiguration(local)==configuration::Result::Saved);
+  assert(!strcmp(applyConfiguration(system,c),"OK"));
+  assert(system.configurationStatus().active().maxRunSeconds==241);
+  Commands cache;cache.connection(true);assert(cache.submit(c,0));
+  auto supplied=c;supplied.hasDuration=true;supplied.values[3]=2;
+  assert(!cache.submit(supplied,0)); // Same ID, different presence/content.
+  const std::string fixture=kBackendConfig;
+  for(const std::string field:{"\"auto_mode\":true,","\"soil_moisture_min\":30.0,",
+      "\"soil_moisture_max\":70.0,","\"air_humidity_min\":50.0,","\"air_humidity_max\":80.0,",
+      "\"air_temperature_min\":20.0,","\"air_temperature_max\":35.0,",",\"min_water_level_alert\":20"}){
+    auto missing=fixture;missing.erase(missing.find(field),field.size());PumpCommand out;
+    assert(!parseConfiguration(missing.data(),missing.size(),identity,out));
+  }
+  for(const std::string value:{"null","\"2\"","true","NaN"}){
+    auto bad=fixture;bad.insert(bad.find("\"auto_mode\""),"\"max_watering_duration_minutes\":"+value+",");
+    PumpCommand out;assert(!parseConfiguration(bad.data(),bad.size(),identity,out));
+  }
+  for(const std::string value:{"0","11","1.5","1e999"}){
+    auto bad=fixture;bad.insert(bad.find("\"auto_mode\""),"\"max_watering_duration_minutes\":"+value+",");
+    assert(!parsed(bad).valuesValid);
+  }
+  auto bad=fixture;bad.replace(bad.find("30.0"),4,"101.0");
+  assert(!parsed(bad).valuesValid);
+  const auto before=system.configurationStatus().active();
+  assert(!strcmp(applyConfiguration(system,parsed(bad)),"INVALID_CONFIG"));
+  assert(configuration::equal(before,system.configurationStatus().active()));
+  Ingress ingress;const char* topic="iot/garden/02:03:04:05:06:07/config";
+  char bytes[kCommandBytes];size_t n;
+  assert(ingress.fragment(topic,int(strlen(topic)),fixture.data(),int(fixture.size()),int(fixture.size()),0,true,topic,0,true));
+  assert(ingress.pop(bytes,n));c=parsed(std::string(bytes,n));
+  system.stopManual();system.begin(&storage);system.update(sample(20));
+  assert(system.startManual(1)==irrigation::Result::Accepted);
+  assert(!strcmp(applyConfiguration(system,c),"PUMP_RUNNING"));
+  assert(system.status().pumpOn&&system.configurationStatus().active().maxRunSeconds==241);
+  system.stopManual();
+  const char* pumpTopic="iot/garden/02:03:04:05:06:07/cmd";
+  assert(!ingress.fragment(pumpTopic,int(strlen(pumpTopic)),"{}",2,2,0,true,pumpTopic));
+}
 void parser(){
   const auto text=wire("A");auto c=parsed(text);assert(c.isConfig&&c.valuesValid&&!c.automatic);
   assert(c.values[0]==30&&c.values[1]==70&&c.values[2]==20&&c.values[3]==2);
@@ -188,4 +236,4 @@ void transport(){
   // Full config ingress does not consume even one slot of the independent pump FIFO.
   assert(pumps.fragment("/cmd",4,"{}",2,2,0,false,"/cmd"));configs.reset();assert(!configs.pop(bytes,n));
 }
-int main(){parser();ownerStorage();cacheAndAck();bridge();transport();std::cout<<"MQTT configuration PASS\n";}
+int main(){backendCompatibility();parser();ownerStorage();cacheAndAck();bridge();transport();std::cout<<"MQTT configuration PASS\n";}

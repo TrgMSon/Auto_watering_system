@@ -163,3 +163,146 @@ const char* name(Reason reason) {
   return "UNKNOWN";
 }
 }  // namespace watering
+
+namespace watering {
+void AutonomousController::stop(uint32_t now) {
+  if (state_ != State::Watering) return;
+  state_ = State::Cooldown; cooling_ = true; stopped_ = now;
+  if (inCycle_ == 2 && cycle_ == 1) { waiting_ = true; retryAt_ = now; }
+}
+void AutonomousController::setAutomatic(bool enabled, uint32_t now) {
+  if (!enabled && automatic_) { stop(now); wet_ = safe_ = false; }
+  automatic_ = enabled;
+}
+void AutonomousController::latchFault(Block fault, uint32_t now) {
+  if (fault != Block::ActuatorFault && fault != Block::StorageFault) return;
+  stop(now); fault_ = fault; wet_ = safe_ = false; state_ = State::Locked;
+}
+AutonomousDecision AutonomousController::decision(Block block) const {
+  AutonomousDecision d;
+  d.state = state_; d.block = block; d.desiredPumpOn = state_ == State::Watering;
+  d.automatic = automatic_; d.episodeActive = episode_;
+  d.cycle = cycle_; d.reservationsInCycle = inCycle_; d.reservationsTotal = total_;
+  return d;
+}
+AutonomousDecision AutonomousController::evaluate(const sensors::Reading& r, uint32_t now, uint64_t id) {
+  return evaluateImpl(r, now, id, false);
+}
+AutonomousDecision AutonomousController::requestManual(const sensors::Reading& r, uint32_t now, uint64_t id) {
+  return evaluateImpl(r, now, id, true);
+}
+bool AutonomousController::acknowledgeRun(uint32_t started, uint32_t duration) {
+  if (state_ != State::Watering || !duration || duration > kRunMs) return false;
+  started_ = started; runDuration_ = duration; return true;
+}
+AutonomousDecision AutonomousController::evaluateImpl(const sensors::Reading& r, uint32_t now, uint64_t id, bool manual) {
+  const auto safety = safety_.safety(r, now);
+  const bool valid = safety.reason == Reason::Idle;
+  const bool fresh = static_cast<uint32_t>(now - r.sampledAtMs) <= config_.maxReadingAgeMs;
+  const bool newer = !haveSample_ || id > sampleId_;
+  const bool continuous = haveSample_ &&
+      static_cast<uint32_t>(r.sampledAtMs - previousSample_) <= config_.maxReadingAgeMs;
+  if (newer) { haveSample_ = true; sampleId_ = id; previousSample_ = r.sampledAtMs; }
+  // Missing acquisitions break evidence even when the same old sample is replayed.
+  if (!valid || !fresh) wet_ = safe_ = false;
+  if (fault_ == Block::ActuatorFault || fault_ == Block::StorageFault)
+    return decision(fault_);
+  // Safety takes precedence over a coincident runtime deadline or budget limit.
+  if (!valid) {
+    stop(now); state_ = State::Locked;
+    fault_ = safety.reason == Reason::LowWater ? Block::WaterUnsafe : Block::SensorUnsafe;
+    return decision(fault_);
+  }
+  if (state_ == State::Watering) {
+    if (static_cast<uint32_t>(now - started_) >= runDuration_ || (!manualRun_ && r.soilPercent >= config_.stopPercent))
+      stop(now);
+  }
+  if (newer) {
+    if (!continuous) wet_ = safe_ = false;
+    if (!safe_) { safe_ = true; safeSince_ = r.sampledAtMs; }
+    if (state_ != State::Watering && r.soilPercent >= config_.stopPercent) {
+      if (!wet_) { wet_ = true; wetSince_ = r.sampledAtMs; }
+    } else wet_ = false;
+  }
+  if (fault_ == Block::SensorUnsafe || fault_ == Block::WaterUnsafe) {
+    if (!newer || !safe_ || static_cast<uint32_t>(r.sampledAtMs - safeSince_) < kStableMs)
+      return decision(fault_);
+    fault_ = Block::None; state_ = State::Idle;
+  }
+  // RAM-only initialization: B2 must commit this transition before granting quota.
+  if (episode_ && newer && wet_ && state_ != State::Watering &&
+      static_cast<uint32_t>(r.sampledAtMs - wetSince_) >= kStableMs) {
+    episode_ = false; cycle_ = inCycle_ = total_ = 0; waiting_ = false;
+#if WATERING_DEMO_RETRY
+    episodeRetryMs_ = kRetryMs;
+#endif
+    state_ = cooling_ ? State::Cooldown : State::Idle;
+    return decision(Block::None); // Persist episode renewal before any MANUAL proposal.
+  }
+  if (state_ == State::Watering) return decision(Block::None);
+  if (cooling_) {
+    // A fresh acquisition after the entire OFF interval is mandatory.
+    if (static_cast<uint32_t>(now - stopped_) < kCooldownMs || !newer ||
+        static_cast<uint32_t>(r.sampledAtMs - stopped_) < kCooldownMs) {
+      state_ = State::Cooldown; return decision(automatic_ ? Block::None : Block::ManualInterruption);
+    }
+    cooling_ = false;
+  }
+  if (total_ >= 4) { state_ = State::Locked; return decision(Block::BudgetExhausted); }
+  if (waiting_) {
+#if WATERING_DEMO_RETRY
+    const uint32_t kRetryMs = episodeRetryMs_; // Episode-local override only.
+#endif
+    if (static_cast<uint32_t>(now - retryAt_) < kRetryMs || !newer ||
+        static_cast<uint32_t>(r.sampledAtMs - retryAt_) < kRetryMs) {
+      state_ = State::Locked; return decision(Block::WaitingRetry);
+    }
+    // Open cycle 2 only when an actual dry acquisition requests its first run.
+  }
+  state_ = State::Idle;
+  if (!automatic_ && !manual) return decision(Block::ManualInterruption);
+  if ((!newer && !manual) || (!manual && r.soilPercent >= config_.startPercent)) return decision(Block::None);
+  if (!episode_) { episode_ = true; cycle_ = 1; }
+  if (waiting_) { cycle_ = 2; inCycle_ = 0; waiting_ = false; }
+  ++inCycle_; ++total_;  // Reserve a full 5s before the domain requests ON.
+  state_ = State::Watering; started_ = now; runDuration_ = kRunMs; manualRun_ = manual; wet_ = false;
+  return decision(Block::None);
+}
+}  // namespace watering
+
+namespace watering {
+bool AutonomousController::restore(const AutonomousRestore& r, uint32_t now) {
+  // Restore resets all sample evidence and mode; never resumes a run.
+  *this = AutonomousController(config_);
+  const bool counts = r.total <= 4 && (r.total == 0 ? r.cycle == 0 && !r.episode :
+      r.episode && r.cycle == (r.total <= 2 ? 1u : 2u));
+  if (!r.initialized || !counts || (r.pending && !r.total) ||
+      (r.total && !r.pending && !r.cooldown) ||
+      (r.waiting != (r.total == 2 && !r.pending))) {
+    latchFault(Block::StorageFault, now); return false;
+  }
+  episode_ = r.episode; cycle_ = r.cycle; total_ = r.total;
+  inCycle_ = total_ ? (cycle_ == 1 ? total_ : total_ - 2) : 0;
+  cooling_ = r.cooldown; waiting_ = r.waiting;
+  stopped_ = retryAt_ = now;
+  if (r.pending || r.maintenance) latchFault(Block::StorageFault, now);
+  else state_ = cooling_ ? State::Cooldown : total_ >= 4 || waiting_ ? State::Locked : State::Idle;
+  return true;
+}
+}  // namespace watering
+
+namespace watering {
+const char* name(Block b) {
+  switch(b) {
+    case Block::None:return "NONE";
+    case Block::BudgetExhausted:return "BUDGET_EXHAUSTED";
+    case Block::WaitingRetry:return "WAITING_RETRY";
+    case Block::SensorUnsafe:return "SENSOR_UNSAFE";
+    case Block::WaterUnsafe:return "WATER_UNSAFE";
+    case Block::ManualInterruption:return "MANUAL_INTERRUPTION";
+    case Block::ActuatorFault:return "ACTUATOR_FAULT";
+    case Block::StorageFault:return "STORAGE_FAULT";
+  }
+  return "UNKNOWN";
+}
+}

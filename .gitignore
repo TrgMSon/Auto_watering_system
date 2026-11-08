@@ -50,7 +50,13 @@ app.*.map.json
 mobile/docs/
 
 firmware/docs/*
+/firmware/Demo/
 
+/firmware/Production/
+
+/firmware/Legacy/
+
+pycache/
 # ==========================================
 # 1. Spring Boot / Java (Backend)
 # ==========================================

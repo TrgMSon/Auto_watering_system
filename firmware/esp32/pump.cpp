@@ -1,4 +1,5 @@
 #include "pump.h"
+#include "autonomous_feature.h"
 #include <Arduino.h>
 #include <string.h>
 #include "board_config.h"
@@ -8,19 +9,42 @@
 #include "soc/gpio_struct.h"
 #include "esp_timer.h"
 #define PUMP_IRAM IRAM_ATTR
+#if WATERING_AUTONOMOUS_TEST
+#include "esp_arduino_version.h"
+#include "esp_idf_version.h"
+#include "sdkconfig.h"
+#include "esp_private/gptimer.h"
+#include "esp_memory_utils.h"
+#if ESP_ARDUINO_VERSION != ESP_ARDUINO_VERSION_VAL(3, 3, 12) || ESP_IDF_VERSION != ESP_IDF_VERSION_VAL(5, 5, 5)
+#error Experimental pump guard requires audited Arduino ESP32 3.3.12 / ESP-IDF 5.5.5
+#endif
+#if !CONFIG_IDF_TARGET_ESP32 || !CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM || !CONFIG_GPTIMER_OBJ_CACHE_SAFE || !CONFIG_ESP_TIMER_IN_IRAM
+#error Experimental pump guard requires audited ESP32 ISR, object and clock cache-safe placement
+#endif
+#define PUMP_DRAM DRAM_ATTR
+#endif
 #else
 #define PUMP_IRAM
+#endif
+#ifndef PUMP_DRAM
+#define PUMP_DRAM
 #endif
 namespace pump {
 namespace {
 constexpr uint32_t kLeaseMs = 250;
-bool running = false, guardReady = false;
-Run activeRun;
-StopEvent stopEvent;
+#if WATERING_AUTONOMOUS_TEST
+// Owner-task-only diagnostic: setup()/loop() share Arduino loopTask.
+// Never accessed by ISR or BLE/MQTT workers; not a cross-task status API.
+enum class GuardInitialization { Unknown, Ready, Failed };
+GuardInitialization guardInitialization = GuardInitialization::Unknown;
+#endif
+PUMP_DRAM bool running = false, guardReady = false;
+PUMP_DRAM Run activeRun;
+PUMP_DRAM StopEvent stopEvent;
 QualificationPolicy qualification;
-uint32_t leaseStartedMs = 0, leaseDurationMs = 0;
+PUMP_DRAM uint32_t leaseStartedMs = 0, leaseDurationMs = 0;
 #ifdef ARDUINO
-portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+PUMP_DRAM portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 gptimer_handle_t timer = nullptr;
 struct Lock { Lock() { portENTER_CRITICAL(&mux); } ~Lock() { portEXIT_CRITICAL(&mux); } };
 uint32_t PUMP_IRAM nowMs() { return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL); }
@@ -56,7 +80,60 @@ bool PUMP_IRAM alarmCallback(gptimer_handle_t, const gptimer_alarm_event_data_t*
   portEXIT_CRITICAL_ISR(&mux);
   return false;
 }
+#if WATERING_AUTONOMOUS_TEST
+bool guardAttempted = false;
+bool rejectGuard(bool activationAttempted) {
+  if (!timer) return false;
+  if (activationAttempted) {
+    // enable() may have changed FSM before returning an error. stop()/disable()
+    // tolerate INIT/ENABLE via INVALID_STATE; del_timer remains the final check.
+    const esp_err_t stopped = gptimer_stop(timer);
+    const esp_err_t disabled = gptimer_disable(timer);
+    if ((stopped != ESP_OK && stopped != ESP_ERR_INVALID_STATE) ||
+        (disabled != ESP_OK && disabled != ESP_ERR_INVALID_STATE)) return false;
+  }
+  // Keep ownership of an unreclaimable handle. Never allocate/retry around it.
+  if (gptimer_del_timer(timer) == ESP_OK) timer = nullptr;
+  return false;
+}
+bool cacheSafePumpState() {
+  return esp_ptr_in_iram(reinterpret_cast<const void*>(alarmCallback)) &&
+      esp_ptr_in_iram(reinterpret_cast<const void*>(checkGuard)) &&
+      esp_ptr_in_iram(reinterpret_cast<const void*>(stop)) &&
+      esp_ptr_in_iram(reinterpret_cast<const void*>(writeOff)) &&
+      esp_ptr_in_iram(reinterpret_cast<const void*>(nowMs)) &&
+      esp_ptr_in_iram(reinterpret_cast<const void*>(esp_timer_get_time)) &&
+      esp_ptr_in_dram(&running) && esp_ptr_in_dram(&activeRun) &&
+      esp_ptr_in_dram(&stopEvent) && esp_ptr_in_dram(&leaseStartedMs) &&
+      esp_ptr_in_dram(&leaseDurationMs) && esp_ptr_in_dram(&mux);
+}
+#endif
 bool initializeGuard() {
+#if WATERING_AUTONOMOUS_TEST
+  if (guardAttempted) return guardReady; // Boot-latched failures, no resource churn.
+  guardAttempted = true;
+  if (!cacheSafePumpState()) return false;
+  gptimer_config_t config = {};
+  config.clk_src = GPTIMER_CLK_SRC_DEFAULT;
+  config.direction = GPTIMER_COUNT_UP;
+  config.resolution_hz = 1000000;
+  config.flags.intr_shared = false;
+  if (gptimer_new_timer(&config, &timer) != ESP_OK) return rejectGuard(false);
+  if (!timer || !esp_ptr_internal(timer)) return rejectGuard(false);
+  gptimer_event_callbacks_t callbacks = {}; callbacks.on_alarm = alarmCallback;
+  if (gptimer_register_event_callbacks(timer, &callbacks, nullptr) != ESP_OK) return rejectGuard(false);
+  // register_event_callbacks lazily allocates the interrupt, still disabled.
+  intr_handle_t interrupt = nullptr;
+  if (gptimer_get_intr_handle(timer, &interrupt) != ESP_OK || !interrupt ||
+      !esp_ptr_internal(interrupt)) return rejectGuard(false);
+  if (esp_intr_set_in_iram(interrupt, true) != ESP_OK) return rejectGuard(false);
+  gptimer_alarm_config_t alarm = {};
+  alarm.alarm_count = 10000; alarm.reload_count = 0; alarm.flags.auto_reload_on_alarm = true;
+  if (gptimer_set_alarm_action(timer, &alarm) != ESP_OK) return rejectGuard(false);
+  if (gptimer_enable(timer) != ESP_OK) return rejectGuard(true);
+  if (gptimer_start(timer) != ESP_OK) return rejectGuard(true);
+  return true;
+#else
   if (timer) return guardReady;  // A partial failure never authorizes starts.
   gptimer_config_t config = {};
   config.clk_src = GPTIMER_CLK_SRC_DEFAULT;
@@ -70,6 +147,7 @@ bool initializeGuard() {
   if (gptimer_set_alarm_action(timer, &alarm) != ESP_OK) return false;
   if (gptimer_enable(timer) != ESP_OK) return false;
   return gptimer_start(timer) == ESP_OK;
+#endif
 }
 #endif
 bool pollLocked() {
@@ -80,6 +158,9 @@ bool pollLocked() {
 }
 }
 void begin(QualificationPolicy policy) {
+#if WATERING_AUTONOMOUS_TEST
+  guardInitialization = GuardInitialization::Unknown;
+#endif
   { Lock lock; (void)lock; qualification = policy; stop(StopCause::Off);
     stopEvent = StopEvent{}; leaseDurationMs = 0; }
   // Preload OFF before OUTPUT; GPIO ownership stays in this module.
@@ -90,7 +171,16 @@ void begin(QualificationPolicy policy) {
   const bool ready = !initFailure;
 #endif
   { Lock lock; (void)lock; guardReady = ready; }
+#if WATERING_AUTONOMOUS_TEST
+  guardInitialization = ready ? GuardInitialization::Ready : GuardInitialization::Failed;
+#endif
 }
+#if WATERING_AUTONOMOUS_TEST
+const char* guardInitializationStatus() {
+  return guardInitialization == GuardInitialization::Ready ? "READY" :
+      guardInitialization == GuardInitialization::Failed ? "FAILED" : "UNKNOWN";
+}
+#endif
 bool poll() { Lock lock; (void)lock; return pollLocked(); }
 bool isOn() { Lock lock; (void)lock; pollLocked(); return running; }
 uint32_t remainingMs() {

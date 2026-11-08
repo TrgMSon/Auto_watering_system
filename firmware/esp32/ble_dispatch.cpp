@@ -94,6 +94,10 @@ Code execute(irrigation::System& system, const Command& command, Clock* clock) {
   }
   const auto result = command.op == Op::Off ? system.stopManual() :
       command.op == Op::On ? system.startManual(command.seconds) : irrigation::Result::Invalid;
+#if WATERING_AUTONOMOUS_TEST
+  if(result!=irrigation::Result::Accepted && system.status().autonomousBlock==watering::Block::StorageFault)
+    return Code::StorageError;
+#endif
   switch (result) {
     case irrigation::Result::Accepted: return Code::Ok;
     case irrigation::Result::AlreadyOn: return Code::PumpBusy;

@@ -62,7 +62,7 @@ class Json {
 bool same(const PumpCommand& a,const PumpCommand& b){
   if(a.isConfig!=b.isConfig||a.on!=b.on||a.seconds!=b.seconds)return false;
   if(!a.isConfig)return true;
-  if(a.automatic!=b.automatic||a.valuesValid!=b.valuesValid)return false;
+  if(a.automatic!=b.automatic||a.valuesValid!=b.valuesValid||a.hasDuration!=b.hasDuration)return false;
   for(unsigned i=0;i<8;++i)if(a.values[i]!=b.values[i])return false;
   return true;
 }
@@ -72,7 +72,7 @@ bool validConfigurationValues(const PumpCommand& c){
   const auto* v=c.values;
   return v[0]>=0&&v[0]<v[1]&&v[1]<=100&&
       v[2]>=20&&v[2]<=100&&floor(v[2])==v[2]&&
-      v[3]>=1&&v[3]<=10&&floor(v[3])==v[3]&&
+      (!c.hasDuration||(v[3]>=1&&v[3]<=10&&floor(v[3])==v[3]))&&
       v[4]>=0&&v[4]<=v[5]&&v[5]<=100&&v[6]<=v[7];
 }
 }
@@ -134,10 +134,12 @@ bool parseConfiguration(const char* b,size_t n,const char* identity,PumpCommand&
         unsigned i=0;while(i<9&&strcmp(key,names[i]))++i;
         if(i==9||(fields&(1u<<i)))return false;
         fields|=1u<<i;
+        if(i==3)c.hasDuration=true;
         if(i==8){if(!j.boolean(c.automatic))return false;}
         else if(!j.decimal(c.values[i],c.valuesValid))return false;
       }while(j.take(','));
-      if(!j.take('}')||fields!=511)return false;
+      // The deployed publisher omits duration; all other fields remain required.
+      if(!j.take('}')||(fields!=511&&fields!=(511u&~(1u<<3))))return false;
     }else return false;
     if(seen&bit)return false;
     seen|=bit;
@@ -151,7 +153,9 @@ const char* applyConfiguration(irrigation::System& system,const PumpCommand& c){
   if(!validConfigurationValues(c))return "INVALID_CONFIG";
   configuration::Config candidate=system.configurationStatus().active();
   candidate.soilStart=float(c.values[0]);candidate.soilStop=float(c.values[1]);
-  candidate.waterMin=float(c.values[2]);candidate.maxRunSeconds=uint32_t(c.values[3])*60;
+  candidate.waterMin=float(c.values[2]);
+  // Resolve omission at owner execution time, not at ingress/parse time.
+  if(c.hasDuration)candidate.maxRunSeconds=uint32_t(c.values[3])*60;
   switch(system.applyRemoteConfiguration(candidate,c.automatic)){
     case irrigation::RemoteConfigResult::Ok:return "OK";
     case irrigation::RemoteConfigResult::Invalid:return "INVALID_CONFIG";

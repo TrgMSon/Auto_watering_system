@@ -23,6 +23,9 @@ void System::loadConfiguration(configuration::Storage& storage) {
   config_.minWaterPercent=c.waterMin; config_.fullDistanceCm=c.fullCm;
   config_.emptyDistanceCm=c.emptyCm; config_.calibrationConfirmed=true;
   controller_.configure(config_);
+#if WATERING_AUTONOMOUS_TEST
+  autonomous_.configure(config_);
+#endif
   status_.decision = controller_.safety(reading_, millis());
   snapshot();
 }
@@ -45,6 +48,9 @@ configuration::Result System::updateConfiguration(const configuration::Config& c
     config_.minWaterPercent=c.waterMin; config_.fullDistanceCm=c.fullCm;
     config_.emptyDistanceCm=c.emptyCm; config_.calibrationConfirmed=true;
     controller_.configure(config_);
+#if WATERING_AUTONOMOUS_TEST
+  autonomous_.configure(config_);
+#endif
     status_.decision = controller_.safety(reading_, millis());
     snapshot();  // No evaluate/reset: preserve locks, attempts and cooldown.
   }
@@ -75,6 +81,9 @@ RemoteConfigResult System::applyRemoteConfiguration(const configuration::Config&
   // Remote settings do not confirm a calibration; retain the owner's evidence.
   config_.calibrationConfirmed = calibrationConfirmed;
   controller_.configure(config_);
+#if WATERING_AUTONOMOUS_TEST
+  autonomous_.configure(config_);
+#endif
   if (automatic && !changeDesiredMode(Mode::Auto)) return RemoteConfigResult::StorageError;
   service();  // AUTO may start only through the existing controller and guard.
   return RemoteConfigResult::Ok;
@@ -100,7 +109,11 @@ bool System::changeDesiredMode(Mode requested) {
   status_.pendingBootAuto = false;
   return true;
 }
-void System::begin(configuration::Storage* storage, desired_mode::Storage* modes) {
+void System::begin(configuration::Storage* storage, desired_mode::Storage* modes
+#if WATERING_AUTONOMOUS_TEST
+    , autonomous_storage::Ledger* ledger
+#endif
+    ) {
   pump::begin(qualification_);
   bootMs_ = millis();
   controller_ = watering::Controller(config_);
@@ -112,10 +125,16 @@ void System::begin(configuration::Storage* storage, desired_mode::Storage* modes
   status_.modePersisted = modes_.confirmed();
   status_.desiredMode = modes_.automatic() ? Mode::Auto : Mode::Manual;
   status_.pendingBootAuto = modes_.automatic();
+#if WATERING_AUTONOMOUS_TEST
+  autonomous_.begin(ledger,bootMs_);
+#endif
   service();
 }
 void System::update(const sensors::Reading& reading) {
   reading_ = reading;
+#if WATERING_AUTONOMOUS_TEST
+  autonomous_.observe(reading);
+#endif
   // update() is called only for a new sensors::poll acquisition in production.
   // Reject old timestamps as well as stale/invalid/low-water/calibration data.
   if (status_.pendingBootAuto && int32_t(reading.sampledAtMs - bootMs_) >= 0 &&
@@ -133,6 +152,9 @@ void System::snapshot() {
       reading_.soilPercent >= 0 && reading_.soilPercent <= 100 && age <= config_.maxReadingAgeMs;
 }
 void System::stop(watering::Reason reason) {
+#if WATERING_AUTONOMOUS_TEST
+  (void)reason;autonomous_.interrupt();autonomousSnapshot();return;
+#endif
   pump::command("OFF");
   pump::takeStopEvent();  // Explicit stop reconciles this generation here.
   if (reason == watering::Reason::Timeout) controller_.completed(millis(), reading_);
@@ -153,6 +175,9 @@ void System::stop(watering::Reason reason) {
   snapshot();
 }
 void System::service() {
+#if WATERING_AUTONOMOUS_TEST
+  autonomous_.service(status_.mode==Mode::Auto);autonomousSnapshot();return;
+#endif
   const bool expectedOn = status_.pumpOn;
   pump::poll();
   const bool actualOn = pump::isOn();
@@ -206,6 +231,14 @@ Result System::command(const char* text) {
   }
   // Reset cannot execute AUTO or shorten an active interval/cooldown.
   if (text && strcmp(text, "RESET_WATERING") == 0) {
+#if WATERING_AUTONOMOUS_TEST
+    if(pump::isOn())return Result::AlreadyOn;
+    if(status_.decision.state==watering::State::Cooldown)return Result::Cooldown;
+    if(controller_.safety(reading_,millis()).reason!=watering::Reason::Idle)return Result::Unsafe;
+    if(!changeDesiredMode(Mode::Manual))return Result::ModeStorageFailed;
+    if(!autonomous_.maintenance())return Result::ConfigFailed;
+    autonomousSnapshot();return Result::Accepted;
+#endif
     if (controller_.state() == watering::State::Watering) return Result::AlreadyOn;
     if (controller_.state() == watering::State::Cooldown) return Result::Cooldown;
     if (controller_.safety(reading_, millis()).reason != watering::Reason::Idle) return Result::Unsafe;
@@ -238,6 +271,20 @@ Result System::stopManual() {
   return Result::Accepted;
 }
 Result System::startManual(uint32_t durationSeconds) {
+#if WATERING_AUTONOMOUS_TEST
+  if(durationSeconds<1||durationSeconds>600)return Result::InvalidDuration;
+  if(status_.mode!=Mode::Manual)return Result::ManualOnly;
+  if(durationSeconds>5)return Result::QualificationLimit;
+  const auto experimentalResult=autonomous_.manual(durationSeconds);autonomousSnapshot();
+  switch(experimentalResult) {
+    case experimental_watering::Outcome::Started:return Result::Accepted;
+    case experimental_watering::Outcome::Busy:return Result::AlreadyOn;
+    case experimental_watering::Outcome::Unsafe:return Result::Unsafe;
+    case experimental_watering::Outcome::Cooldown:return Result::Cooldown;
+    case experimental_watering::Outcome::ActuatorFault:return Result::GuardUnavailable;
+    default:return Result::Locked;
+  }
+#endif
   const bool wasRunning = status_.pumpOn || pump::isOn();
   service();
   if (durationSeconds < 1 || durationSeconds > 600) return Result::InvalidDuration;
@@ -292,3 +339,27 @@ const char* name(Result result) {
   return "UNKNOWN";
 }
 }
+
+#if WATERING_AUTONOMOUS_TEST
+namespace irrigation {
+void System::autonomousSnapshot() {
+  // Keep accepted OFF intent even if transport disconnect/expiry discarded its ACK slot.
+  if(autonomous_.takeManualRequest() && status_.mode!=Mode::Manual)
+    changeDesiredMode(Mode::Manual);
+  status_.decision=controller_.safety(reading_,millis());
+  const auto& a=autonomous_.status();status_.decision.state=a.state;
+  status_.autonomousBlock=a.block;status_.decision.desiredPumpOn=a.desiredPumpOn;
+  status_.decision.wateringAttempts=a.reservationsTotal;
+  status_.decision.cooldownRemainingMs=autonomous_.cooldownRemaining(millis());
+  switch(a.block) {
+    case watering::Block::BudgetExhausted:status_.decision.reason=watering::Reason::RetryLimit;break;
+    case watering::Block::WaitingRetry:status_.decision.reason=watering::Reason::Cooldown;break;
+    case watering::Block::ManualInterruption:status_.decision.reason=watering::Reason::ManualStop;break;
+    case watering::Block::ActuatorFault:status_.decision.reason=watering::Reason::ActuatorStopped;break;
+    case watering::Block::StorageFault:status_.decision.reason=watering::Reason::Locked;break;
+    default:if(a.state==watering::State::Cooldown)status_.decision.reason=watering::Reason::Cooldown;break;
+  }
+  snapshot();
+}
+}
+#endif

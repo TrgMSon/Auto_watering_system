@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "autonomous_feature.h"
 namespace pump {
 constexpr uint32_t kMaxRunMs = 5000;  // Legacy and AUTO interval.
 constexpr uint32_t kQualificationSeconds = 5;
@@ -20,6 +21,11 @@ struct Run { uint32_t startedMs = 0, durationMs = 0, generation = 0; };
 enum class StopCause { None, Timeout, Off, SafetyLeaseExpired };
 struct StopEvent { StopCause cause = StopCause::None; uint32_t generation = 0; };
 void begin(QualificationPolicy policy = QualificationPolicy{});
+#if WATERING_AUTONOMOUS_TEST
+// Owner task only (same task as begin): read-only, no SDK/poll/GPIO effects.
+// Not for ISR or concurrent worker use; no cross-task synchronization.
+const char* guardInitializationStatus();
+#endif
 bool poll();  // True only when this call expires a run; event remains latched.
 bool isOn();
 uint32_t remainingMs();
