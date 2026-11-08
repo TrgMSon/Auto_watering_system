@@ -29,7 +29,6 @@ void main() {
       expect(config.autoMode, isFalse);
       expect(config.soilMoistureMin, 40);
       expect(config.soilMoistureMax, 80);
-      expect(config.maxWateringDuration, 2);
     });
 
     test('still reports other API errors', () {
@@ -47,7 +46,6 @@ void main() {
           'auto_mode': true,
           'soil_moisture_min': 30.0,
           'soil_moisture_max': 70.0,
-          'max_watering_duration': 90,
         },
       );
 
@@ -55,7 +53,6 @@ void main() {
 
       expect(config.autoMode, isTrue);
       expect(config.soilMoistureMin, 30);
-      expect(config.maxWateringDuration, 90);
     });
   });
 }

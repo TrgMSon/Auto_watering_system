@@ -21,7 +21,6 @@ DeviceConfigModel _config({int waterLevelMin = 20}) => DeviceConfigModel(
       airHumidityMax: 80,
       temperatureMin: 20,
       temperatureMax: 35,
-      maxWateringDuration: 2,
       waterLevelMin: waterLevelMin,
     );
 
@@ -62,7 +61,7 @@ void main() {
     expect(find.text('Mực nước tối thiểu: 20%'), findsOneWidget);
   });
 
-  testWidgets('lưu gửi ngưỡng nước và giữ nguyên thời gian bơm', (tester) async {
+  testWidgets('lưu gửi ngưỡng nước, không gửi thời gian bơm', (tester) async {
     await pumpSheet(tester, _config(waterLevelMin: 0));
 
     await tester.ensureVisible(find.text('Lưu cài đặt'));
@@ -71,6 +70,6 @@ void main() {
 
     final event = verify(() => bloc.add(captureAny())).captured.single as AutomationConfigUpdated;
     expect(event.config.waterLevelMin, 20);
-    expect(event.config.maxWateringDuration, 2);
+    expect(event.config.toJson().containsKey('max_watering_duration'), isFalse);
   });
 }

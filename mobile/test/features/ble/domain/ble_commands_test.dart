@@ -86,7 +86,6 @@ void main() {
         airHumidityMax: 80,
         temperatureMin: 20,
         temperatureMax: 35,
-        maxWateringDuration: 2,
         waterLevelMin: 25,
       );
       final command = BleConfigCommand.fromDeviceConfig(config);
