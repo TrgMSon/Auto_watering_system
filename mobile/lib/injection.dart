@@ -40,6 +40,9 @@ import 'features/sharing/data/repositories/api_sharing_repository.dart';
 import 'features/sharing/domain/repositories/sharing_repository.dart';
 import 'features/sharing/presentation/bloc/sharing_bloc.dart';
 import 'features/ble/data/ble_key_repository.dart';
+import 'features/ble/data/flutter_blue_plus_connector.dart';
+import 'features/ble/domain/ble_connector.dart';
+import 'features/ble/presentation/bloc/ble_session_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -65,6 +68,11 @@ Future<void> configureDependencies() async {
   );
 
   getIt.registerLazySingleton(() => BleKeyRepository(getIt<ApiClient>()));
+  getIt.registerLazySingleton<BleConnector>(() => FlutterBluePlusConnector());
+  getIt.registerFactory(() => BleSessionCubit(
+        connector: getIt<BleConnector>(),
+        keyRepository: getIt<BleKeyRepository>(),
+      ));
 
   // UseCases - Auth
   getIt.registerLazySingleton(() => LoginUseCase(getIt<AuthRepository>()));

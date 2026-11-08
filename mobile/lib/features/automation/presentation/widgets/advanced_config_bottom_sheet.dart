@@ -125,6 +125,8 @@ class _AdvancedConfigBottomSheetState extends State<AdvancedConfigBottomSheet> {
               labels: RangeLabels('${soilMoistureMin.toInt()}%', '${soilMoistureMax.toInt()}%'),
               activeColor: AppColors.primary,
               onChanged: (RangeValues values) {
+                // Firmware không nhận ngưỡng bật bằng ngưỡng tắt.
+                if (values.start >= values.end) return;
                 setState(() {
                   soilMoistureMin = values.start;
                   soilMoistureMax = values.end;

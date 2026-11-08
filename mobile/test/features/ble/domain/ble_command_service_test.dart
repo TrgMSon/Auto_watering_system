@@ -52,17 +52,31 @@ void main() {
       expect(esp32.isPumpOn, isFalse);
     });
 
-    test('firmware chưa mở 0003 nên cấu hình bị từ chối', () async {
-      await expectLater(
-        service.send(BleConfigCommand(
-          soilMin: 30.5,
-          soilMax: 70,
-          autoMode: false,
-          maxDurationSeconds: 300,
-          minWaterCm: 7.5,
-        )),
-        throwsA(isA<BleWriteRejectedException>()),
-      );
+    test('cấu hình được ESP32 lưu', () async {
+      final result = await service.send(BleConfigCommand(
+        soilMin: 30.5,
+        soilMax: 70,
+        autoMode: true,
+        maxDurationSeconds: 300,
+        minWaterPercent: 25,
+      ));
+      expect(result, const BleCommandResult(op: 'CONFIG', code: BleResultCode.ok));
+      expect(esp32.soilMin, 30.5);
+      expect(esp32.isAutoMode, isTrue);
+      expect(esp32.maxRunSeconds, 300);
+      expect(esp32.minWaterPercent, 25);
+    });
+
+    test('cấu hình khi bơm đang chạy trả PUMP_BUSY', () async {
+      esp32.isPumpOn = true;
+      final result = await service.send(BleConfigCommand(
+        soilMin: 30,
+        soilMax: 70,
+        autoMode: false,
+        maxDurationSeconds: 120,
+        minWaterPercent: 20,
+      ));
+      expect(result.code, BleResultCode.pumpBusy);
     });
 
     test('đồng bộ giờ', () async {
@@ -279,7 +293,7 @@ void main() {
   group('Cảm biến', () {
     test('đọc một lần', () async {
       final sample = await service.readSensors();
-      expect(sample.waterLevelCm, isNull);
+      expect(sample.waterLevelPercent, 60.0);
       expect(sample.isPumpOn, isFalse);
     });
 

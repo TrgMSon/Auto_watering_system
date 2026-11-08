@@ -12,6 +12,9 @@ import 'package:watering_app/features/device_management/presentation/bloc/device
 import 'package:watering_app/features/device_management/presentation/bloc/device_state.dart';
 import 'package:watering_app/features/device_management/presentation/pages/device_list_page.dart';
 import 'package:watering_app/features/device_management/presentation/widgets/device_card.dart';
+import 'package:watering_app/features/ble/presentation/bloc/ble_session_cubit.dart';
+
+class MockBleSessionCubit extends MockCubit<BleSessionState> implements BleSessionCubit {}
 
 class MockDeviceBloc extends MockBloc<DeviceEvent, DeviceState>
     implements DeviceBloc {}
@@ -30,14 +33,21 @@ void main() {
     registerFallbackValue(const DeviceLoadRequested());
   });
 
+  late MockBleSessionCubit mockBleCubit;
+
   setUp(() {
     mockDeviceBloc = MockDeviceBloc();
+    mockBleCubit = MockBleSessionCubit();
+    when(() => mockBleCubit.state).thenReturn(const BleSessionState());
   });
 
   Widget buildWidget() {
     return MaterialApp(
-      home: BlocProvider<DeviceBloc>.value(
-        value: mockDeviceBloc,
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider<DeviceBloc>.value(value: mockDeviceBloc),
+          BlocProvider<BleSessionCubit>.value(value: mockBleCubit),
+        ],
         child: const DeviceListPage(),
       ),
     );
@@ -154,7 +164,9 @@ void main() {
         expect(isObscured(), isFalse);
       });
 
-      testWidgets('closes on valid input and says nothing was sent yet', (tester) async {
+      testWidgets('sends valid input to the device over BLE', (tester) async {
+        when(() => mockBleCubit.sendWifi(any(), ssid: any(named: 'ssid'), password: any(named: 'password')))
+            .thenAnswer((_) async => null);
         await openForm(tester);
 
         await tester.enterText(ssidField, 'Nhà Lan');
@@ -163,10 +175,33 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Cấu hình Wi-Fi'), findsNothing);
-        expect(
-          find.text('Chưa gửi tới thiết bị vì ứng dụng chưa hỗ trợ kết nối BLE.'),
-          findsOneWidget,
-        );
+        expect(find.text('Thiết bị đã kết nối Wi-Fi.'), findsOneWidget);
+        verify(() => mockBleCubit.sendWifi(any(), ssid: 'Nhà Lan', password: 'password123')).called(1);
+      });
+
+      testWidgets('shows the error when sending Wi-Fi fails', (tester) async {
+        when(() => mockBleCubit.sendWifi(any(), ssid: any(named: 'ssid'), password: any(named: 'password')))
+            .thenAnswer((_) async => 'Thiết bị không vào được Wi-Fi. Kiểm tra tên và mật khẩu.');
+        await openForm(tester);
+
+        await tester.enterText(ssidField, 'Nhà Lan');
+        await tester.enterText(passwordField, 'password123');
+        await tester.tap(submitButton);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Thiết bị không vào được Wi-Fi. Kiểm tra tên và mật khẩu.'), findsOneWidget);
+      });
+
+      testWidgets('rejects the pipe character the firmware cannot sign', (tester) async {
+        await openForm(tester);
+
+        await tester.enterText(ssidField, 'Nha|Lan');
+        await tester.enterText(passwordField, 'password123');
+        await tester.tap(submitButton);
+        await tester.pump();
+
+        expect(find.text('Tên Wi-Fi không được chứa dấu |'), findsOneWidget);
+        verifyNever(() => mockBleCubit.sendWifi(any(), ssid: any(named: 'ssid'), password: any(named: 'password')));
       });
     });
   });

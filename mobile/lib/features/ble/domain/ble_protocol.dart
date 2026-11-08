@@ -28,6 +28,7 @@ enum BleResultCode {
   invalidTime('INVALID_TIME'),
   wifiOk('WIFI_OK'),
   wifiFail('WIFI_FAIL'),
+  storageError('STORAGE_ERROR'),
 
   /// Firmware gửi mã ngoài hợp đồng; giữ lại để app báo lỗi thay vì chờ hết giờ.
   unknown('UNKNOWN');

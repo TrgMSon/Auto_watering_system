@@ -12,12 +12,17 @@ import 'package:watering_app/features/dashboard/presentation/bloc/dashboard_bloc
 import 'package:watering_app/features/dashboard/presentation/bloc/dashboard_event.dart';
 import 'package:watering_app/features/dashboard/presentation/bloc/dashboard_state.dart';
 import 'package:watering_app/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:watering_app/features/ble/domain/ble_messages.dart';
+import 'package:watering_app/features/ble/presentation/bloc/ble_session_cubit.dart';
 
 class MockDashboardBloc extends MockBloc<DashboardEvent, DashboardState>
     implements DashboardBloc {}
 
+class MockBleSessionCubit extends MockCubit<BleSessionState> implements BleSessionCubit {}
+
 void main() {
   late MockDashboardBloc mockDashboardBloc;
+  late MockBleSessionCubit mockBleCubit;
 
   final testDevice1 = DeviceModel(
     id: 'ESP_001',
@@ -62,6 +67,8 @@ void main() {
 
   setUp(() {
     mockDashboardBloc = MockDashboardBloc();
+    mockBleCubit = MockBleSessionCubit();
+    when(() => mockBleCubit.state).thenReturn(const BleSessionState());
   });
 
   Widget buildTestWidget({
@@ -73,8 +80,11 @@ void main() {
       theme: ThemeData.light(useMaterial3: true),
       darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: themeMode,
-      home: BlocProvider<DashboardBloc>.value(
-        value: bloc ?? mockDashboardBloc,
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider<DashboardBloc>.value(value: bloc ?? mockDashboardBloc),
+          BlocProvider<BleSessionCubit>.value(value: mockBleCubit),
+        ],
         child: const DashboardPage(),
       ),
     );
@@ -190,18 +200,96 @@ void main() {
       expect(find.byIcon(Icons.water), findsOneWidget);
     });
 
-    testWidgets('renders Bluetooth icon when isBleConnected is true', (tester) async {
+    testWidgets('renders Bluetooth icon when BLE is connected to the selected device', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
         telemetry: testTelemetryOff,
-        isBleConnected: true,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice1.id,
       ));
 
       await tester.pumpWidget(buildTestWidget());
 
-      expect(find.byIcon(Icons.bluetooth_connected), findsOneWidget);
+      // Nút ngắt Bluetooth và biểu tượng trạng thái.
+      expect(find.byIcon(Icons.bluetooth_connected), findsNWidgets(2));
       expect(find.byIcon(Icons.wifi), findsNothing);
+    });
+
+    testWidgets('offline device connected over BLE shows BLE readings and pumps via BLE', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice2.id,
+        sample: const BleSensorSample(
+          soilMoisture: 33.3,
+          temperature: 29.0,
+          humidity: null,
+          waterLevelPercent: 55.0,
+          isPumpOn: false,
+        ),
+      ));
+      when(() => mockBleCubit.setPump(any())).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      expect(find.text('33.3%'), findsOneWidget);
+      expect(find.text('55.0%'), findsOneWidget);
+      expect(find.text('--'), findsOneWidget);
+      expect(find.text('Thiết bị đang offline'), findsNothing);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      verify(() => mockBleCubit.setPump(true)).called(1);
+      verifyNever(() => mockDashboardBloc.add(any()));
+    });
+
+    testWidgets('shows the BLE error when pumping via BLE fails', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice2.id,
+        sample: const BleSensorSample(
+          soilMoisture: 33.3,
+          temperature: 29.0,
+          humidity: 60.0,
+          waterLevelPercent: 10.0,
+          isPumpOn: false,
+        ),
+      ));
+      when(() => mockBleCubit.setPump(any()))
+          .thenAnswer((_) async => 'Bồn nước gần cạn, thiết bị không bơm.');
+
+      await tester.pumpWidget(buildTestWidget());
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bồn nước gần cạn, thiết bị không bơm.'), findsOneWidget);
+    });
+
+    testWidgets('tapping the Bluetooth button connects to the selected device', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+      ));
+      when(() => mockBleCubit.connect(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(buildTestWidget());
+      await tester.tap(find.byTooltip('Kết nối Bluetooth'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockBleCubit.connect(testDevice1.id)).called(1);
     });
 
     testWidgets('renders wifi_off icon, disabled switch, and offline text when device is offline', (tester) async {

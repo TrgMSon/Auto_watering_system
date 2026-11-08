@@ -23,7 +23,6 @@ class DashboardLoaded extends DashboardState {
   final TelemetryModel? telemetry;
   final bool isTelemetryEmpty;
   final bool isTogglingPump;
-  final bool isBleConnected;
   final bool? pumpStatus;
   final DateTime? pumpOffAt;
   final String? errorMessage;
@@ -39,7 +38,6 @@ class DashboardLoaded extends DashboardState {
     this.telemetry,
     this.isTelemetryEmpty = false,
     this.isTogglingPump = false,
-    this.isBleConnected = false,
     this.pumpStatus,
     this.pumpOffAt,
     this.errorMessage,
@@ -55,7 +53,6 @@ class DashboardLoaded extends DashboardState {
     bool clearTelemetry = false,
     bool? isTelemetryEmpty,
     bool? isTogglingPump,
-    bool? isBleConnected,
     bool? pumpStatus,
     bool clearPumpStatus = false,
     DateTime? pumpOffAt,
@@ -74,7 +71,6 @@ class DashboardLoaded extends DashboardState {
       telemetry: clearTelemetry ? null : (telemetry ?? this.telemetry),
       isTelemetryEmpty: isTelemetryEmpty ?? (clearTelemetry ? false : this.isTelemetryEmpty),
       isTogglingPump: isTogglingPump ?? this.isTogglingPump,
-      isBleConnected: isBleConnected ?? this.isBleConnected,
       pumpStatus: clearPumpStatus ? null : (pumpStatus ?? this.pumpStatus),
       pumpOffAt: clearPumpOffAt ? null : (pumpOffAt ?? this.pumpOffAt),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -91,7 +87,6 @@ class DashboardLoaded extends DashboardState {
         telemetry,
         isTelemetryEmpty,
         isTogglingPump,
-        isBleConnected,
         pumpStatus,
         pumpOffAt,
         errorMessage,

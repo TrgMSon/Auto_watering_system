@@ -1,25 +1,37 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../ble/presentation/bloc/ble_session_cubit.dart';
 import '../../domain/entities/device.dart';
 
-/// Mở form nhập Wi-Fi cho thiết bị.
-///
-/// Ứng dụng chưa có kết nối BLE nên thông tin nhập vào chưa được gửi tới ESP32
-/// và không được lưu lại. Sau này gửi qua characteristic `0006` tại đây.
+typedef WifiCredentials = ({String ssid, String password});
+
+/// Mở form nhập Wi-Fi rồi gửi tới ESP32 qua Bluetooth (`0006`).
+/// Thông tin Wi-Fi không được lưu trên điện thoại hay server.
 Future<void> showWifiConfigSheet(BuildContext context, Device device) async {
-  final submitted = await showModalBottomSheet<bool>(
+  final credentials = await showModalBottomSheet<WifiCredentials>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     builder: (_) => WifiConfigSheet(device: device),
   );
-  if (submitted != true || !context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Chưa gửi tới thiết bị vì ứng dụng chưa hỗ trợ kết nối BLE.'),
-    ),
-  );
+  if (credentials == null || !context.mounted) return;
+
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.showSnackBar(const SnackBar(
+    content: Text('Đang gửi Wi-Fi tới thiết bị, có thể mất đến 35 giây...'),
+    duration: Duration(seconds: 40),
+  ));
+  final error = await context.read<BleSessionCubit>().sendWifi(
+        device.id,
+        ssid: credentials.ssid,
+        password: credentials.password,
+      );
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(SnackBar(
+    content: Text(error ?? 'Thiết bị đã kết nối Wi-Fi.'),
+  ));
 }
 
 class WifiConfigSheet extends StatefulWidget {
@@ -31,7 +43,7 @@ class WifiConfigSheet extends StatefulWidget {
 }
 
 class _WifiConfigSheetState extends State<WifiConfigSheet> {
-  // Giới hạn theo chuẩn Wi-Fi: SSID tối đa 32 byte, mật khẩu WPA2 từ 8 đến 63 ký tự.
+  // Giới hạn theo firmware: SSID tối đa 32 byte, mật khẩu WPA2 từ 8 đến 63 byte, không có dấu `|`.
   static const int _maxSsidBytes = 32;
   static const int _minPasswordLength = 8;
   static const int _maxPasswordLength = 63;
@@ -50,7 +62,9 @@ class _WifiConfigSheetState extends State<WifiConfigSheet> {
 
   void _onSubmit() {
     if (_formKey.currentState?.validate() ?? false) {
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop<WifiCredentials>(
+        (ssid: _ssidController.text, password: _passwordController.text),
+      );
     }
   }
 
@@ -118,6 +132,9 @@ class _WifiConfigSheetState extends State<WifiConfigSheet> {
         if (utf8.encode(value).length > _maxSsidBytes) {
           return 'Tên Wi-Fi quá dài';
         }
+        if (value.contains('|')) {
+          return 'Tên Wi-Fi không được chứa dấu |';
+        }
         return null;
       },
     );
@@ -148,8 +165,12 @@ class _WifiConfigSheetState extends State<WifiConfigSheet> {
         if (value == null || value.isEmpty) {
           return 'Vui lòng nhập mật khẩu Wi-Fi';
         }
-        if (value.length < _minPasswordLength || value.length > _maxPasswordLength) {
+        final length = utf8.encode(value).length;
+        if (length < _minPasswordLength || length > _maxPasswordLength) {
           return 'Mật khẩu phải có từ $_minPasswordLength đến $_maxPasswordLength ký tự';
+        }
+        if (value.contains('|')) {
+          return 'Mật khẩu không được chứa dấu |';
         }
         return null;
       },

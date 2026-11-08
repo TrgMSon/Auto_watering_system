@@ -18,7 +18,7 @@ class BleSensorSample extends Equatable {
     required this.soilMoisture,
     required this.temperature,
     required this.humidity,
-    required this.waterLevelCm,
+    required this.waterLevelPercent,
     required this.isPumpOn,
   });
 
@@ -33,7 +33,7 @@ class BleSensorSample extends Equatable {
       soilMoisture: _optionalNumber(json, 'soil'),
       temperature: _optionalNumber(json, 'temp'),
       humidity: _optionalNumber(json, 'hum'),
-      waterLevelCm: _optionalNumber(json, 'water'),
+      waterLevelPercent: _optionalNumber(json, 'water'),
       isPumpOn: pump == 1,
     );
   }
@@ -41,7 +41,8 @@ class BleSensorSample extends Equatable {
   final double? soilMoisture;
   final double? temperature;
   final double? humidity;
-  final double? waterLevelCm;
+  /// Mực nước theo % bồn (0 đến 100), từ trường `water` của firmware.
+  final double? waterLevelPercent;
   final bool isPumpOn;
 
   static double? _optionalNumber(Map<String, dynamic> json, String key) {
@@ -52,7 +53,7 @@ class BleSensorSample extends Equatable {
   }
 
   @override
-  List<Object?> get props => [soilMoisture, temperature, humidity, waterLevelCm, isPumpOn];
+  List<Object?> get props => [soilMoisture, temperature, humidity, waterLevelPercent, isPumpOn];
 }
 
 /// Kết quả nghiệp vụ từ `0005`, ví dụ `{"op":"PUMP_ON","code":"OK"}`.

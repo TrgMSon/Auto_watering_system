@@ -25,10 +25,10 @@ void main() {
         soilMax: 70,
         autoMode: true,
         maxDurationSeconds: 600,
-        minWaterCm: 5,
+        minWaterPercent: 20,
       );
-      expect(command.signingMessage(_nonce), '$_nonce|CONFIG|30.0|70.0|1|600|5.0');
-      expect(_signed(command), '1e4b0b9e4f4d0ea5');
+      expect(command.signingMessage(_nonce), '$_nonce|CONFIG|30.0|70.0|1|600|20.0');
+      expect(_signed(command), '5313188c56af17c5');
     });
 
     test('đồng bộ giờ', () {
@@ -58,10 +58,10 @@ void main() {
         soilMax: 70,
         autoMode: true,
         maxDurationSeconds: 600,
-        minWaterCm: 5,
+        minWaterPercent: 20,
       );
       expect(utf8.decode(command.encode(nonce: _nonce, secretKey: _key)),
-          '{"min":30.0,"max":70.0,"auto":1,"max_dur":600,"min_water":5.0,"sig":"1e4b0b9e4f4d0ea5"}');
+          '{"min":30.0,"max":70.0,"auto":1,"max_dur":600,"min_water":20.0,"sig":"5313188c56af17c5"}');
     });
 
     test('chữ ký và JSON cùng dùng giá trị đã làm tròn', () {
@@ -70,9 +70,9 @@ void main() {
         soilMax: 70,
         autoMode: false,
         maxDurationSeconds: 120,
-        minWaterCm: 5,
+        minWaterPercent: 20,
       );
-      expect(command.signingMessage(_nonce), '$_nonce|CONFIG|30.3|70.0|0|120|5.0');
+      expect(command.signingMessage(_nonce), '$_nonce|CONFIG|30.3|70.0|0|120|20.0');
       expect(decode(command)['min'], 30.3);
     });
 
@@ -87,22 +87,22 @@ void main() {
         temperatureMin: 20,
         temperatureMax: 35,
         maxWateringDuration: 2,
-        waterLevelMin: 5,
+        waterLevelMin: 25,
       );
       final command = BleConfigCommand.fromDeviceConfig(config);
       expect(command.maxDurationSeconds, 120);
-      expect(command.minWaterCm, 5.0);
+      expect(command.minWaterPercent, 25.0);
     });
   });
 
   group('Từ chối giá trị ngoài hợp đồng', () {
-    BleConfigCommand config({double min = 30, double max = 70, int dur = 120, double water = 5}) =>
+    BleConfigCommand config({double min = 30, double max = 70, int dur = 120, double water = 20}) =>
         BleConfigCommand(
           soilMin: min,
           soilMax: max,
           autoMode: true,
           maxDurationSeconds: dur,
-          minWaterCm: water,
+          minWaterPercent: water,
         );
 
     test('thời gian bơm', () {
@@ -121,7 +121,8 @@ void main() {
     test('max_dur và mực nước', () {
       expect(() => config(dur: 59), throwsArgumentError);
       expect(() => config(dur: 601), throwsArgumentError);
-      expect(() => config(water: -1), throwsArgumentError);
+      expect(() => config(water: 19), throwsArgumentError);
+      expect(() => config(water: 101), throwsArgumentError);
       expect(config(dur: 60).maxDurationSeconds, 60);
       expect(config(dur: 600).maxDurationSeconds, 600);
     });
@@ -142,7 +143,7 @@ void main() {
       final sample = BleSensorSample.fromBytes(
           utf8.encode('{"soil":42.5,"temp":31.8,"hum":68.0,"water":25.4,"pump":1}'));
       expect(sample.soilMoisture, 42.5);
-      expect(sample.waterLevelCm, 25.4);
+      expect(sample.waterLevelPercent, 25.4);
       expect(sample.isPumpOn, isTrue);
     });
 
@@ -162,10 +163,10 @@ void main() {
       expect(() => BleCommandResult.fromBytes(utf8.encode('{"op":"X"}')), throwsFormatException);
     });
 
-    test('đủ 12 mã kết quả, mã lạ không làm hỏng luồng', () {
+    test('đủ 13 mã kết quả, mã lạ không làm hỏng luồng', () {
       const codes = [
         'OK', 'BAD_SIG', 'NONCE_EXPIRED', 'BAD_JSON', 'OUT_OF_RANGE', 'LOW_WATER',
-        'MAINTENANCE', 'SENSOR_ERROR', 'PUMP_BUSY', 'INVALID_TIME', 'WIFI_OK', 'WIFI_FAIL',
+        'MAINTENANCE', 'SENSOR_ERROR', 'PUMP_BUSY', 'INVALID_TIME', 'WIFI_OK', 'WIFI_FAIL', 'STORAGE_ERROR',
       ];
       for (final code in codes) {
         expect(BleResultCode.fromWire(code).wire, code);
