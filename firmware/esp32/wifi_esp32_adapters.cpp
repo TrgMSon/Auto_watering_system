@@ -5,6 +5,7 @@
 #include <nvs.h>
 #include <esp_log.h>
 #include <stdio.h>
+#include <lwip/ip4_addr.h>
 ESP_EVENT_DEFINE_BASE(WIFI_PROVISION_BARRIER);
 namespace ble_wifi {
 namespace {
@@ -24,6 +25,21 @@ bool usableIp(const esp_netif_ip_info_t& info){
   const unsigned first=ip>>24;
   return first>0&&first<224&&first!=127&&hosts>=3&&mask!=0&&
       (hosts&(hosts+1))==0&&(ip&hosts)!=0&&(ip&hosts)!=hosts;
+}
+bool setFallbackDns(esp_netif_t* netif){
+  esp_netif_dns_info_t dns={};
+  IP4_ADDR(&dns.ip.u_addr.ip4,1,1,1,1);
+  dns.ip.type=IPADDR_TYPE_V4;
+  return wifiChecked("dns-fallback",esp_netif_set_dns_info(netif,ESP_NETIF_DNS_FALLBACK,&dns));
+}
+void printDns(esp_netif_t* netif,esp_netif_dns_type_t type,const char* label){
+  esp_netif_dns_info_t dns={};
+  if(esp_netif_get_dns_info(netif,type,&dns)!=ESP_OK){
+    printf("[WIFI] dns %s=unavailable\n",label);return;
+  }
+  if(dns.ip.type==IPADDR_TYPE_V4&&!ip4_addr_isany_val(dns.ip.u_addr.ip4))
+    printf("[WIFI] dns %s=" IPSTR "\n",label,IP2STR(&dns.ip.u_addr.ip4));
+  else printf("[WIFI] dns %s=0.0.0.0\n",label);
 }
 }
 void EspRadioSdk::event(void* arg,esp_event_base_t base,int32_t id,void* data){
@@ -72,6 +88,7 @@ bool EspRadioSdk::initialize(){
       !wifiChecked("wifi-handler",esp_event_handler_instance_register(WIFI_EVENT,ESP_EVENT_ANY_ID,event,this,&wifiHandler_))||
       !wifiChecked("ip-handler",esp_event_handler_instance_register(IP_EVENT,ESP_EVENT_ANY_ID,event,this,&ipHandler_))||
       !wifiChecked("barrier-handler",esp_event_handler_instance_register(WIFI_PROVISION_BARRIER,0,event,this,&barrierHandler_))){cleanup();return false;}
+  if(!setFallbackDns(netif_)){cleanup();return false;}
   ready_=true;failed_=false;printf("[WIFI] stage=init-ready\n");return true;
 }
 bool EspRadioSdk::stop(){
@@ -88,7 +105,12 @@ bool EspRadioSdk::drain(uint32_t& token){
   if(events&1)printf("[WIFI] event=STA_CONNECTED\n");
   if(reason)printf("[WIFI] event=STA_DISCONNECTED reason=%lu\n",static_cast<unsigned long>(reason-1));
   if(events&8)printf("[WIFI] event=STA_DISCONNECTED reason=unavailable\n");
-  if(events&2)printf("[WIFI] event=STA_GOT_IP\n");
+  if(events&2){
+    printf("[WIFI] event=STA_GOT_IP\n");
+    printDns(netif_,ESP_NETIF_DNS_MAIN,"main");
+    printDns(netif_,ESP_NETIF_DNS_BACKUP,"backup");
+    printDns(netif_,ESP_NETIF_DNS_FALLBACK,"fallback");
+  }
   if(events&4)printf("[WIFI] event=STA_LOST_IP\n");
   if(fault_.load()){printf("[WIFI] stage=events overflow-or-fault\n");return false;}return true;
 }
