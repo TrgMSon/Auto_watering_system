@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -24,10 +25,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.project.backend.dto.device.CreateDeviceRequest;
+import com.project.backend.dto.device.DeviceConfigRequest;
 import com.project.backend.dto.device.DeviceViewerResponse;
 import com.project.backend.exception.ConflictException;
 import com.project.backend.exception.NotFoundException;
 import com.project.backend.model.Device;
+import com.project.backend.model.DeviceConfig;
 import com.project.backend.model.User;
 import com.project.backend.model.UserDevice;
 import com.project.backend.model.enums.Role;
@@ -128,6 +131,51 @@ class DeviceServiceImplTest {
 
                 assertThrows(ConflictException.class, () -> deviceService.createDevice(request));
                 verify(deviceRepository, never()).save(any(Device.class));
+        }
+
+        @Test
+        void rejectsEqualSoilMoistureThresholdsBeforePublishingConfiguration() {
+                String deviceId = "AA:BB:CC:DD:EE:FF";
+                Device device = activeDevice(deviceId);
+                UserDevice ownerLink = new UserDevice();
+                ownerLink.setPermission("owner");
+                when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+                when(userDeviceRepository.findByUser_IdAndDevice_Id(12, deviceId))
+                                .thenReturn(Optional.of(ownerLink));
+                DeviceConfigRequest request = validConfigRequest();
+                request.setSoilMoistureMax(request.getSoilMoistureMin());
+
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () -> deviceService.updateDeviceConfig(deviceId, 12, request));
+
+                verify(deviceConfigRepository, never()).save(any(DeviceConfig.class));
+                verify(commandPublisher, never()).publishConfiguration(any(), any());
+        }
+
+        @Test
+        void publishesConfigurationWithFirmwareMqttFieldNames() {
+                String deviceId = "AA:BB:CC:DD:EE:FF";
+                Device device = activeDevice(deviceId);
+                UserDevice ownerLink = new UserDevice();
+                ownerLink.setPermission("owner");
+                when(deviceRepository.findById(deviceId)).thenReturn(Optional.of(device));
+                when(userDeviceRepository.findByUser_IdAndDevice_Id(12, deviceId))
+                                .thenReturn(Optional.of(ownerLink));
+                when(deviceConfigRepository.save(any(DeviceConfig.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                deviceService.updateDeviceConfig(deviceId, 12, validConfigRequest());
+
+                verify(commandPublisher).publishConfiguration(eq(deviceId), argThat(payload -> payload.equals(Map.of(
+                                "auto_mode", true,
+                                "soil_moisture_min", 30.0f,
+                                "soil_moisture_max", 70.0f,
+                                "air_humidity_min", 50.0f,
+                                "air_humidity_max", 80.0f,
+                                "air_temperature_min", 20.0f,
+                                "air_temperature_max", 35.0f,
+                                "min_water_level_alert", 20))));
         }
 
         @Test
@@ -342,5 +390,25 @@ class DeviceServiceImplTest {
                 deviceService.registerDevice(deviceId, 12, 1);
 
                 assertEquals(Role.USER, user.getRole());
+        }
+
+        private Device activeDevice(String deviceId) {
+                Device device = new Device();
+                device.setId(deviceId);
+                device.setStatus("active");
+                return device;
+        }
+
+        private DeviceConfigRequest validConfigRequest() {
+                DeviceConfigRequest request = new DeviceConfigRequest();
+                request.setAutoMode(true);
+                request.setSoilMoistureMin(30.0f);
+                request.setSoilMoistureMax(70.0f);
+                request.setAirHumidityMin(50.0f);
+                request.setAirHumidityMax(80.0f);
+                request.setAirTemperatureMin(20.0f);
+                request.setAirTemperatureMax(35.0f);
+                request.setWaterLevelMin(20);
+                return request;
         }
 }
