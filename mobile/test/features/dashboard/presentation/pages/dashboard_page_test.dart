@@ -251,6 +251,48 @@ void main() {
       verifyNever(() => mockDashboardBloc.add(any()));
     });
 
+    testWidgets('keeps server readings when BLE sensors are null during pump toggle', (tester) async {
+      final lastTelemetry = TelemetryModel(
+        deviceId: testDevice2.id,
+        soilMoisture: 42.0,
+        temperature: 28.0,
+        humidity: 65.0,
+        waterLevel: 78.0,
+        isPumpOn: false,
+        recordedAt: DateTime(2026, 10, 7, 10, 0),
+      );
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+        telemetry: lastTelemetry,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice2.id,
+        sample: const BleSensorSample(
+          soilMoisture: 33.3,
+          temperature: null,
+          humidity: null,
+          waterLevelPercent: 55.0,
+          isPumpOn: false,
+        ),
+      ));
+      when(() => mockBleCubit.setPump(any())).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.text('28.0°C'), findsOneWidget);
+      expect(find.text('65.0%'), findsOneWidget);
+      expect(find.text('Cập nhật lần cuối: 07/10/2026 10:00'), findsOneWidget);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(find.text('28.0°C'), findsOneWidget);
+      expect(find.text('65.0%'), findsOneWidget);
+      verify(() => mockBleCubit.setPump(true)).called(1);
+    });
+
     testWidgets('shows the BLE error when pumping via BLE fails', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice2],

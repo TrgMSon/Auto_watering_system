@@ -205,9 +205,25 @@ void worker(void*){
   for(;;){
     ::telemetry_snapshot::Snapshot copy;bool have;
     {Lock lock;copy=latest;have=observed;}
+    const bool wifi=ble_wifi_service::networkSnapshot().online;
     const time_t utc=time(nullptr);
-    const bool clock=utc>=ble_commands::kUnixMin&&utc<=ble_commands::kUnixMax;
-    runtime.service(millis(),ready,ble_wifi_service::networkSnapshot().online,clock,copy,have,client);
+    bool clock=utc>=ble_commands::kUnixMin&&utc<=ble_commands::kUnixMax;
+    static bool timeSyncStarted=false;
+    static bool clockReadyLogged=false;
+    if(wifi&&!clock&&!timeSyncStarted){
+      configTime(0,0,"pool.ntp.org","time.google.com","time.cloudflare.com");
+      timeSyncStarted=true;
+      Serial.println("[MQTT] SNTP time sync requested");
+    }
+    if(!clock){
+      const time_t synchronizedUtc=time(nullptr);
+      clock=synchronizedUtc>=ble_commands::kUnixMin&&synchronizedUtc<=ble_commands::kUnixMax;
+    }
+    if(clock&&!clockReadyLogged){
+      Serial.println("[MQTT] system clock ready");
+      clockReadyLogged=true;
+    }
+    runtime.service(millis(),ready,wifi,clock,copy,have,client);
     client.commands();
     vTaskDelay(pdMS_TO_TICKS(50));
   }

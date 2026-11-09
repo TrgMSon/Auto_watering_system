@@ -5,6 +5,17 @@ struct Writer : ble_keys::Storage {
   virtual bool write(const uint8_t* p, size_t n)=0;
 };
 enum class Result { Ok, Invalid, Exists, StorageError };
+enum class RecordStatus { Missing, Valid, Invalid, Unreadable };
+// Accept only the read interface: this operation has no write capability.
+inline RecordStatus inspect(ble_keys::Storage& storage, const uint8_t* mac) {
+  uint8_t record[ble_keys::kRecordMax]={}; size_t size=0;
+  auto read=storage.read(record,sizeof(record),size);
+  auto status=read==ble_keys::Read::Missing ? RecordStatus::Missing :
+      read==ble_keys::Read::Error ? RecordStatus::Unreadable :
+      ble_keys::valid(record,size,mac) ? RecordStatus::Valid : RecordStatus::Invalid;
+  ble_keys::wipe(record,sizeof(record));
+  return status;
+}
 inline Result store(Writer& s, const uint8_t* record, size_t n, const uint8_t* mac, bool replace) {
   if (!ble_keys::valid(record,n,mac)) return Result::Invalid;
   uint8_t previous[ble_keys::kRecordMax]={}; size_t size=0;
@@ -29,7 +40,9 @@ class Frame {
     if (!started_) { started_=true; start_=now; }
     if (used_<7) {
       header_[used_++]=b;
-      if (used_<=4 && b!=uint8_t("BKP1"[used_-1])) return fail();
+      // BKS1 is a separate, read-only request; BKP1 frames remain unchanged.
+      if (used_<=4 && b!=uint8_t("BKP1"[used_-1]) && !(used_==3 && b=='S')) return fail();
+      if (used_==4 && header_[2]=='S') { done_=true; return 2; }
       if (used_==5 && b>1) return fail();
       if (used_==7) {
         expected_=size_t(header_[5])+(size_t(header_[6])<<8);

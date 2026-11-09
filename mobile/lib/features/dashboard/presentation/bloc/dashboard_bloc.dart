@@ -12,15 +12,21 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
   final DashboardRepository repository;
   final DateTime Function() _now;
+  final Duration _deviceStatusRefreshInterval;
   StreamSubscription<TelemetryModel?>? _telemetrySubscription;
+  Timer? _deviceStatusRefreshTimer;
+  bool _isRefreshingDeviceStatuses = false;
   int _activeLoadRequestId = 0;
 
   DashboardBloc({
     required this.repository,
     DateTime Function()? now,
+    Duration deviceStatusRefreshInterval = const Duration(seconds: 10),
   })  : _now = now ?? DateTime.now,
+        _deviceStatusRefreshInterval = deviceStatusRefreshInterval,
         super(const DashboardInitial()) {
     on<DashboardLoadRequested>(_onLoadRequested);
+    on<DashboardDeviceStatusRefreshRequested>(_onDeviceStatusRefreshRequested);
     on<DashboardDeviceSelected>(_onDeviceSelected);
     on<DashboardTelemetryUpdated>(_onTelemetryUpdated);
     on<DashboardTelemetryEmpty>(_onTelemetryEmpty);
@@ -55,7 +61,9 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         final initialDevice = devices.first;
         emit(DashboardLoaded(devices: devices, selectedDevice: initialDevice));
         _listenToTelemetry(initialDevice);
+        _startDeviceStatusRefresh();
       } else {
+        _stopDeviceStatusRefresh();
         emit(const DashboardLoaded(devices: []));
       }
     } catch (e) {
@@ -76,10 +84,12 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final latestState = _currentLoadedState(currentState);
       if (devices.isEmpty) {
         _telemetrySubscription?.cancel();
+        _stopDeviceStatusRefresh();
         emit(const DashboardLoaded(devices: []));
         return;
       }
       _handleRefreshedDevices(latestState, devices, emit);
+      _startDeviceStatusRefresh();
     } catch (e) {
       if (requestId != _activeLoadRequestId) return;
       emit(_currentLoadedState(currentState).copyWith(
@@ -87,6 +97,63 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
         errorMessage: e.toString(),
       ));
     }
+  }
+
+  Future<void> _onDeviceStatusRefreshRequested(
+    DashboardDeviceStatusRefreshRequested event,
+    Emitter<DashboardState> emit,
+  ) async {
+    final initialState = state;
+    if (initialState is! DashboardLoaded ||
+        initialState.selectedDevice == null ||
+        _isRefreshingDeviceStatuses) {
+      return;
+    }
+
+    _isRefreshingDeviceStatuses = true;
+    final requestId = _activeLoadRequestId;
+    try {
+      final devices = await repository.getDevices();
+      if (isClosed || requestId != _activeLoadRequestId) return;
+      final latestState = state;
+      if (latestState is! DashboardLoaded ||
+          latestState.selectedDevice?.id != initialState.selectedDevice!.id) {
+        return;
+      }
+
+      final devicesById = {for (final device in devices) device.id: device};
+      final updatedDevices = latestState.devices
+          .map((device) => devicesById[device.id] ?? device)
+          .toList();
+      final selectedDevice = devicesById[latestState.selectedDevice!.id];
+      if (selectedDevice == null) return;
+
+      emit(latestState.copyWith(
+        devices: updatedDevices,
+        selectedDevice: selectedDevice,
+        clearError: true,
+      ));
+    } catch (error) {
+      if (!isClosed && state is DashboardLoaded) {
+        emit((state as DashboardLoaded).copyWith(
+          errorMessage: 'Không thể cập nhật trạng thái thiết bị: $error',
+        ));
+      }
+    } finally {
+      _isRefreshingDeviceStatuses = false;
+    }
+  }
+
+  void _startDeviceStatusRefresh() {
+    _deviceStatusRefreshTimer ??= Timer.periodic(
+      _deviceStatusRefreshInterval,
+      (_) => add(const DashboardDeviceStatusRefreshRequested()),
+    );
+  }
+
+  void _stopDeviceStatusRefresh() {
+    _deviceStatusRefreshTimer?.cancel();
+    _deviceStatusRefreshTimer = null;
   }
 
   DashboardLoaded _currentLoadedState(DashboardLoaded fallbackState) {
@@ -298,6 +365,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     Emitter<DashboardState> emit,
   ) {
     _activeLoadRequestId++;
+    _stopDeviceStatusRefresh();
     _telemetrySubscription?.cancel();
     _telemetrySubscription = null;
     emit(const DashboardInitial());
@@ -306,6 +374,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   @override
   Future<void> close() {
     _activeLoadRequestId++;
+    _stopDeviceStatusRefresh();
     _telemetrySubscription?.cancel();
     return super.close();
   }

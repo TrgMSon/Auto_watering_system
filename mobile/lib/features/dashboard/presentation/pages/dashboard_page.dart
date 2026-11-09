@@ -82,8 +82,8 @@ class _DashboardPageState extends State<DashboardPage> {
           final useBle = isBleConnected && !isOnline;
           final bleSample = useBle ? ble.sample : null;
           final telemetry = bleSample != null
-              ? _telemetryFromBle(selectedDevice.id, bleSample)
-              : (useBle ? null : state.telemetry);
+              ? _telemetryFromBle(selectedDevice.id, bleSample, state.telemetry)
+              : state.telemetry;
           final pumpStatus = useBle ? bleSample?.isPumpOn : (state.pumpStatus ?? telemetry?.isPumpOn);
           final isTogglingPump = useBle ? ble.isSending : state.isTogglingPump;
           final canControl = isOnline || isBleConnected;
@@ -350,15 +350,30 @@ Future<void> _togglePumpViaBle(BuildContext context, bool turnOn) async {
   );
 }
 
-TelemetryModel _telemetryFromBle(String deviceId, BleSensorSample sample) => TelemetryModel(
-      deviceId: deviceId,
-      soilMoisture: sample.soilMoisture,
-      temperature: sample.temperature,
-      humidity: sample.humidity,
-      waterLevel: sample.waterLevelPercent,
-      isPumpOn: sample.isPumpOn,
-      recordedAt: DateTime.now(),
-    );
+TelemetryModel _telemetryFromBle(
+  String deviceId,
+  BleSensorSample sample,
+  TelemetryModel? fallback,
+) {
+  final usesFallback =
+      (sample.soilMoisture == null && fallback?.soilMoisture != null) ||
+      (sample.temperature == null && fallback?.temperature != null) ||
+      (sample.humidity == null && fallback?.humidity != null) ||
+      (sample.waterLevelPercent == null && fallback?.waterLevel != null);
+  final recordedAt = usesFallback
+      ? fallback?.recordedAt ?? DateTime.now()
+      : DateTime.now();
+
+  return TelemetryModel(
+    deviceId: deviceId,
+    soilMoisture: sample.soilMoisture ?? fallback?.soilMoisture,
+    temperature: sample.temperature ?? fallback?.temperature,
+    humidity: sample.humidity ?? fallback?.humidity,
+    waterLevel: sample.waterLevelPercent ?? fallback?.waterLevel,
+    isPumpOn: sample.isPumpOn,
+    recordedAt: recordedAt,
+  );
+}
 
 /// Nút kết nối hoặc ngắt Bluetooth với thiết bị đang chọn.
 class _BleConnectButton extends StatelessWidget {

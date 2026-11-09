@@ -28,7 +28,11 @@ class EspRadioSdk : public RadioSdk {
   esp_event_handler_instance_t wifiHandler_=nullptr,ipHandler_=nullptr,barrierHandler_=nullptr;
   bool wifiOwned_=false,ready_=false,failed_=false;
   uint32_t ipv4_=0;
+  bool candidateReported_=false;
   std::atomic<uint32_t> count_{0},ack_{0};std::atomic<bool> fault_{false};
+  // Diagnostic snapshots only; never used for connection/security decisions.
+  // Repeated events between worker polls are coalesced; no credential copies.
+  std::atomic<uint32_t> diagnosticEvents_{0},disconnectReason_{0};
 };
 class NvsCredentialBlob : public Blob {
  public:

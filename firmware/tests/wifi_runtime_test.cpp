@@ -105,5 +105,25 @@ int main(){
     unsigned count=f.sdk.init;for(unsigned i=0;i<100;++i)f.runtime.service(i*30000);
     assert(f.sdk.init==count&&count==1&&!f.blob.writes);
   }
-  std::cout<<"PASS Wi-Fi runtime: reader, boot, timeout/rollover/backoff/reset, live IP, preemption, persistence reload, latched faults\n";
+  {
+    Fixture f;auto fixed=request();strcpy(fixed.ssid,"fixed-network");
+    f.runtime.bootFixed(0,fixed);
+    assert(f.sdk.init==1&&f.sdk.starts==0&&f.blob.reads==0&&f.blob.writes==0);
+    f.runtime.service(1);
+    assert(f.sdk.starts==1&&!strcmp(f.sdk.configured,"fixed-network"));
+    f.sdk.ip=true;f.runtime.service(2);assert(f.runtime.snapshot().online);
+    f.sdk.ip=false;f.runtime.service(3);assert(f.runtime.snapshot().state==State::Backoff);
+    f.runtime.preempt();f.runtime.provisioned(4,Persistence::Verified);
+    assert(f.runtime.snapshot().state==State::Backoff&&f.blob.reads==0&&f.blob.writes==0);
+    f.runtime.service(5002);assert(f.sdk.starts==1);
+    f.runtime.service(5003);f.runtime.service(5004);
+    assert(f.sdk.starts==2&&!strcmp(f.sdk.configured,"fixed-network"));
+    assert(f.blob.reads==0&&f.blob.writes==0);
+  }
+  {
+    Fixture f;auto invalid=request();invalid.ssid[0]=0;
+    f.runtime.bootFixed(0,invalid);
+    assert(f.runtime.snapshot().state==State::NoCredentials&&f.sdk.init==0&&f.blob.reads==0);
+  }
+  std::cout<<"PASS Wi-Fi runtime: persisted and fixed boot, timeout/rollover/backoff/reset, live IP, preemption, persistence reload, latched faults\n";
 }
