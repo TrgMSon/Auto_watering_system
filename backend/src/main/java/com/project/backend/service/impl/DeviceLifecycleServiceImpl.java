@@ -74,14 +74,28 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
         }
         Device device = foundDevice.get();
         DeviceStatus current = lifecycleStatus(device);
-        if (current == null || current == DeviceStatus.DECOMMISSIONED) {
+        if (current == null) {
+            logger.warn("Ignoring MQTT status for device {} with unknown lifecycle state {}",
+                    deviceId, device.getStatus());
+            return;
+        }
+        if (current == DeviceStatus.DECOMMISSIONED) {
+            logger.debug("Ignoring MQTT status for decommissioned device {}", deviceId);
             return;
         }
 
+        String previousStatus = current.value();
         LocalDateTime now = LocalDateTime.now();
         boolean changed = updateFirmwareVersion(device, message.firmwareVersion(), now);
         switch (requestedStatus.get()) {
-            case ACTIVE -> changed |= activateFromDevice(device, current, now);
+            case ACTIVE -> {
+                boolean activated = activateFromDevice(device, current, now);
+                changed |= activated;
+                if (!activated) {
+                    logger.warn("Ignoring ACTIVE MQTT status for device {} in lifecycle state {}",
+                            deviceId, current.value());
+                }
+            }
             case OFFLINE -> {
                 if (current == DeviceStatus.ACTIVE) {
                     device.setStatus(DeviceStatus.OFFLINE.value());
@@ -101,6 +115,14 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
         }
         if (changed) {
             deviceRepository.save(device);
+            logger.info(
+                    "Processed MQTT device status; deviceId={}, requestedStatus={}, previousStatus={}, status={}, lastActiveAt={}",
+                    deviceId, requestedStatus.get().value(), previousStatus, device.getStatus(),
+                    device.getLastActiveAt());
+        } else {
+            logger.debug(
+                    "MQTT device status caused no change; deviceId={}, requestedStatus={}, status={}",
+                    deviceId, requestedStatus.get().value(), device.getStatus());
         }
     }
 
@@ -139,6 +161,8 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
             device.setStatus(DeviceStatus.OFFLINE.value());
             device.setUpdatedAt(LocalDateTime.now());
             deviceRepository.save(device);
+            logger.info("Marked device offline after stale MQTT heartbeat; deviceId={}, lastActiveAt={}",
+                    device.getId(), device.getLastActiveAt());
         }
     }
 
