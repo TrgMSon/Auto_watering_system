@@ -29,15 +29,15 @@ bool usableIp(const esp_netif_ip_info_t& info){
 bool setFallbackDns(esp_netif_t* netif){
   esp_netif_dns_info_t dns={};
   IP4_ADDR(&dns.ip.u_addr.ip4,1,1,1,1);
-  dns.ip.type=IPADDR_TYPE_V4;
+  dns.ip.type=ESP_IPADDR_TYPE_V4;
   return wifiChecked("dns-fallback",esp_netif_set_dns_info(netif,ESP_NETIF_DNS_FALLBACK,&dns));
 }
-void printDns(esp_netif_t* netif,esp_netif_dns_type_t type,const char* label){
+void logDns(const char* label,esp_netif_t* netif,esp_netif_dns_type_t type){
   esp_netif_dns_info_t dns={};
   if(esp_netif_get_dns_info(netif,type,&dns)!=ESP_OK){
     printf("[WIFI] dns %s=unavailable\n",label);return;
   }
-  if(dns.ip.type==IPADDR_TYPE_V4&&!ip4_addr_isany_val(dns.ip.u_addr.ip4))
+  if(dns.ip.type==ESP_IPADDR_TYPE_V4&&!ip4_addr_isany_val(dns.ip.u_addr.ip4))
     printf("[WIFI] dns %s=" IPSTR "\n",label,IP2STR(&dns.ip.u_addr.ip4));
   else printf("[WIFI] dns %s=0.0.0.0\n",label);
 }
@@ -107,9 +107,9 @@ bool EspRadioSdk::drain(uint32_t& token){
   if(events&8)printf("[WIFI] event=STA_DISCONNECTED reason=unavailable\n");
   if(events&2){
     printf("[WIFI] event=STA_GOT_IP\n");
-    printDns(netif_,ESP_NETIF_DNS_MAIN,"main");
-    printDns(netif_,ESP_NETIF_DNS_BACKUP,"backup");
-    printDns(netif_,ESP_NETIF_DNS_FALLBACK,"fallback");
+    logDns("main",netif_,ESP_NETIF_DNS_MAIN);
+    logDns("backup",netif_,ESP_NETIF_DNS_BACKUP);
+    logDns("fallback",netif_,ESP_NETIF_DNS_FALLBACK);
   }
   if(events&4)printf("[WIFI] event=STA_LOST_IP\n");
   if(fault_.load()){printf("[WIFI] stage=events overflow-or-fault\n");return false;}return true;
