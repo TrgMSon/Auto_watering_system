@@ -25,6 +25,7 @@ namespace plant_ble {
 namespace {
 using ble_telemetry::Packet;
 using ble_telemetry::Session;
+constexpr UBaseType_t kEventQueueDepth = WIFI_FIXED_ENABLED ? 16 : 32;
 enum Attribute { Service, SensorDecl, Sensor, SensorCccd, PumpDecl, Pump,
   ConfigDecl, Config, NonceDecl, Nonce, ResultsDecl, Results, ResultsCccd,
 #if !WIFI_FIXED_ENABLED
@@ -657,7 +658,9 @@ void worker(void*) {
 bool begin(const ble_commands::KeySource* keys) {
   if (mailbox) return false;  // Boot-only, no repeated radio allocation.
   keySource = keys; // Provider lifetime must cover boot initialization. Default missing.
-  events = xQueueCreate(32, sizeof(Event));
+  Serial.printf("[BLE] event_queue_depth=%u slot_bytes=%u reserved_bytes=%u\n",
+      unsigned(kEventQueueDepth),unsigned(sizeof(Event)),unsigned(kEventQueueDepth*sizeof(Event)));
+  events = xQueueCreate(kEventQueueDepth, sizeof(Event));
   mailbox = xQueueCreate(1, sizeof(ble_telemetry::Snapshot));
   if (!events || !mailbox) {
     if (events) vQueueDelete(events);
