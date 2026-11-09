@@ -61,6 +61,8 @@ flowchart LR
 
 Backend publish cấu hình với cờ retained để broker giữ cấu hình mới nhất; ESP32 nhận lại cấu hình đó khi kết nối/subcribe lại, kể cả khi thiết bị offline lúc người dùng lưu. Lệnh máy bơm không retained, tránh phát lại lệnh cũ. Thiết bị gửi xác nhận sau khi xử lý lệnh hoặc cấu hình. Backend chờ xác nhận; trạng thái lệnh được giữ trong bộ nhớ tối đa 24 giờ và bị xóa khi backend khởi động lại. Thiết bị nên gửi telemetry mỗi 10–30 giây.
 
+Để cố định Wi-Fi trong firmware chính, sao chép `firmware/esp32/wifi_local.example.h` thành `firmware/esp32/wifi_local.h`, nhập SSID/mật khẩu của mạng WPA2 2.4 GHz trong file local và đặt `WIFI_FIXED_ENABLED` thành `1`. File `wifi_local.h` bị Git ignore; không commit hoặc chia sẻ. Build firmware từ `firmware/esp32` sau khi tạo file này. Chế độ này cấu hình Wi-Fi trong RAM, tự thử kết nối lại và tắt BLE provisioning Wi-Fi; cấu hình MQTT vẫn được provision riêng và đọc từ NVS. SSID/mật khẩu Wi-Fi được biên dịch vào firmware, vì vậy không chia sẻ source/build artifacts chứa thông tin đó. Để trở lại Wi-Fi đã provision qua BLE, xóa file local hoặc đặt cờ về `0`, rồi build và nạp lại firmware.
+
 ### MQTT: quản lý tài khoản trên EMQX Cloud
 
 `MQTT_USERNAME`/`MQTT_PASSWORD` trong cấu hình backend là tài khoản kết nối của backend tới broker, khác với tài khoản riêng của ESP32. Khi admin tạo thiết bị, backend sinh `mqtt_username`/`mqtt_password`, lưu chúng vào MySQL và tạo cùng user đó trong built-in authentication database của EMQX qua Management API. Khi admin decommission thiết bị, backend xóa user khỏi EMQX trước khi xóa credential và liên kết trong MySQL. Nếu EMQX API lỗi, thao tác thiết bị thất bại thay vì trả về thành công giả.

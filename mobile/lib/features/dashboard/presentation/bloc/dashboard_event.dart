@@ -13,6 +13,10 @@ class DashboardLoadRequested extends DashboardEvent {
   const DashboardLoadRequested();
 }
 
+class DashboardDeviceStatusRefreshRequested extends DashboardEvent {
+  const DashboardDeviceStatusRefreshRequested();
+}
+
 class DashboardDeviceSelected extends DashboardEvent {
   final DeviceModel device;
   const DashboardDeviceSelected(this.device);

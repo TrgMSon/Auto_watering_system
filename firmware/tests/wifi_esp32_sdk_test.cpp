@@ -16,6 +16,12 @@ int main(){
  shim::reset();{
   EspRadioSdk sdk;EspRadio radio(sdk);
   assert(radio.startRam(r));uint32_t first=shim::posted;
+  wifi_event_sta_disconnected_t disconnected;disconnected.reason=202;
+  shim::emit(WIFI_EVENT,WIFI_EVENT_STA_CONNECTED);
+  shim::emit(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,&disconnected);
+  disconnected.reason=0; // Callback must copy the numeric reason, not the pointer.
+  shim::emit(IP_EVENT,IP_EVENT_STA_GOT_IP);
+  shim::emit(IP_EVENT,IP_EVENT_STA_LOST_IP);
   shim::associated=true;memcpy(shim::ap.ssid,r.ssid,32);shim::ip.ip.addr=0x0201a8c0;shim::ip.netmask.addr=0x00ffffff;
   shim::emit(IP_EVENT);assert(radio.poll()==Radio::State::Pending); // old event and link cannot cross barrier
   acknowledge(first);assert(radio.poll()==Radio::State::Pending); // old IP explicitly cleared

@@ -37,6 +37,15 @@ void loop() {
     if (!state) continue;
     finished=true;
     if (state<0) { Serial.println("ERROR frame"); return; }
+    if (state==2) {
+      ble_keys::NvsReader reader;
+      auto status=provisioning::inspect(reader,mac);
+      frame.clear();
+      Serial.println(status==provisioning::RecordStatus::Missing ? "STATUS missing" :
+          status==provisioning::RecordStatus::Valid ? "STATUS valid" :
+          status==provisioning::RecordStatus::Invalid ? "STATUS invalid" : "STATUS unreadable");
+      return;
+    }
     NvsWriter storage;
     auto result=provisioning::store(storage,frame.record,frame.size(),mac,frame.replace());
     frame.clear();
