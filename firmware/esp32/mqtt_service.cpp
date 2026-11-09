@@ -15,6 +15,8 @@
 #include <atomic>
 namespace plant_mqtt {
 namespace {
+constexpr char kLogTag[]="mqtt_client";
+constexpr uint32_t kWorkerStackBytes=6144;
 constexpr uint32_t kHeapLogIntervalMs=60000;
 constexpr uint32_t kInternalHeapCaps=MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT;
 portMUX_TYPE mux=portMUX_INITIALIZER_UNLOCKED;
@@ -218,7 +220,7 @@ class EspClient:public Client {
 };
 void worker(void*){
   // No secret/SDK error payload logging; some underlying logs include URIs.
-  esp_log_level_set("mqtt_client",ESP_LOG_NONE);
+  esp_log_level_set(kLogTag,ESP_LOG_NONE);
   uint8_t mac[6]={};
   const bool tlsReady=kTlsDateVerification;
   const bool identityReady=tlsReady&&esp_read_mac(mac,ESP_MAC_WIFI_STA)==ESP_OK&&topics.initialize(mac);
@@ -274,7 +276,7 @@ bool begin(){
   if(!kTlsDateVerification)return false;
   if(started)return false;
   started=true;
-  return xTaskCreate(worker,"mqtt-telemetry",6144,nullptr,1,nullptr)==pdPASS;
+  return xTaskCreate(worker,"mqtt-telemetry",kWorkerStackBytes,nullptr,1,nullptr)==pdPASS;
 }
 void publish(const ::telemetry_snapshot::Snapshot& snapshot){Lock lock;latest=snapshot;observed=true;}
 }
