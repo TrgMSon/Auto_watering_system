@@ -11,6 +11,9 @@ using esp_event_handler_instance_t=void*;
 using Handler=void(*)(void*,esp_event_base_t,int32_t,void*);
 constexpr int ESP_EVENT_ANY_ID=-1;
 extern const char *WIFI_EVENT,*IP_EVENT;
+constexpr int WIFI_EVENT_STA_CONNECTED=4,WIFI_EVENT_STA_DISCONNECTED=5;
+constexpr int IP_EVENT_STA_GOT_IP=0,IP_EVENT_STA_LOST_IP=1;
+struct wifi_event_sta_disconnected_t{uint8_t reason=0;};
 #define ESP_EVENT_DEFINE_BASE(name) const char* name=#name
 struct esp_netif_t{};
 struct Addr{uint32_t addr=0;};

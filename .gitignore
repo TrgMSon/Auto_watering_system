@@ -51,6 +51,7 @@ mobile/docs/
 
 firmware/docs/*
 /firmware/Demo/
+/firmware/esp32/wifi_local.h
 
 /firmware/Production/
 

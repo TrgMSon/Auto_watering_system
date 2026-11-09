@@ -362,10 +362,13 @@ void process(const Event& e) {
       esp_gatt_status_t status = ESP_GATT_WRITE_NOT_PERMIT;
       const bool cccd = e.handle == handles[SensorCccd] || e.handle == handles[ResultsCccd];
       if(e.handle==handles[Wifi]&&session.matches(e.connection)){
+        Serial.printf("[WIFI] stage=ble-write-received bytes=%u prepared=%u response=%u offset=%u\n",
+            unsigned(e.length),unsigned(e.prepared),unsigned(e.response),unsigned(e.offset));
         struct Payload {char bytes[ble_wifi::kWriteCapacity]={};~Payload(){ble_commands::wipeWifi(bytes,sizeof(bytes));}} payload;
         size_t payloadSize=0;bool copied;
         {SecurityLock lock;copied=wifiInput.take(e.wifiPayloadTicket,e.generation,payload.bytes,sizeof(payload.bytes),payloadSize);}
         if(e.prepared||!e.response||e.offset||!e.length||e.length>ble_wifi::kWriteCapacity||e.length>session.mtu-3){
+          Serial.println("[WIFI] stage=ble-write-rejected reason=transport");
           authentication.consume();
           if(e.response)response(e.connection,e.transaction,e.prepared?ESP_GATT_REQ_NOT_SUPPORTED:
               e.offset?ESP_GATT_INVALID_OFFSET:ESP_GATT_INVALID_ATTR_LEN);
@@ -374,19 +377,35 @@ void process(const Event& e) {
         bool bond=false;
         if(e.encryptedWriteGeneration!=e.generation||!pairing.matches(e.peer,e.generation)||
             !pairing.security.bondedPeer(e.generation)||!pairingSdk.bonded(e.peer,bond)||!bond){
+          Serial.println("[WIFI] stage=ble-write-rejected reason=security");
           authentication.consume();response(e.connection,e.transaction,ESP_GATT_INSUF_AUTHENTICATION);break;
         }
         if(!copied||payloadSize!=e.length||!ble_wifi_service::available()){
+          Serial.println("[WIFI] stage=ble-write-rejected reason=handoff-unavailable");
           authentication.consume();response(e.connection,e.transaction,ESP_GATT_INSUF_RESOURCE);break;
         }
         const auto auth=authentication.authenticateWifi(payload.bytes,e.length,millis(),pairing.security,e.generation,session.mtu,
             false,true,0,e.encryptedWriteGeneration);
-        if(auth.securityDenied||auth.missingKey){response(e.connection,e.transaction,ESP_GATT_INSUF_AUTHENTICATION);break;}
-        if(auth.transportDenied){response(e.connection,e.transaction,ESP_GATT_INVALID_ATTR_LEN);break;}
-        if(!session.resultsSubscribed||session.congested||size_t(session.mtu-3)<ble_wifi::kBusinessMax||
-            !ble_wifi_service::reserve(auth,millis())){
+        if(auth.securityDenied||auth.missingKey){
+          Serial.printf("[WIFI] stage=ble-auth-rejected security=%u missing-key=%u\n",
+              unsigned(auth.securityDenied),unsigned(auth.missingKey));
+          response(e.connection,e.transaction,ESP_GATT_INSUF_AUTHENTICATION);break;
+        }
+        if(auth.transportDenied){
+          Serial.println("[WIFI] stage=ble-auth-rejected reason=transport");
+          response(e.connection,e.transaction,ESP_GATT_INVALID_ATTR_LEN);break;
+        }
+        Serial.printf("[WIFI] stage=ble-auth-result code=%s\n",ble_commands::name(auth.code));
+        if(!session.resultsSubscribed||session.congested||size_t(session.mtu-3)<ble_wifi::kBusinessMax){
+          Serial.printf("[WIFI] stage=ble-handoff-rejected notify=%u congested=%u mtu=%u\n",
+              unsigned(session.resultsSubscribed),unsigned(session.congested),unsigned(session.mtu));
           response(e.connection,e.transaction,ESP_GATT_INSUF_RESOURCE);break;
         }
+        if(!ble_wifi_service::reserve(auth,millis())){
+          Serial.println("[WIFI] stage=ble-handoff-rejected reason=busy");
+          response(e.connection,e.transaction,ESP_GATT_INSUF_RESOURCE);break;
+        }
+        Serial.printf("[WIFI] stage=ble-handoff-queued bytes=%u\n",unsigned(e.length));
         // ACK the bounded handoff now, never wait up to 30 seconds for connection.
         response(e.connection,e.transaction,ESP_GATT_OK);break;
       }

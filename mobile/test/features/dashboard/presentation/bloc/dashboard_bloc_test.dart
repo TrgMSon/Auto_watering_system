@@ -70,6 +70,7 @@ void main() {
 
     test('DashboardEvent props equality', () {
       expect(const DashboardLoadRequested().props, isEmpty);
+      expect(const DashboardDeviceStatusRefreshRequested().props, isEmpty);
       expect(DashboardDeviceSelected(testDevice1).props, [testDevice1]);
       expect(DashboardTelemetryUpdated(testTelemetry1).props, [testTelemetry1]);
       expect(const DashboardTelemetryEmpty().props, isEmpty);
@@ -94,6 +95,55 @@ void main() {
     });
 
     group('DashboardLoadRequested', () {
+      test(
+        'periodically refreshes selected device status while preserving telemetry',
+        () async {
+          final activeDevice = DeviceModel(
+            id: testDevice2.id,
+            deviceName: testDevice2.deviceName,
+            status: 'active',
+            permission: testDevice2.permission,
+          );
+          final telemetry = TelemetryModel(
+            deviceId: testDevice2.id,
+            soilMoisture: 45.0,
+            temperature: 28.5,
+            humidity: 65.0,
+            waterLevel: 80.0,
+            isPumpOn: false,
+            recordedAt: DateTime(2026, 10, 7, 10, 0),
+          );
+          var deviceRequestCount = 0;
+          when(() => mockRepository.getDevices()).thenAnswer((_) async {
+            deviceRequestCount++;
+            return deviceRequestCount == 1 ? [testDevice2] : [activeDevice];
+          });
+
+          final bloc = DashboardBloc(
+            repository: mockRepository,
+            deviceStatusRefreshInterval: const Duration(milliseconds: 10),
+          );
+          bloc.emit(DashboardLoaded(
+            devices: [testDevice2],
+            selectedDevice: testDevice2,
+            telemetry: telemetry,
+          ));
+
+          bloc.add(const DashboardLoadRequested());
+          await pumpEventQueue();
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+
+          final state = bloc.state as DashboardLoaded;
+          expect(state.selectedDevice?.isOnline, isTrue);
+          expect(state.devices.single.isOnline, isTrue);
+          expect(state.telemetry, telemetry);
+          expect(deviceRequestCount, greaterThan(1));
+          verify(() => mockRepository.getDevices()).called(deviceRequestCount);
+
+          await bloc.close();
+        },
+      );
+
       blocTest<DashboardBloc, DashboardState>(
         'emits [DashboardLoading, DashboardLoaded] when getDevices succeeds with devices',
         build: () {

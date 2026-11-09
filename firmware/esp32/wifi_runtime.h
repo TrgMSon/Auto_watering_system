@@ -15,11 +15,21 @@ class Runtime {
  public:
   Runtime(ble_wifi::EspRadio& radio,ble_wifi::CredentialStorage& storage):radio_(radio),storage_(storage){}
   void boot(uint32_t now){reload(now,false,false);}
+  void bootFixed(uint32_t now,const ble_commands::WifiRequest& credentials){
+    fixed_=true;
+    credentials_=credentials;
+    if(!ble_commands::validWifiRequest(credentials_)){
+      credentials_.clear();set(State::NoCredentials,Reason::Invalid);return;
+    }
+    start(now);
+  }
   void preempt(){
+    if(fixed_)return;
     if(s_.state==State::Connecting||s_.state==State::Online)radio_.stopCandidate();
     set(State::Provisioning);
   }
   void provisioned(uint32_t now,ble_wifi::Persistence outcome){
+    if(fixed_)return;
     reload(now,true,outcome==ble_wifi::Persistence::Verified);
   }
   void service(uint32_t now){
@@ -56,6 +66,10 @@ class Runtime {
     since_=now;set(State::Backoff,reason);
   }
   void reload(uint32_t now,bool delayed,bool keepLink){
+    if(fixed_){
+      if(delayed)backoff(now,Reason::LinkLost);else start(now);
+      return;
+    }
     const auto read=storage_.load(credentials_);
     if(radio_.faulted()){unavailable();return;}
     if(read!=ble_wifi::Read::Ok){
@@ -72,5 +86,6 @@ class Runtime {
   ble_wifi::EspRadio& radio_;ble_wifi::CredentialStorage& storage_;
   ble_commands::WifiRequest credentials_;Snapshot s_;
   uint32_t since_=0,wait_=0;unsigned level_=0;
+  bool fixed_=false;
 };
 }
