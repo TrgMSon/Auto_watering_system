@@ -52,16 +52,24 @@ class EspClient:public Client {
       Serial.println("[MQTT] broker/TLS configuration is invalid");
       return false;
     }
+    Serial.println("[MQTT] allocating client; heap snapshot follows");
+    logInternalHeap();
     handle_=esp_mqtt_client_init(&c);
     if(!handle_){
-      Serial.println("[MQTT] client initialization failed");
+      Serial.println("[MQTT] client initialization failed (check internal heap)");
       return false;
     }
-    if(esp_mqtt_client_register_event(handle_,MQTT_EVENT_ANY,event,this)!=ESP_OK||esp_mqtt_client_start(handle_)!=ESP_OK){
-      Serial.println("[MQTT] client event registration or start failed");
+    const esp_err_t registerResult=esp_mqtt_client_register_event(handle_,MQTT_EVENT_ANY,event,this);
+    if(registerResult!=ESP_OK){
+      Serial.printf("[MQTT] event registration failed err=0x%x\n",static_cast<unsigned>(registerResult));
       esp_mqtt_client_destroy(handle_);handle_=nullptr;return false;
     }
-    Serial.println("[MQTT] connecting to broker");
+    const esp_err_t startResult=esp_mqtt_client_start(handle_);
+    if(startResult!=ESP_OK){
+      Serial.printf("[MQTT] client start failed err=0x%x\n",static_cast<unsigned>(startResult));
+      esp_mqtt_client_destroy(handle_);handle_=nullptr;return false;
+    }
+    Serial.println("[MQTT] client started; waiting for transport/TLS result");
     return true;
   }
   void stop()override{
@@ -84,18 +92,28 @@ class EspClient:public Client {
       {Lock lock;subscriptions.requested(0,id);}
       const int configId=esp_mqtt_client_subscribe(handle_,configTopic,1);
       {Lock lock;subscriptions.requested(1,configId);}
+      Serial.printf("[MQTT] subscribe requested cmd_id=%d config_id=%d\n",id,configId);
       subscribeAt_=millis();
-      if(id<0||configId<0)failed_.store(true);
+      if(id<0||configId<0){
+        Serial.println("[MQTT] subscribe request failed locally");
+        failed_.store(true);
+      }
       return;
     }
     if(!subscribed_.load()){
       int pumpState,configState;
       {Lock lock;pumpState=subscriptions.state(0);configState=subscriptions.state(1);}
-      if(pumpState<0||configState<0){failed_.store(true);return;}
+      if(pumpState<0||configState<0){
+        Serial.printf("[MQTT] broker rejected subscription cmd=%d config=%d\n",pumpState,configState);
+        failed_.store(true);return;
+      }
       if(pumpState==1&&configState==1){
         subscribed_.store(true);
       }else {
-        if(uint32_t(millis()-subscribeAt_)>=5000){failed_.store(true);return;}
+        if(uint32_t(millis()-subscribeAt_)>=5000){
+          Serial.printf("[MQTT] SUBACK timeout cmd=%d config=%d\n",pumpState,configState);
+          failed_.store(true);return;
+        }
         // Do not hold pump/OFF work behind a slow config SUBACK.
         if(pumpState!=1)return;
       }
@@ -177,15 +195,25 @@ class EspClient:public Client {
         Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(false);
         self.subscribed_.store(false);self.connected_.store(false);self.failed_.store(true);
       }
-      Serial.println(id==MQTT_EVENT_ERROR
-          ? "[MQTT] TLS/transport error; reconnect scheduled"
-          : "[MQTT] disconnected; reconnect scheduled");
+      if(id==MQTT_EVENT_ERROR){
+        if(e&&e->error_handle){
+          const esp_mqtt_error_codes_t& error=*e->error_handle;
+          Serial.printf("[MQTT] error detail type=%d esp_err=0x%x tls_err=0x%x cert_flags=0x%x broker_rc=%d\n",
+              static_cast<int>(error.error_type),static_cast<unsigned>(error.esp_tls_last_esp_err),
+              static_cast<unsigned>(error.esp_tls_stack_err),static_cast<unsigned>(error.esp_tls_cert_verify_flags),
+              static_cast<int>(error.connect_return_code));
+        }else Serial.println("[MQTT] error event has no SDK error details");
+        logInternalHeap();
+        Serial.println("[MQTT] TLS/transport or broker connection error; reconnect scheduled");
+      }else Serial.println("[MQTT] disconnected; reconnect scheduled");
     }
     else if(id==MQTT_EVENT_SUBSCRIBED&&e){
       // SDK reports subscription failures using error_handle/return codes; require
       // exact matching message ID and granted QoS, never treat CONNACK as SUBACK.
       const bool granted=e->data_len==1&&e->data&&
           (static_cast<unsigned char>(e->data[0])==0||static_cast<unsigned char>(e->data[0])==1);
+      Serial.printf("[MQTT] SUBACK msg_id=%d granted=%u code=%d\n",e->msg_id,granted?1u:0u,
+          e->data_len==1&&e->data?static_cast<unsigned char>(e->data[0]):255u);
       Lock lock;subscriptions.received(e->msg_id,granted);
     }
     else if(id==MQTT_EVENT_PUBLISHED&&e){
@@ -227,6 +255,8 @@ void worker(void*){
   const bool configReady=identityReady&&loadConfig(mac,config);
   const bool trustReady=configReady&&(kTlsNativeDates||prepareMqttTrust(config.ca));
   const bool ready=tlsReady&&identityReady&&configReady&&trustReady;
+  Serial.printf("[MQTT] startup checks tls=%u identity=%u nvs_config=%u ca_ready=%u\n",
+      tlsReady?1u:0u,identityReady?1u:0u,configReady?1u:0u,trustReady?1u:0u);
   if(!tlsReady)Serial.println("[MQTT] certificate date verification is unavailable in this build");
   else if(!identityReady)Serial.println("[MQTT] could not initialize the device identity");
   else if(!configReady)Serial.println("[MQTT] MQTT config missing/invalid; check provisioned host, TLS port, CA, username and password");
