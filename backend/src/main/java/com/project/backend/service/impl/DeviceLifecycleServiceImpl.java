@@ -67,6 +67,8 @@ public class DeviceLifecycleServiceImpl implements DeviceLifecycleService {
             return;
         }
 
+        logger.info("Processing MQTT device status; deviceId={}, requestedStatus={}",
+                deviceId, requestedStatus.get().value());
         Optional<Device> foundDevice = deviceRepository.findById(deviceId);
         if (foundDevice.isEmpty()) {
             logger.warn("Ignoring status update from unknown device {}", deviceId);

@@ -3,6 +3,7 @@ package com.project.backend.service.impl;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
@@ -85,6 +86,9 @@ public class FirmwareServiceImpl implements FirmwareService {
         if (firmware.length == 0 || firmware[0] != (byte) 0xE9) {
             throw new IllegalArgumentException("File không có header firmware ESP32 hợp lệ");
         }
+        if (!containsVersion(firmware, normalizedVersion)) {
+            throw new IllegalArgumentException("Phiên bản phát hành không khớp firmware_version.h trong file .bin");
+        }
 
         FirmwareRelease release = new FirmwareRelease();
         release.setVersion(normalizedVersion);
@@ -151,5 +155,18 @@ public class FirmwareServiceImpl implements FirmwareService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is required by the Java runtime", exception);
         }
+    }
+
+    private static boolean containsVersion(byte[] firmware, String version) {
+        byte[] encodedVersion = version.getBytes(StandardCharsets.US_ASCII);
+        byte[] expected = java.util.Arrays.copyOf(encodedVersion, encodedVersion.length + 1);
+        for (int start = 0; start <= firmware.length - expected.length; start++) {
+            int offset = 0;
+            while (offset < expected.length && firmware[start + offset] == expected[offset]) {
+                offset++;
+            }
+            if (offset == expected.length) return true;
+        }
+        return false;
     }
 }

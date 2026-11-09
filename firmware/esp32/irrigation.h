@@ -8,11 +8,12 @@
 #include "configuration.h"
 #include "desired_mode.h"
 #include "telemetry_snapshot.h"
+#include <atomic>
 
 namespace irrigation {
 enum class Mode { Manual, Auto };
-enum class RemoteConfigResult { Ok, Invalid, PumpRunning, StorageError };
-enum class Result { Accepted, AlreadyOn, Unsafe, Locked, ManualOnly, Invalid, Cooldown, ConfigSaved, ConfigUnchanged, ConfigFailed, ConfigBusy, InvalidDuration, ExceedsConfiguredMaximum, QualificationLimit, GuardUnavailable, ModeStorageFailed };
+enum class RemoteConfigResult { Ok, Invalid, PumpRunning, OtaInProgress, StorageError };
+enum class Result { Accepted, AlreadyOn, Unsafe, Locked, ManualOnly, Invalid, Cooldown, ConfigSaved, ConfigUnchanged, ConfigFailed, ConfigBusy, InvalidDuration, ExceedsConfiguredMaximum, QualificationLimit, GuardUnavailable, ModeStorageFailed, OtaInProgress };
 watering::Config confirmedConfig();
 struct Status {
   Mode mode = Mode::Manual;
@@ -40,6 +41,8 @@ class System {
       , autonomous_storage::Ledger* ledger = nullptr
 #endif
       );
+  void setOtaLock(bool locked) { otaLocked_.store(locked); }
+  bool otaLocked() const { return otaLocked_.load(); }
 #if WATERING_AUTONOMOUS_TEST
   void setActivationGate(uint64_t (*capture)(), bool (*allowed)(uint64_t), pump::Result (*start)(uint64_t,uint32_t)) { autonomous_.setGate(capture,allowed,start); }
 #endif
@@ -67,6 +70,7 @@ class System {
   sensors::Reading reading_;
   Status status_;
   pump::QualificationPolicy qualification_;
+  std::atomic<bool> otaLocked_{false};
 #if WATERING_AUTONOMOUS_TEST
   experimental_watering::Owner autonomous_;
   void autonomousSnapshot();

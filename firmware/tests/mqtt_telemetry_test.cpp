@@ -52,10 +52,10 @@ int main(){
     Runtime rt;Fake c;uint32_t now=origin;
     auto tick=[&](uint32_t n){rt.service(n,true,true,true,snapshot,false,c);};
     tick(now);assert(c.starts==1&&rt.state()==State::Connecting);
-    for(uint32_t delay:{5000u,10000u,20000u,30000u,30000u}){
+    for(unsigned retry=0;retry<5;++retry){
       now+=15000;tick(now);assert(rt.state()==State::Backoff);
-      unsigned before=c.starts;tick(now+delay-1);assert(c.starts==before);
-      now+=delay;tick(now);assert(c.starts==before+1);
+      unsigned before=c.starts;tick(now+kReconnectDelayMs-1);assert(c.starts==before);
+      now+=kReconnectDelayMs;tick(now);assert(c.starts==before+1);
     }
     c.up=true;tick(++now);assert(c.statuses==1&&!c.samples&&rt.state()==State::Online);
     tick(now+9999);assert(c.statuses==1&&!c.samples);

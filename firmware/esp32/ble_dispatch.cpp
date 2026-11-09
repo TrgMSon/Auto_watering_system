@@ -84,6 +84,7 @@ Code execute(irrigation::System& system, const Command& command, Clock* clock) {
       case irrigation::RemoteConfigResult::Ok: return Code::Ok;
       case irrigation::RemoteConfigResult::Invalid: return Code::OutOfRange;
       case irrigation::RemoteConfigResult::PumpRunning: return Code::PumpBusy;
+      case irrigation::RemoteConfigResult::OtaInProgress: return Code::OtaInProgress;
       case irrigation::RemoteConfigResult::StorageError: return Code::StorageError;
     }
     return Code::None;
@@ -101,6 +102,7 @@ Code execute(irrigation::System& system, const Command& command, Clock* clock) {
   switch (result) {
     case irrigation::Result::Accepted: return Code::Ok;
     case irrigation::Result::AlreadyOn: return Code::PumpBusy;
+    case irrigation::Result::OtaInProgress: return Code::OtaInProgress;
     case irrigation::Result::InvalidDuration:
     case irrigation::Result::ExceedsConfiguredMaximum:
     case irrigation::Result::QualificationLimit: return Code::OutOfRange;
