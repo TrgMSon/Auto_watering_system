@@ -55,6 +55,9 @@ public class MqttConfig {
     @Value("${app.mqtt.client.id:}")
     private String clientId;
 
+    @Value("${app.mqtt.tls.trust-all-certificates:false}")
+    private boolean trustAllCertificates;
+
     @EventListener
     public void onMqttConnectionFailed(MqttConnectionFailedEvent event) {
         logger.error("MQTT client connection failed: {}", event.getSource(), event.getCause());
@@ -74,7 +77,12 @@ public class MqttConfig {
             options.setPassword(password.toCharArray());
         }
         if (brokerUrl.startsWith("ssl://")) {
-            options.setSocketFactory(SSLSocketFactory.getDefault());
+            if (trustAllCertificates) {
+                logger.warn("MQTT TLS certificate validation is disabled; broker identity is not verified");
+                options.setSocketFactory(MqttTlsSocketFactory.createTrustAll());
+            } else {
+                options.setSocketFactory(SSLSocketFactory.getDefault());
+            }
         }
         factory.setConnectionOptions(options);
         return factory;
