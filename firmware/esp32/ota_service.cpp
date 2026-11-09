@@ -14,6 +14,7 @@
 #include <esp_http_client.h>
 #include <esp_ota_ops.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/version.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -25,6 +26,33 @@ constexpr uint32_t kCheckIntervalMs = 60UL * 60UL * 1000UL;
 constexpr uint32_t kRetryIntervalMs = 5UL * 60UL * 1000UL;
 constexpr size_t kCheckResponseBytes = 2048;
 constexpr size_t kDownloadChunkBytes = 1024;
+
+// Mbed TLS 3 renamed the SHA-256 *_ret APIs while preserving their int return
+// values. Keep the OTA digest checks compatible with both Mbed TLS 2 and 3.
+int sha256Starts(mbedtls_sha256_context* context, int is224) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+  return mbedtls_sha256_starts(context, is224);
+#else
+  return mbedtls_sha256_starts_ret(context, is224);
+#endif
+}
+
+int sha256Update(mbedtls_sha256_context* context, const unsigned char* input, size_t size) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+  return mbedtls_sha256_update(context, input, size);
+#else
+  return mbedtls_sha256_update_ret(context, input, size);
+#endif
+}
+
+int sha256Finish(mbedtls_sha256_context* context, unsigned char* output) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+  return mbedtls_sha256_finish(context, output);
+#else
+  return mbedtls_sha256_finish_ret(context, output);
+#endif
+}
+
 std::atomic<bool> requested{false};
 std::atomic<bool> approved{false};
 std::atomic<bool> taskRunning{false};
@@ -248,7 +276,7 @@ bool installRelease(const Release& release) {
 
   mbedtls_sha256_context sha;
   mbedtls_sha256_init(&sha);
-  bool ok = mbedtls_sha256_starts_ret(&sha, 0) == 0;
+  bool ok = sha256Starts(&sha, 0) == 0;
   unsigned char buffer[kDownloadChunkBytes];
   size_t received = 0;
   bool firstByte = true;
@@ -265,7 +293,7 @@ bool installRelease(const Release& release) {
       break;
     }
     firstByte = false;
-    ok = mbedtls_sha256_update_ret(&sha, buffer, static_cast<size_t>(count)) == 0 &&
+    ok = sha256Update(&sha, buffer, static_cast<size_t>(count)) == 0 &&
         esp_ota_write(handle, buffer, static_cast<size_t>(count)) == ESP_OK;
     received += static_cast<size_t>(count);
   }
@@ -273,7 +301,7 @@ bool installRelease(const Release& release) {
   unsigned char digest[32];
   if (ok) ok = received == release.sizeBytes &&
       esp_http_client_is_complete_data_received(session.get()) &&
-      mbedtls_sha256_finish_ret(&sha, digest) == 0 && hashMatches(digest, release.sha256);
+      sha256Finish(&sha, digest) == 0 && hashMatches(digest, release.sha256);
   mbedtls_sha256_free(&sha);
   if (!ok) {
     esp_ota_abort(handle);
