@@ -23,9 +23,27 @@ static configuration::PreferencesStorage configStorage;
 
 static pump::SerialCommands commands;
 static irrigation::System irrigationSystem;
+#if WATERING_AUTONOMOUS_TEST
+#include "autonomous_nvs.h"
+#include "mqtt_commands.h"
+static autonomous_storage::NvsStorage autonomousStorage;
+static autonomous_storage::Ledger autonomousLedger(autonomousStorage);
+static pump::Result autonomousStartReserved(uint64_t epoch,uint32_t seconds) {
+  if(Serial.available()>0)return pump::Result::Off;
+  return ble_command_bridge::startReserved(epoch,seconds);
+}
+static bool autonomousActivationAllowed(uint64_t epoch) {
+  // Any queued USB input conservatively defers ON until Serial is processed.
+  return Serial.available()==0 && ble_command_bridge::activationAllowed(epoch);
+}
+#endif
 
 void printPumpStatus() {
   const auto& status = irrigationSystem.status();
+#if WATERING_AUTONOMOUS_TEST
+  Serial.printf("EXPERIMENTAL autonomous_block=%s guard_init=%s\n",
+      watering::name(status.autonomousBlock), pump::guardInitializationStatus());
+#endif
   Serial.printf("mode=%s pump=%s watering_state=%s soil_pct=%.2f soil_valid=%d "
                 "water_pct=%.2f water_valid=%d reason=%s remaining_ms=%lu "
                 "cooldown_remaining_ms=%lu watering_attempts=%u\n",
@@ -64,8 +82,16 @@ void servicePump() {
 }
 
 void setup() {
+#if WATERING_AUTONOMOUS_TEST
+  irrigationSystem.setActivationGate(plant_mqtt::commandIngressEpoch,autonomousActivationAllowed,autonomousStartReserved);
+  irrigationSystem.begin(&configStorage,&configStorage,&autonomousLedger);
+#else
   irrigationSystem.begin(&configStorage, &configStorage);
+#endif
   Serial.begin(115200);
+#if WATERING_AUTONOMOUS_TEST
+  Serial.println("WARNING EXPERIMENTAL AUTONOMOUS TEST BUILD: NVS budget required; not hardware-qualified");
+#endif
   Serial.print("Smart Plant Watering firmware ");
   Serial.println(kFirmwareVersion);
 #if defined(F31D_GUARD_TEST) && F31D_GUARD_TEST == 1

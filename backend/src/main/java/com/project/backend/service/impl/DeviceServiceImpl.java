@@ -303,9 +303,9 @@ public class DeviceServiceImpl implements DeviceService {
             throw new IllegalArgumentException("Tham số không hợp lệ");
 
         requireOwnerOperableDevice(deviceId, userId);
-        validateThresholds(
-                request.getSoilMoistureMin(), request.getSoilMoistureMax(),
-                "Độ ẩm đất tối thiểu phải nhỏ hơn hoặc bằng tối đa");
+        if (request.getSoilMoistureMin() >= request.getSoilMoistureMax()) {
+            throw new IllegalArgumentException("Độ ẩm đất tối thiểu phải nhỏ hơn tối đa");
+        }
         validateThresholds(
                 request.getAirHumidityMin(), request.getAirHumidityMax(),
                 "Độ ẩm không khí tối thiểu phải nhỏ hơn hoặc bằng tối đa");

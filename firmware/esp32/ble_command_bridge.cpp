@@ -43,6 +43,17 @@ bool reserve(uint64_t generation, uint32_t transaction, const ble_commands::Comm
 bool result(ble_commands::Dispatch::Slot& slot) { Lock lock; (void)lock; return dispatch.result(slot); }
 void release(uint32_t ticket) { Lock lock; (void)lock; dispatch.release(ticket); }
 void expire(uint32_t now) { Lock lock; (void)lock; dispatch.expire(now); }
+bool activationAllowed(uint64_t epoch) {
+  Lock lock; (void)lock;
+  return epoch==offEpoch && !dispatch.offPending() && !mqtt.offPending();
+}
+#if WATERING_AUTONOMOUS_TEST
+pump::Result startReserved(uint64_t epoch,uint32_t seconds) {
+  Lock lock; (void)lock;
+  if(epoch!=offEpoch||dispatch.offPending()||mqtt.offPending())return pump::Result::Off;
+  return pump::start(seconds);
+}
+#endif
 void serviceOwner(irrigation::System& system, ble_commands::Clock* clock) {
   ble_commands::Dispatch::Slot request;
   int mqttSlot = -1;
@@ -71,6 +82,10 @@ void serviceOwner(irrigation::System& system, ble_commands::Clock* clock) {
     const auto outcome = mqttRequest.on ? system.startManual(mqttRequest.seconds) : system.stopManual();
     const char* detail = !mqttRequest.on && system.status().modeStorageError ? "OFF_APPLIED_MODE_SAVE_FAILED" :
         outcome == irrigation::Result::Unsafe ? watering::name(system.status().decision.reason) : nullptr;
+#if WATERING_AUTONOMOUS_TEST
+    if(outcome!=irrigation::Result::Accepted && system.status().autonomousBlock==watering::Block::StorageFault)
+      detail="STORAGE_ERROR";
+#endif
     Lock lock; (void)lock; mqtt.complete(mqttSlot, outcome, detail); return;
   }
   if (!bleClaim) return;
