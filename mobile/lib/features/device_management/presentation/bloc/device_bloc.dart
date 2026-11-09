@@ -22,6 +22,14 @@ class DeviceBloc extends Bloc<DeviceEvent, DeviceState> {
     on<DeviceAddRequested>(_onAddRequested);
     on<DeviceDeleteRequested>(_onDeleteRequested);
     on<DeviceToggleRequested>(_onToggleRequested);
+    on<DeviceResetRequested>(_onResetRequested);
+  }
+
+  void _onResetRequested(
+    DeviceResetRequested event,
+    Emitter<DeviceState> emit,
+  ) {
+    emit(const DeviceInitial());
   }
 
   Future<void> _onLoadRequested(

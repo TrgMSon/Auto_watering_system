@@ -1,8 +1,10 @@
 package com.project.backend.dto.device;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Data 
+@Data
+@NoArgsConstructor
 public class RegisterDeviceRequest {
     private int userId;
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,17 +12,22 @@ import 'package:watering_app/features/dashboard/presentation/bloc/dashboard_bloc
 import 'package:watering_app/features/dashboard/presentation/bloc/dashboard_event.dart';
 import 'package:watering_app/features/dashboard/presentation/bloc/dashboard_state.dart';
 import 'package:watering_app/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:watering_app/features/ble/domain/ble_messages.dart';
+import 'package:watering_app/features/ble/presentation/bloc/ble_session_cubit.dart';
 
 class MockDashboardBloc extends MockBloc<DashboardEvent, DashboardState>
     implements DashboardBloc {}
 
+class MockBleSessionCubit extends MockCubit<BleSessionState> implements BleSessionCubit {}
+
 void main() {
   late MockDashboardBloc mockDashboardBloc;
+  late MockBleSessionCubit mockBleCubit;
 
   final testDevice1 = DeviceModel(
     id: 'ESP_001',
     deviceName: 'Vườn Lan Ban Công',
-    status: 'ONLINE',
+    status: 'active',
     permission: 'OWNER',
     blePassKey: '123456',
   );
@@ -29,7 +35,7 @@ void main() {
   final testDevice2 = DeviceModel(
     id: 'ESP_002',
     deviceName: 'Vườn Hồng Sân Thượng',
-    status: 'OFFLINE',
+    status: 'offline',
     permission: 'VIEWER',
   );
 
@@ -61,6 +67,8 @@ void main() {
 
   setUp(() {
     mockDashboardBloc = MockDashboardBloc();
+    mockBleCubit = MockBleSessionCubit();
+    when(() => mockBleCubit.state).thenReturn(const BleSessionState());
   });
 
   Widget buildTestWidget({
@@ -72,8 +80,11 @@ void main() {
       theme: ThemeData.light(useMaterial3: true),
       darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: themeMode,
-      home: BlocProvider<DashboardBloc>.value(
-        value: bloc ?? mockDashboardBloc,
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider<DashboardBloc>.value(value: bloc ?? mockDashboardBloc),
+          BlocProvider<BleSessionCubit>.value(value: mockBleCubit),
+        ],
         child: const DashboardPage(),
       ),
     );
@@ -101,39 +112,41 @@ void main() {
     });
 
     testWidgets('renders AppErrorWidget with message and retry button on DashboardError state', (tester) async {
-      const errorMessage = 'Không thể kết nối đến máy chủ';
-      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: errorMessage));
+      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: 'Mất kết nối máy chủ'));
 
       await tester.pumpWidget(buildTestWidget());
 
       expect(find.byType(AppErrorWidget), findsOneWidget);
-      expect(find.text(errorMessage), findsOneWidget);
+      expect(find.text('Mất kết nối máy chủ'), findsOneWidget);
       expect(find.text('Thử lại'), findsOneWidget);
-      expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
     testWidgets('tapping retry on AppErrorWidget dispatches DashboardLoadRequested', (tester) async {
-      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: 'Lỗi tải dữ liệu'));
+      when(() => mockDashboardBloc.state).thenReturn(const DashboardError(message: 'Lỗi tải thiết bị'));
 
       await tester.pumpWidget(buildTestWidget());
-      clearInteractions(mockDashboardBloc);
 
-      final retryButton = find.widgetWithText(ElevatedButton, 'Thử lại');
-      expect(retryButton, findsOneWidget);
-
-      await tester.tap(retryButton);
+      await tester.tap(find.text('Thử lại'));
       await tester.pumpAndSettle();
 
-      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(1);
+      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(2);
     });
 
-    testWidgets('renders empty message when device list is empty', (tester) async {
+    testWidgets('renders empty message, icon, instructions and reload button when device list is empty', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(const DashboardLoaded(devices: []));
 
       await tester.pumpWidget(buildTestWidget());
 
-      expect(find.text('Tổng quan'), findsOneWidget);
+      expect(find.byIcon(Icons.devices_other), findsOneWidget);
       expect(find.text('Bạn chưa có thiết bị nào.'), findsOneWidget);
+      expect(find.text('Liên hệ quản trị viên để được gán thiết bị'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Tải lại'), findsOneWidget);
+      expect(find.byType(DropdownButton<DeviceModel>), findsNothing);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Tải lại'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(2);
     });
 
     testWidgets('renders Loaded state: dropdown, pump card, sensor cards, and RefreshIndicator', (tester) async {
@@ -141,7 +154,6 @@ void main() {
         devices: [testDevice1, testDevice2],
         selectedDevice: testDevice1,
         telemetry: testTelemetryOff,
-        isBleConnected: false,
       ));
 
       await tester.pumpWidget(buildTestWidget());
@@ -152,7 +164,7 @@ void main() {
 
       // Connection status indicator (WiFi for cloud connection)
       expect(find.byIcon(Icons.wifi), findsOneWidget);
-      expect(find.text('ONLINE'), findsOneWidget);
+      expect(find.text('Online'), findsOneWidget);
 
       // RefreshIndicator
       expect(find.byType(RefreshIndicator), findsOneWidget);
@@ -163,9 +175,11 @@ void main() {
       expect(find.byType(Switch), findsOneWidget);
       final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
       expect(pumpSwitch.value, isFalse);
+      expect(pumpSwitch.onChanged, isNotNull);
 
-      // Telemetry Section Title
+      // Telemetry Section Title & Last Updated
       expect(find.text('Thông số hiện tại'), findsOneWidget);
+      expect(find.text('Cập nhật lần cuối: 07/10/2026 10:00'), findsOneWidget);
 
       // Sensor cards titles
       expect(find.text('Độ ẩm đất'), findsOneWidget);
@@ -186,25 +200,122 @@ void main() {
       expect(find.byIcon(Icons.water), findsOneWidget);
     });
 
-    testWidgets('renders Bluetooth icon when isBleConnected is true', (tester) async {
+    testWidgets('renders Bluetooth icon when BLE is connected to the selected device', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
         telemetry: testTelemetryOff,
-        isBleConnected: true,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice1.id,
       ));
 
       await tester.pumpWidget(buildTestWidget());
 
-      expect(find.byIcon(Icons.bluetooth_connected), findsOneWidget);
+      // Nút ngắt Bluetooth và biểu tượng trạng thái.
+      expect(find.byIcon(Icons.bluetooth_connected), findsNWidgets(2));
       expect(find.byIcon(Icons.wifi), findsNothing);
     });
 
-    testWidgets('renders loading spinner in sensor section when telemetry is null', (tester) async {
+    testWidgets('offline device connected over BLE shows BLE readings and pumps via BLE', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice2.id,
+        sample: const BleSensorSample(
+          soilMoisture: 33.3,
+          temperature: 29.0,
+          humidity: null,
+          waterLevelPercent: 55.0,
+          isPumpOn: false,
+        ),
+      ));
+      when(() => mockBleCubit.setPump(any())).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      expect(find.text('33.3%'), findsOneWidget);
+      expect(find.text('55.0%'), findsOneWidget);
+      expect(find.text('--'), findsOneWidget);
+      expect(find.text('Thiết bị đang offline'), findsNothing);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      verify(() => mockBleCubit.setPump(true)).called(1);
+      verifyNever(() => mockDashboardBloc.add(any()));
+    });
+
+    testWidgets('shows the BLE error when pumping via BLE fails', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice2.id,
+        sample: const BleSensorSample(
+          soilMoisture: 33.3,
+          temperature: 29.0,
+          humidity: 60.0,
+          waterLevelPercent: 10.0,
+          isPumpOn: false,
+        ),
+      ));
+      when(() => mockBleCubit.setPump(any()))
+          .thenAnswer((_) async => 'Bồn nước gần cạn, thiết bị không bơm.');
+
+      await tester.pumpWidget(buildTestWidget());
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bồn nước gần cạn, thiết bị không bơm.'), findsOneWidget);
+    });
+
+    testWidgets('tapping the Bluetooth button connects to the selected device', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+      ));
+      when(() => mockBleCubit.connect(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(buildTestWidget());
+      await tester.tap(find.byTooltip('Kết nối Bluetooth'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockBleCubit.connect(testDevice1.id)).called(1);
+    });
+
+    testWidgets('renders wifi_off icon, disabled switch, and offline text when device is offline', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+        telemetry: testTelemetryOff,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.byIcon(Icons.wifi_off), findsOneWidget);
+      expect(find.byIcon(Icons.wifi), findsNothing);
+      expect(find.text('Offline'), findsOneWidget);
+      expect(find.text('Thiết bị đang offline'), findsOneWidget);
+
+      final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
+      expect(pumpSwitch.onChanged, isNull);
+    });
+
+    testWidgets('renders loading spinner in sensor section when telemetry is null and not empty', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
         telemetry: null,
+        isTelemetryEmpty: false,
       ));
 
       await tester.pumpWidget(buildTestWidget());
@@ -213,9 +324,25 @@ void main() {
       expect(find.text('Thông số hiện tại'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Độ ẩm đất'), findsNothing);
+      expect(find.text('Thiết bị chưa gửi dữ liệu'), findsNothing);
     });
 
-    testWidgets('renders loading spinner replacing switch when isTogglingPump is true', (tester) async {
+    testWidgets('renders empty message in sensor section when isTelemetryEmpty is true', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        isTelemetryEmpty: true,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.text('Thông số hiện tại'), findsOneWidget);
+      expect(find.text('Thiết bị chưa gửi dữ liệu'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Độ ẩm đất'), findsNothing);
+    });
+
+    testWidgets('renders loading spinner replacing switch and pending text when isTogglingPump is true', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
@@ -227,6 +354,7 @@ void main() {
 
       expect(find.byType(Switch), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Đang chờ thiết bị xác nhận...'), findsOneWidget);
     });
 
     testWidgets('renders active pump status text when isPumpOn is true', (tester) async {
@@ -242,10 +370,24 @@ void main() {
       final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
       expect(pumpSwitch.value, isTrue);
     });
+
+    testWidgets('renders countdown text when pump is on and pumpOffAt is set', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOn,
+        pumpStatus: true,
+        pumpOffAt: DateTime.now().add(const Duration(seconds: 120)),
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+
+      expect(find.textContaining('Còn '), findsOneWidget);
+    });
   });
 
   group('DashboardPage User Interactions', () {
-    testWidgets('tapping switch when pump is OFF dispatches DashboardPumpToggled(true)', (tester) async {
+    testWidgets('tapping switch when pump is OFF dispatches DashboardPumpToggled(true) without a duration picker', (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
@@ -261,7 +403,74 @@ void main() {
       await tester.tap(switchFinder);
       await tester.pumpAndSettle();
 
+      expect(find.text('Chọn thời gian bơm'), findsNothing);
       verify(() => mockDashboardBloc.add(const DashboardPumpToggled(true))).called(1);
+    });
+
+    testWidgets('auto mode disables turning the pump on and explains why', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        isAutoMode: true,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      expect(find.text('Đang tưới tự động. Tắt chế độ này để bơm tay.'), findsOneWidget);
+      final switchWidget = tester.widget<Switch>(find.byType(Switch));
+      expect(switchWidget.onChanged, isNull);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      verifyNever(() => mockDashboardBloc.add(any()));
+    });
+
+    testWidgets('auto mode still allows turning a running pump off', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOn,
+        pumpStatus: true,
+        isAutoMode: true,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      verify(() => mockDashboardBloc.add(const DashboardPumpToggled(false))).called(1);
+    });
+
+    testWidgets('shows SnackBar when pumpErrorMessage is emitted', (tester) async {
+      final stateController = StreamController<DashboardState>.broadcast();
+      addTearDown(stateController.close);
+
+      whenListen(
+        mockDashboardBloc,
+        stateController.stream,
+        initialState: DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetryOff,
+        ),
+      );
+
+      await tester.pumpWidget(buildTestWidget());
+
+      stateController.add(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        pumpErrorMessage: 'Thiết bị từ chối lệnh bơm.',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Thiết bị từ chối lệnh bơm.'), findsOneWidget);
     });
 
     testWidgets('tapping switch when pump is ON dispatches DashboardPumpToggled(false)', (tester) async {
@@ -281,6 +490,25 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => mockDashboardBloc.add(const DashboardPumpToggled(false))).called(1);
+    });
+
+    testWidgets('tapping switch when device is offline does not dispatch DashboardPumpToggled', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice2],
+        selectedDevice: testDevice2,
+        telemetry: testTelemetryOff,
+      ));
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      final switchFinder = find.byType(Switch);
+      expect(switchFinder, findsOneWidget);
+
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mockDashboardBloc.add(any()));
     });
 
     testWidgets('selecting device from dropdown dispatches DashboardDeviceSelected', (tester) async {
@@ -325,6 +553,53 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(1);
+    });
+
+    testWidgets('pulling to refresh awaits bloc refresh completion', (tester) async {
+      final stateController = StreamController<DashboardState>.broadcast();
+      addTearDown(stateController.close);
+
+      whenListen(
+        mockDashboardBloc,
+        stateController.stream,
+        initialState: DashboardLoaded(
+          devices: [testDevice1],
+          selectedDevice: testDevice1,
+          telemetry: testTelemetryOff,
+          isRefreshing: false,
+        ),
+      );
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      // Perform pull-down gesture to trigger RefreshIndicator
+      await tester.fling(find.byType(ListView), const Offset(0.0, 300.0), 1000.0);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(1);
+
+      // Bloc emits refreshing state
+      stateController.add(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        isRefreshing: true,
+      ));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // RefreshIndicator is still active
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+
+      // Bloc emits completed refresh state
+      stateController.add(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        isRefreshing: false,
+      ));
+      await tester.pumpAndSettle();
     });
   });
 

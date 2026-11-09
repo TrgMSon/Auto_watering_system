@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_error_widget.dart';
+import '../../../../core/widgets/app_loading_indicator.dart';
 import '../../data/models/device_config_model.dart';
 import '../../data/models/schedule_model.dart';
 import '../bloc/automation_bloc.dart';
@@ -12,7 +14,10 @@ import '../widgets/schedule_bottom_sheet.dart';
 class AutomationPage extends StatefulWidget {
   final String deviceId;
 
-  const AutomationPage({super.key, this.deviceId = ''});
+  /// Firmware chỉ nhận cấu hình mới khi bơm đang tắt.
+  final bool isPumpOn;
+
+  const AutomationPage({super.key, this.deviceId = '', this.isPumpOn = false});
 
   @override
   State<AutomationPage> createState() => _AutomationPageState();
@@ -42,10 +47,21 @@ class _AutomationPageState extends State<AutomationPage> {
       body: BlocBuilder<AutomationBloc, AutomationState>(
         builder: (context, state) {
           if (state is AutomationLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingIndicator(
+              message: 'Đang tải cấu hình tự động...',
+            );
           }
           if (state is AutomationError) {
-            return Center(child: Text('Lỗi: ${state.message}'));
+            return AppErrorWidget(
+              message: state.message,
+              onRetry: () {
+                if (widget.deviceId.isNotEmpty) {
+                  context
+                      .read<AutomationBloc>()
+                      .add(AutomationLoadRequested(widget.deviceId));
+                }
+              },
+            );
           }
           if (state is AutomationInitial) {
             return const Center(child: Text('Chưa tìm thấy thiết bị của tài khoản.'));
@@ -85,9 +101,9 @@ class _AutomationPageState extends State<AutomationPage> {
                             );
                           },
                         ),
-                        if (config.autoMode) ...[
                           const Divider(height: 1),
                           ListTile(
+                            enabled: _configLockReason(config) == null,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             leading: Container(
                               padding: const EdgeInsets.all(8),
@@ -98,7 +114,13 @@ class _AutomationPageState extends State<AutomationPage> {
                               child: const Icon(Icons.tune, color: AppColors.primary, size: 20),
                             ),
                             title: const Text('Tùy chỉnh ngưỡng tự động'),
-                            subtitle: Text('Đất: ${config.soilMoistureMin.toInt()}% - ${config.soilMoistureMax.toInt()}%\nKhông khí: ${config.airHumidityMin.toInt()}% - ${config.airHumidityMax.toInt()}%\nNhiệt độ: ${config.temperatureMin.toInt()}°C - ${config.temperatureMax.toInt()}°C\nThời gian bơm: ${config.maxWateringDuration}s'),
+                            subtitle: Text([
+                              'Đất: ${config.soilMoistureMin.toInt()}% - ${config.soilMoistureMax.toInt()}%',
+                              'Không khí: ${config.airHumidityMin.toInt()}% - ${config.airHumidityMax.toInt()}%',
+                              'Nhiệt độ: ${config.temperatureMin.toInt()}°C - ${config.temperatureMax.toInt()}°C',
+                              'Nước tối thiểu: ${config.waterLevelMin}%',
+                              if (_configLockReason(config) case final reason?) reason,
+                            ].join('\n')),
                             trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                             onTap: () {
                               _showAdvancedConfigDialog(context, config);
@@ -106,7 +128,6 @@ class _AutomationPageState extends State<AutomationPage> {
                           ),
                           if (state.isSaving)
                             const LinearProgressIndicator(),
-                        ]
                       ],
                     ),
                 ),
@@ -187,6 +208,13 @@ class _AutomationPageState extends State<AutomationPage> {
         },
       ),
     );
+  }
+
+  /// Firmware chỉ nhận ngưỡng mới khi đang ở chế độ thủ công và bơm tắt.
+  String? _configLockReason(DeviceConfigModel config) {
+    if (config.autoMode) return 'Tắt tưới tự động để sửa ngưỡng.';
+    if (widget.isPumpOn) return 'Chờ bơm tắt để sửa ngưỡng.';
+    return null;
   }
 
   void _showScheduleBottomSheet(BuildContext context, String deviceId, ScheduleModel? existingSchedule) {

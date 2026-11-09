@@ -5,60 +5,84 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.backend.dto.sensor.EnvironmentalStatsResponse;
 import com.project.backend.dto.sensor.SensorLogRequest;
 import com.project.backend.dto.sensor.WaterLevelStatsResponse;
 import com.project.backend.exception.ConflictException;
+import com.project.backend.exception.NotFoundException;
 import com.project.backend.model.Device;
 import com.project.backend.model.SensorLog;
+import com.project.backend.model.UserDevice;
 import com.project.backend.repository.DeviceRepository;
 import com.project.backend.repository.SensorLogRepository;
+import com.project.backend.repository.UserDeviceRepository;
+import com.project.backend.service.DeviceLifecycleService;
 import com.project.backend.service.SensorDataService;
 
 @Service
 public class SensorDataServiceImpl implements SensorDataService {
-    private SensorLogRepository sensorLogRepository;
-    private DeviceRepository deviceRepository;
-    private ObjectMapper objectMapper;
+    private static final Logger logger = LoggerFactory.getLogger(SensorDataServiceImpl.class);
+
+    private final SensorLogRepository sensorLogRepository;
+    private final DeviceRepository deviceRepository;
+    private final UserDeviceRepository userDeviceRepository;
+    private final ObjectMapper objectMapper;
+    private final DeviceLifecycleService deviceLifecycleService;
 
     public SensorDataServiceImpl(SensorLogRepository sensorLogRepository, DeviceRepository deviceRepository,
-            ObjectMapper objectMapper) {
+            UserDeviceRepository userDeviceRepository, ObjectMapper objectMapper,
+            DeviceLifecycleService deviceLifecycleService) {
         this.sensorLogRepository = sensorLogRepository;
         this.deviceRepository = deviceRepository;
+        this.userDeviceRepository = userDeviceRepository;
         this.objectMapper = objectMapper;
+        this.deviceLifecycleService = deviceLifecycleService;
     }
 
     @Override
+    @Transactional
     public void recordSensorLog(String topicName, String payload) {
-        try {
-            String deviceId = deviceIdFromTopic(topicName);
-            if (deviceId.isBlank())
-                return;
-
-            SensorLogRequest request = objectMapper.readValue(payload, SensorLogRequest.class);
-            Device device = deviceRepository.findById(deviceId)
-                    .orElseThrow(() -> new ConflictException("Thiết bị không tồn tại"));
-
-            SensorLog sensorLog = new SensorLog();
-            sensorLog.setDevice(device);
-            sensorLog.setSoilMoisture(request.getSoilMoisture());
-            sensorLog.setTemperature(request.getTemperature());
-            sensorLog.setHumidity(request.getHumidity());
-            sensorLog.setWaterLevel(request.getWaterLevel());
-
-            sensorLog.setRecordedAt(request.getRecordedAt() != null ? request.getRecordedAt() : LocalDateTime.now());
-
-            sensorLogRepository.save(sensorLog);
-        } catch (Exception e) {
-            e.printStackTrace();
+        String deviceId = deviceIdFromTopic(topicName);
+        if (deviceId == null) {
+            logger.warn("Ignoring malformed telemetry topic: {}", topicName);
+            return;
         }
+
+        SensorLogRequest request;
+        try {
+            request = objectMapper.readValue(payload, SensorLogRequest.class);
+        } catch (JsonProcessingException exception) {
+            logger.warn("Ignoring malformed telemetry payload for {}", deviceId, exception);
+            return;
+        }
+
+        if (!deviceLifecycleService.recordTelemetry(deviceId)) {
+            return;
+        }
+
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new ConflictException("Thiết bị không tồn tại"));
+        SensorLog sensorLog = new SensorLog();
+        sensorLog.setDevice(device);
+        sensorLog.setSoilMoisture(request.getSoilMoisture());
+        sensorLog.setTemperature(request.getTemperature());
+        sensorLog.setHumidity(request.getHumidity());
+        sensorLog.setWaterLevel(request.getWaterLevel());
+        sensorLog.setRecordedAt(request.getRecordedAt() != null ? request.getRecordedAt() : LocalDateTime.now());
+        sensorLogRepository.save(sensorLog);
     }
 
     @Override
-    public List<EnvironmentalStatsResponse> getEnvironmentalStats(String deviceId, String range) {
+    public List<EnvironmentalStatsResponse> getEnvironmentalStats(String deviceId, int userId, String range) {
+        requireStatisticsPermission(deviceId, userId);
+
         // 1. Tính toán thời gian bắt đầu dựa vào range
         LocalDateTime startTime = calculateStartTime(range);
 
@@ -83,7 +107,9 @@ public class SensorDataServiceImpl implements SensorDataService {
     }
 
     @Override
-    public List<WaterLevelStatsResponse> getWaterLevelStats(String deviceId, String range) {
+    public List<WaterLevelStatsResponse> getWaterLevelStats(String deviceId, int userId, String range) {
+        requireStatisticsPermission(deviceId, userId);
+
         // 1. Tính toán thời gian bắt đầu từ range (24h, 7d, 30d)
         LocalDateTime startTime = calculateStartTime(range);
 
@@ -106,6 +132,15 @@ public class SensorDataServiceImpl implements SensorDataService {
         return responseList;
     }
 
+    private void requireStatisticsPermission(String deviceId, int userId) {
+        UserDevice association = userDeviceRepository.findByUser_IdAndDevice_Id(userId, deviceId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thiết bị"));
+        String permission = association.getPermission();
+        if (!"owner".equalsIgnoreCase(permission) && !"viewer".equalsIgnoreCase(permission)) {
+            throw new NotFoundException("Không tìm thấy thiết bị");
+        }
+    }
+
     // Hàm phụ trợ tính mốc thời gian
     private LocalDateTime calculateStartTime(String range) {
         LocalDateTime now = LocalDateTime.now();
@@ -121,6 +156,8 @@ public class SensorDataServiceImpl implements SensorDataService {
             return null;
         }
         String deviceId = topic.substring("iot/garden/".length(), topic.length() - "/telemetry".length());
-        return deviceId.isBlank() || deviceId.contains("/") ? null : deviceId;
+        return deviceId.isBlank() || deviceId.contains("/")
+                ? null
+                : deviceId.trim().replace('-', ':').toUpperCase(java.util.Locale.ROOT);
     }
 }

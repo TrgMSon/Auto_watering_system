@@ -59,8 +59,15 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/", "/login", "/index.html", "/static/**",
+                                "/favicon.ico", "/manifest.json", "/asset-manifest.json",
+                                "/robots.txt", "/logo*.png")
+                        .permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/firmware/check", "/api/firmware/*/download").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/dashboard/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
@@ -95,4 +102,3 @@ public class SecurityConfig {
         objectMapper.writeValue(response.getWriter(), ApiResponse.error(statusCode, message));
     }
 }
-

@@ -10,7 +10,7 @@ class DeviceConfigModel {
   final double temperatureMin;
   final double temperatureMax;
 
-  final int maxWateringDuration;
+  /// Ngưỡng mực nước thấp, tính bằng % bồn như firmware (20 đến 100).
   final int waterLevelMin;
 
   const DeviceConfigModel({
@@ -22,8 +22,7 @@ class DeviceConfigModel {
     required this.airHumidityMax,
     required this.temperatureMin,
     required this.temperatureMax,
-    required this.maxWateringDuration,
-    this.waterLevelMin = 0,
+    this.waterLevelMin = 20,
   });
 
   factory DeviceConfigModel.fromJson(Map<String, dynamic> json) {
@@ -36,10 +35,12 @@ class DeviceConfigModel {
       airHumidityMax: (json['air_humidity_max'] ?? 80).toDouble(),
       temperatureMin: (json['air_temperature_min'] ?? json['temperature_min'] ?? 20).toDouble(),
       temperatureMax: (json['air_temperature_max'] ?? json['temperature_max'] ?? 35).toDouble(),
-      maxWateringDuration: json['max_watering_duration'] ?? 120,
-      waterLevelMin: json['water_level_min'] ?? 0,
+      waterLevelMin: json['water_level_min'] ?? 20,
     );
   }
+
+  /// Đưa ngưỡng cũ về khoảng backend và firmware nhận, để lưu không bị lỗi 400.
+  static int normalizeWaterLevelMin(int value) => value.clamp(20, 100);
 
   Map<String, dynamic> toJson() {
     return {
@@ -50,8 +51,7 @@ class DeviceConfigModel {
       'air_humidity_max': airHumidityMax,
       'air_temperature_min': temperatureMin,
       'air_temperature_max': temperatureMax,
-      'max_watering_duration': maxWateringDuration,
-      'water_level_min': waterLevelMin,
+      'water_level_min': normalizeWaterLevelMin(waterLevelMin),
     };
   }
 
@@ -63,7 +63,6 @@ class DeviceConfigModel {
     double? airHumidityMax,
     double? temperatureMin,
     double? temperatureMax,
-    int? maxWateringDuration,
     int? waterLevelMin,
   }) {
     return DeviceConfigModel(
@@ -75,7 +74,6 @@ class DeviceConfigModel {
       airHumidityMax: airHumidityMax ?? this.airHumidityMax,
       temperatureMin: temperatureMin ?? this.temperatureMin,
       temperatureMax: temperatureMax ?? this.temperatureMax,
-      maxWateringDuration: maxWateringDuration ?? this.maxWateringDuration,
       waterLevelMin: waterLevelMin ?? this.waterLevelMin,
     );
   }

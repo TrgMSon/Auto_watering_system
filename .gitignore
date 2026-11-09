@@ -46,8 +46,17 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+**/docs/
 mobile/docs/
 
+firmware/docs/*
+/firmware/Demo/
+
+/firmware/Production/
+
+/firmware/Legacy/
+
+pycache/
 # ==========================================
 # 1. Spring Boot / Java (Backend)
 # ==========================================
@@ -74,6 +83,7 @@ hs_err_pid*
 replay_pid*
 
 # React js
+backend/data/firmware/
 node_modules
 /frontend/node_modules/
 
@@ -122,6 +132,7 @@ app.*.map.json
 build/
 sdkconfig.old
 
+mqtt_service.d
 # Arduino IDE / C++ temporary files
 *.hex
 *.bin
@@ -169,3 +180,6 @@ flutter/.env
 # OS system files
 .DS_Store
 Thumbs.db
+
+**/.agents
+cau-hoi-ble-tra-loi.md

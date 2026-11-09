@@ -23,6 +23,7 @@ public class Device {
     @Column(name = "firmware_version")
     private String firmwareVersion;
 
+    @Column(length = 20)
     private String status;
 
     @Column(name = "last_active_at")
@@ -36,6 +37,12 @@ public class Device {
 
     @Column(name = "ble_pass_key")
     private String blePassKey;
+
+    @Column(name = "mqtt_username", length = 55)
+    private String mqttUsername;
+
+    @Column(name = "mqtt_password", length = 55)
+    private String mqttPassword;
 
     public Device() {
     }

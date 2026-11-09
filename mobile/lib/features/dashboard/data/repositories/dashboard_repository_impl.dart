@@ -8,10 +8,20 @@ import '../../domain/repositories/dashboard_repository.dart';
 import '../../domain/entities/dashboard_summary.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
-  DashboardRepositoryImpl(this._apiClient);
+  DashboardRepositoryImpl(
+    this._apiClient, {
+    Duration pollInterval = const Duration(seconds: 5),
+  }) : _pollInterval = pollInterval;
 
   final ApiClient _apiClient;
-  final Map<String, bool> _pumpStatus = {};
+  final Duration _pollInterval;
+  final Map<String, DateTime> _pumpOffAt = {};
+
+  bool? _isPumpOn(String deviceId) {
+    final offAt = _pumpOffAt[deviceId];
+    if (offAt == null) return null;
+    return DateTime.now().isBefore(offAt);
+  }
 
   @override
   Future<List<DeviceModel>> getDevices() async {
@@ -45,7 +55,11 @@ class DashboardRepositoryImpl implements DashboardRepository {
       );
       final status = acknowledgment['status']?.toString().toUpperCase();
       if (status == 'SUCCEEDED') {
-        _pumpStatus[deviceId] = turnOn;
+        if (turnOn) {
+          _pumpOffAt[deviceId] = DateTime.now().add(Duration(seconds: duration));
+        } else {
+          _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+        }
         return;
       }
       if (status == 'FAILED' || status == 'PUBLISH_FAILED') {
@@ -62,17 +76,55 @@ class DashboardRepositoryImpl implements DashboardRepository {
   }
 
   @override
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey) async* {
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey) async* {
     while (true) {
-      final response = await _apiClient.get(
-        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
-      );
-      if (response.isNotEmpty) {
-        yield TelemetryModel.fromJson(response).copyWith(
-          isPumpOn: _pumpStatus[deviceId],
+      try {
+        final response = await _apiClient.get(
+          '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/telemetry/latest',
         );
+        if (response.isNotEmpty) {
+          final model = TelemetryModel.fromJson(response);
+          yield TelemetryModel(
+            deviceId: model.deviceId,
+            soilMoisture: model.soilMoisture,
+            temperature: model.temperature,
+            humidity: model.humidity,
+            waterLevel: model.waterLevel,
+            isPumpOn: _isPumpOn(deviceId),
+            recordedAt: model.recordedAt,
+          );
+        } else {
+          yield null;
+        }
+      } catch (e, stackTrace) {
+        yield* Stream<TelemetryModel?>.error(e, stackTrace);
       }
-      await Future<void>.delayed(const Duration(seconds: 5));
+      await Future<void>.delayed(_pollInterval);
+    }
+  }
+
+  @override
+  Future<bool> getAutoMode(String deviceId) async {
+    try {
+      final config = await _apiClient.get(
+        '${ApiEndpoints.devices}/${Uri.encodeComponent(deviceId)}/config',
+      );
+      final autoMode = config['auto_mode'];
+      return autoMode == true || autoMode == 1;
+    } on ApiException catch (e) {
+      // Thiết bị chưa có cấu hình thì chưa bật tự động.
+      if (e.statusCode == 404) return false;
+      rethrow;
+    }
+  }
+
+  @override
+  void applyPumpStatus(String deviceId, {required bool isOn}) {
+    if (!isOn) {
+      _pumpOffAt[deviceId] = DateTime.fromMillisecondsSinceEpoch(0);
+    } else if (_isPumpOn(deviceId) == false) {
+      // Không biết thời lượng của lệnh bật từ người khác, nên bỏ mốc tắt cũ.
+      _pumpOffAt.remove(deviceId);
     }
   }
 

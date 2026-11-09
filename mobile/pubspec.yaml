@@ -26,6 +26,7 @@ dependencies:
   # Secure Storage
   flutter_secure_storage: ^11.2.0
   shared_preferences: ^2.3.5
+  crypto: ^3.0.6
 
   # Charts
   fl_chart: ^1.2.0
@@ -39,6 +40,8 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
+  stomp_dart_client: ^3.0.1
+  flutter_blue_plus: ^2.3.15
 
 dev_dependencies:
   flutter_test:

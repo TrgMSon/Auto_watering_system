@@ -1,4 +1,4 @@
-﻿import 'package:equatable/equatable.dart';
+import 'package:equatable/equatable.dart';
 import '../../data/models/device_model.dart';
 import '../../data/models/telemetry_model.dart';
 
@@ -29,6 +29,10 @@ class DashboardTelemetryUpdated extends DashboardEvent {
   List<Object?> get props => [telemetry];
 }
 
+class DashboardTelemetryEmpty extends DashboardEvent {
+  const DashboardTelemetryEmpty();
+}
+
 class DashboardTelemetryFailed extends DashboardEvent {
   final String message;
   const DashboardTelemetryFailed(this.message);
@@ -39,8 +43,35 @@ class DashboardTelemetryFailed extends DashboardEvent {
 
 class DashboardPumpToggled extends DashboardEvent {
   final bool turnOn;
-  const DashboardPumpToggled(this.turnOn);
+  final int? durationSeconds;
+
+  const DashboardPumpToggled(this.turnOn, {this.durationSeconds});
 
   @override
-  List<Object?> get props => [turnOn];
+  List<Object?> get props => [turnOn, durationSeconds];
+}
+
+/// Chế độ tự động vừa tải từ server hoặc vừa đổi ở tab Tự động hóa.
+class DashboardAutoModeLoaded extends DashboardEvent {
+  final String deviceId;
+  final bool isAutoMode;
+
+  const DashboardAutoModeLoaded({required this.deviceId, required this.isAutoMode});
+
+  @override
+  List<Object?> get props => [deviceId, isAutoMode];
+}
+
+class DashboardResetRequested extends DashboardEvent {
+  const DashboardResetRequested();
+}
+
+class DashboardPumpStatusReceived extends DashboardEvent {
+  final String deviceId;
+  final bool isOn;
+
+  const DashboardPumpStatusReceived({required this.deviceId, required this.isOn});
+
+  @override
+  List<Object?> get props => [deviceId, isOn];
 }

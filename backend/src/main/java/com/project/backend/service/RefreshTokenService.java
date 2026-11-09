@@ -5,7 +5,10 @@ import com.project.backend.model.User;
 
 public interface RefreshTokenService {
     String createRefreshToken(User user);
+
     RefreshToken validateAndGet(String rawToken);
+
     void revoke(RefreshToken entity);
+
     String rotate(RefreshToken oldToken);
 }

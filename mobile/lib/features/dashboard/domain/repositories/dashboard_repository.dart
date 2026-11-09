@@ -9,5 +9,11 @@ abstract class DashboardRepository {
   // New API-first methods for Tab 1
   Future<List<DeviceModel>> getDevices();
   Future<void> togglePump(String deviceId, bool turnOn, {int duration = 120});
-  Stream<TelemetryModel> watchTelemetry(String deviceId, String? blePassKey);
+  Stream<TelemetryModel?> watchTelemetry(String deviceId, String? blePassKey);
+
+  /// Thiết bị đang ở chế độ tưới tự động hay không, theo cấu hình lưu trên server.
+  Future<bool> getAutoMode(String deviceId);
+
+  /// Cập nhật trạng thái bơm nhận từ WebSocket để lần đọc cảm biến sau không ghi đè.
+  void applyPumpStatus(String deviceId, {required bool isOn});
 }

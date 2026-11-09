@@ -8,16 +8,27 @@ sealed class SensorEvent extends Equatable {
 }
 
 class SensorHistoryRequested extends SensorEvent {
+  final String deviceId;
   final DateTime from;
   final DateTime to;
-  const SensorHistoryRequested({required this.from, required this.to});
+
+  const SensorHistoryRequested({
+    required this.deviceId,
+    required this.from,
+    required this.to,
+  });
 
   @override
-  List<Object?> get props => [from, to];
+  List<Object?> get props => [deviceId, from, to];
 }
 
 class SensorRealtimeStarted extends SensorEvent {
-  const SensorRealtimeStarted();
+  final String deviceId;
+
+  const SensorRealtimeStarted({required this.deviceId});
+
+  @override
+  List<Object?> get props => [deviceId];
 }
 
 class SensorRealtimeStopped extends SensorEvent {
@@ -38,4 +49,8 @@ class SensorRealtimeFailed extends SensorEvent {
 
   @override
   List<Object?> get props => [message];
+}
+
+class SensorResetRequested extends SensorEvent {
+  const SensorResetRequested();
 }
