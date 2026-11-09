@@ -113,6 +113,7 @@ Chỉnh `backend\.env` và điền thông tin thực tế, không commit thông 
 | `MQTT_BROKER_URL` | Địa chỉ broker, ví dụ `tcp://localhost:1883` hoặc `ssl://<MQTT_HOST>:8883` |
 | `MQTT_USERNAME`, `MQTT_PASSWORD` | Thông tin xác thực broker nếu broker yêu cầu |
 | `MQTT_CLIENT_ID` | Client ID của backend trên broker |
+| `MQTT_TLS_TRUST_ALL` | Bỏ qua xác thực chứng chỉ broker khi dùng `ssl://`; mặc định `false`. Chỉ bật (`true`) cho mục đích thử nghiệm vì kết nối sẽ dễ bị giả mạo trung gian (MITM). |
 
 Các biến CORS và refresh token không có trong `.env.example`; hãy bổ sung chúng vào `backend\.env`. MQTT được bật trong cấu hình backend, vì vậy cần cung cấp broker có thể kết nối.
 
