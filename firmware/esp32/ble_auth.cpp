@@ -68,6 +68,7 @@ const char* name(Code code) {
     case Code::Maintenance: return "MAINTENANCE"; case Code::SensorError: return "SENSOR_ERROR";
     case Code::PumpBusy: return "PUMP_BUSY"; case Code::InvalidTime: return "INVALID_TIME";
     case Code::StorageError: return "STORAGE_ERROR";
+    case Code::OtaInProgress: return "OTA_IN_PROGRESS";
     case Code::WifiOk: return "WIFI_OK"; case Code::WifiFail: return "WIFI_FAIL";
     default: return nullptr;
   }

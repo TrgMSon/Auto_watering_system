@@ -9,6 +9,7 @@
 #include "preferences_storage.h"
 #include "ble_server.h"
 #include "mqtt_service.h"
+#include "ota_service.h"
 #include "ble_pairing.h"
 #include "ble_command_bridge.h"
 #include "ble_key_nvs.h"
@@ -58,6 +59,7 @@ void printPumpStatus() {
 
 void servicePump() {
 #if !defined(F31D_GUARD_TEST) || F31D_GUARD_TEST != 1
+  plant_ota::ownerService(irrigationSystem);
   ble_command_bridge::serviceOwner(irrigationSystem, &bleClock);
 #endif
   irrigationSystem.service();
@@ -110,7 +112,10 @@ void setup() {
   Serial.println(keyStatus == ble_keys::Status::Loaded ? "BLE key loaded" :
       keyStatus == ble_keys::Status::Missing ? "BLE key missing" : "BLE key invalid");
   if (!plant_ble::begin(&bleKeySource)) Serial.println("BLE worker unavailable; irrigation unchanged");
-  plant_mqtt::begin();
+  if (!plant_mqtt::begin())
+    Serial.println("[MQTT] worker unavailable (TLS date verification unsupported or task creation failed)");
+  if (!plant_ota::begin()) Serial.println("[OTA] worker unavailable");
+  plant_ota::confirmBoot();
 #endif
 }
 
@@ -155,8 +160,9 @@ void loop() {
 #if !defined(F31D_GUARD_TEST) || F31D_GUARD_TEST != 1
       const auto pairingCommand=ble_pairing::command(line);
       if(pairingCommand!=ble_pairing::Command::None){
-        const bool queued=plant_ble::requestPairing(pairingCommand==ble_pairing::Command::Open,
-            irrigationSystem.status().mode==irrigation::Mode::Manual,pump::isOn());
+        const bool queued=!irrigationSystem.otaLocked()&&
+            plant_ble::requestPairing(pairingCommand==ble_pairing::Command::Open,
+                irrigationSystem.status().mode==irrigation::Mode::Manual,pump::isOn());
         Serial.println(queued?"BLE_PAIR_REQUEST_QUEUED":"BLE_PAIR_REQUEST_REJECTED (requires MANUAL/OFF for open and available BLE queue)");
         continue;
       }

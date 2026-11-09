@@ -149,5 +149,20 @@ int main() {
   system.update(sample());
   assert(system.command("garbage") == Result::Invalid); check(system, false, State::Idle);
   assert(system.command(nullptr) == Result::Invalid);
+
+  system.begin(); system.update(sample());
+  system.setOtaLock(true);
+  assert(system.command("ON") == Result::OtaInProgress);
+  assert(system.command("AUTO") == Result::OtaInProgress);
+  assert(system.startManual(5) == Result::OtaInProgress);
+  assert(system.updateConfiguration(system.configurationStatus().active()) == configuration::Result::Busy);
+  configuration::Config otaConfig = system.configurationStatus().active();
+  assert(system.applyRemoteConfiguration(otaConfig, false) == irrigation::RemoteConfigResult::OtaInProgress);
+  system.service(); check(system, false, State::Idle);
+  system.setOtaLock(false);
+  system.update(sample(70));
+  assert(system.command("ON") == Result::Accepted); check(system, true, State::Watering);
+  system.setOtaLock(true); system.service(); check(system, false, State::Locked);
+  system.setOtaLock(false);
   std::cout << "PASS: F2.3b mode/safety/pump integration, runtime, rearm, rollover, parser gate\n";
 }

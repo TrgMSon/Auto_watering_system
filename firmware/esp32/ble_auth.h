@@ -10,7 +10,7 @@ enum class Op { Unknown, On, Off, Time, Config };
 constexpr bool authenticatedWrite(unsigned suffix) { return suffix == 2 || suffix == 3 || suffix == 7; }
 constexpr bool encryptedWifiWrite(unsigned suffix) { return suffix == 6; }
 enum class Code { None, Ok, BadSig, NonceExpired, BadJson, OutOfRange,
-  LowWater, Maintenance, SensorError, PumpBusy, InvalidTime, WifiOk, WifiFail, StorageError };
+  LowWater, Maintenance, SensorError, PumpBusy, InvalidTime, WifiOk, WifiFail, StorageError, OtaInProgress };
 const char* name(Op op);
 const char* name(Code code);
 struct Crypto {

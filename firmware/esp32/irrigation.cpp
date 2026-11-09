@@ -30,6 +30,7 @@ void System::loadConfiguration(configuration::Storage& storage) {
   snapshot();
 }
 configuration::Result System::updateConfiguration(const configuration::Config& candidate) {
+  if (otaLocked()) return configuration::Result::Busy;
   // A pending restored AUTO is not a manual configuration session. Explicit
   // MANUAL (or the MQTT safe intermediate) must cancel it before a SET/save.
   if (status_.pendingBootAuto) return configuration::Result::Busy;
@@ -57,6 +58,7 @@ configuration::Result System::updateConfiguration(const configuration::Config& c
   return result;
 }
 RemoteConfigResult System::applyRemoteConfiguration(const configuration::Config& candidate, bool automatic) {
+  if (otaLocked()) return RemoteConfigResult::OtaInProgress;
   // Owner only. Validate before any mutation, including a temporary mode change.
   if (!configuration::valid(candidate)) return RemoteConfigResult::Invalid;
   if (status_.pumpOn || pump::isOn() || controller_.state() == watering::State::Watering)
@@ -114,6 +116,7 @@ void System::begin(configuration::Storage* storage, desired_mode::Storage* modes
     , autonomous_storage::Ledger* ledger
 #endif
     ) {
+  otaLocked_.store(false);
   pump::begin(qualification_);
   bootMs_ = millis();
   controller_ = watering::Controller(config_);
@@ -176,6 +179,7 @@ void System::stop(watering::Reason reason) {
 }
 void System::service() {
 #if WATERING_AUTONOMOUS_TEST
+  if (otaLocked()) { pump::command("OFF"); autonomous_.interrupt(); autonomousSnapshot(); return; }
   autonomous_.service(status_.mode==Mode::Auto);autonomousSnapshot();return;
 #endif
   const bool expectedOn = status_.pumpOn;
@@ -185,6 +189,14 @@ void System::service() {
   if (event.cause != pump::StopCause::None || (expectedOn && !actualOn)) {
     stop(event.cause == pump::StopCause::Timeout ? watering::Reason::Timeout :
         event.cause == pump::StopCause::SafetyLeaseExpired ? watering::Reason::SafetyLeaseExpired : watering::Reason::ActuatorStopped);
+    return;
+  }
+  if (otaLocked()) {
+    if (actualOn) {
+      stop(watering::Reason::ManualStop);
+      return;
+    }
+    snapshot();
     return;
   }
   status_.decision = controller_.evaluate(reading_, millis(), status_.mode == Mode::Auto);
@@ -215,6 +227,8 @@ void System::service() {
   }
 }
 Result System::command(const char* text) {
+  if (otaLocked() && text && strcmp(text, "OFF") != 0 &&
+      strcmp(text, "MANUAL") != 0 && strcmp(text, "STATUS") != 0) return Result::OtaInProgress;
   if (text && strcmp(text, "ON") == 0) return startManual(5);
   if (text && strcmp(text, "CONFIG") == 0) return Result::Accepted;
   if (text && (strncmp(text, "SET ", 4) == 0 || strcmp(text, "RESET_CONFIG") == 0)) {
@@ -265,12 +279,17 @@ Result System::command(const char* text) {
   return Result::Invalid;
 }
 Result System::stopManual() {
+  if (otaLocked()) {
+    stop(watering::Reason::ManualStop);
+    return Result::Accepted;
+  }
   changeDesiredMode(Mode::Manual);
   // GPIO OFF succeeded even if desired-mode persistence is unconfirmed. The
   // public diagnostic carries that distinction without changing BLE codes.
   return Result::Accepted;
 }
 Result System::startManual(uint32_t durationSeconds) {
+  if (otaLocked()) return Result::OtaInProgress;
 #if WATERING_AUTONOMOUS_TEST
   if(durationSeconds<1||durationSeconds>600)return Result::InvalidDuration;
   if(status_.mode!=Mode::Manual)return Result::ManualOnly;
@@ -320,6 +339,7 @@ const char* name(Mode mode) { return mode == Mode::Auto ? "AUTO" : "MANUAL"; }
 const char* name(Result result) {
   switch (result) {
     case Result::ModeStorageFailed: return "MODE_SAVE_FAILED_RUNTIME_MANUAL_OFF";
+    case Result::OtaInProgress: return "OTA_IN_PROGRESS";
     case Result::GuardUnavailable: return "GUARD_UNAVAILABLE";
     case Result::InvalidDuration: return "INVALID_DURATION";
     case Result::ExceedsConfiguredMaximum: return "EXCEEDS_CONFIGURED_MAXIMUM";

@@ -61,6 +61,8 @@ flowchart LR
 
 Backend publish cấu hình với cờ retained để broker giữ cấu hình mới nhất; ESP32 nhận lại cấu hình đó khi kết nối/subcribe lại, kể cả khi thiết bị offline lúc người dùng lưu. Lệnh máy bơm không retained, tránh phát lại lệnh cũ. Thiết bị gửi xác nhận sau khi xử lý lệnh hoặc cấu hình. Backend chờ xác nhận; trạng thái lệnh được giữ trong bộ nhớ tối đa 24 giờ và bị xóa khi backend khởi động lại. Thiết bị nên gửi telemetry mỗi 10–30 giây.
 
+Firmware ESP32 DevKit V1 không cần PSRAM. Để theo dõi heap RAM nội bộ, mở Serial Monitor ở 115200 baud; firmware in `[RAM]` lúc MQTT worker khởi động và mỗi 60 giây, gồm heap còn trống, mức thấp nhất kể từ boot và block liên tục lớn nhất. MQTT dùng chung một buffer xử lý payload cho từng lô lệnh để giảm RAM tĩnh khoảng 1.5 KiB; giới hạn payload, hàng đợi độc lập cho lệnh/cấu hình và cấu hình TLS không đổi. Stack task MQTT/BLE được giữ nguyên để tránh đặt ngưỡng thấp chưa được đo trên phần cứng.
+
 Để cố định Wi-Fi trong firmware chính, sao chép `firmware/esp32/wifi_local.example.h` thành `firmware/esp32/wifi_local.h`, nhập SSID/mật khẩu của mạng WPA2 2.4 GHz trong file local và đặt `WIFI_FIXED_ENABLED` thành `1`. File `wifi_local.h` bị Git ignore; không commit hoặc chia sẻ. Build firmware từ `firmware/esp32` sau khi tạo file này. Chế độ này cấu hình Wi-Fi trong RAM, tự thử kết nối lại và tắt BLE provisioning Wi-Fi; cấu hình MQTT vẫn được provision riêng và đọc từ NVS. SSID/mật khẩu Wi-Fi được biên dịch vào firmware, vì vậy không chia sẻ source/build artifacts chứa thông tin đó. Để trở lại Wi-Fi đã provision qua BLE, xóa file local hoặc đặt cờ về `0`, rồi build và nạp lại firmware.
 
 ### MQTT: quản lý tài khoản trên EMQX Cloud
@@ -233,18 +235,30 @@ Các endpoint dưới đây yêu cầu bearer token có role `ADMIN`.
 | Phương thức | Endpoint | Quyền | Chức năng |
 | --- | --- | --- | --- |
 | `GET` | `/api/admin/firmware` | ADMIN | Liệt kê các bản firmware, mới nhất trước |
-| `POST` | `/api/admin/firmware` | ADMIN | Tải lên multipart gồm `version`, `file` và `notes` tùy chọn |
+| `POST` | `/api/admin/firmware` | ADMIN | Tải lên multipart gồm `version`, `file` và `notes` tùy chọn; `version` phải trùng chuỗi trong `firmware_version.h` |
 | `GET` | `/api/firmware/check?currentVersion={version}` | Công khai, chỉ đọc | Trả `latest_version`, `update_available`, SHA-256, dung lượng và `download_url` |
 | `GET` | `/api/firmware/{version}/download` | Công khai, chỉ đọc | Tải file firmware nhị phân |
 
-Chỉ nhận file `.bin` có ESP image header, tối đa 4 MB; phiên bản phải duy nhất.
+Chỉ nhận file `.bin` có ESP image header, tối đa 4 MB; phiên bản phải duy nhất
+và phải xuất hiện trong binary (firmware hiện phát phiên bản này qua MQTT).
 Mỗi lần tải lên sẽ trở thành phiên bản mới nhất và các phiên bản cũ vẫn có thể
-tải xuống. Thiết bị có thể kiểm tra định kỳ 5 giây như sơ đồ OTA. Endpoint kiểm
-tra/tải xuống là công khai để ESP32 dùng được mà không cần JWT; chỉ phát hành
-firmware có thể chia sẻ công khai. Backend/frontend không biên dịch mã nguồn,
-không ra lệnh cập nhật từ xa và không thực hiện OTA trên ESP32: firmware trên
-thiết bị cần tự gọi API, tải file, kiểm tra SHA-256 và cài đặt an toàn. Dùng
-HTTPS cho các endpoint trên khi triển khai ngoài môi trường phát triển.
+tải xuống. Firmware ESP32 kiểm tra phiên bản mỗi giờ qua HTTPS, chỉ tải khi có
+bản mới, xác minh SHA-256/kích thước/header rồi ghi vào phân vùng OTA dự phòng.
+Việc cài đặt chỉ bắt đầu khi bơm đang OFF; các lệnh bật bơm/cấu hình bị khóa
+trong lúc ghi flash. Sau khi khởi động lại, firmware báo phiên bản mới qua MQTT.
+
+URL OTA của firmware được cấu hình trong
+`firmware/esp32/ota_config.h`; hiện trỏ tới backend Render đã cung cấp. Các API
+kiểm tra/tải xuống là công khai để ESP32 dùng được mà không cần JWT, vì vậy chỉ
+phát hành binary đáng tin cậy; kết nối HTTPS vẫn xác minh chứng chỉ máy chủ và
+thời gian hệ thống (SNTP). Firmware phải được build với partition scheme có
+`ota_0`/`ota_1`, và binary phải vừa phân vùng OTA chưa hoạt động. Chọn phiên bản
+mới trong `firmware_version.h` trước khi build; nhập đúng phiên bản đó khi phát
+hành trên dashboard. Nếu build bật `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`,
+firmware xác nhận lần khởi động mới sau khi khởi tạo ứng dụng; nếu không bật,
+bootloader không tự quay lại phiên bản trước khi ứng dụng lỗi sau khi khởi động.
+Nạp firmware qua USB lần đầu nếu thiết bị chưa có phân vùng OTA hoặc đang dùng
+firmware không có updater.
 
 Response kiểm tra được bọc trong `data` của `ApiResponse`, ví dụ:
 

@@ -4,6 +4,7 @@
 #include "firmware_version.h"
 namespace plant_mqtt {
 constexpr uint32_t kCadenceMs=10000;
+constexpr uint32_t kReconnectDelayMs=5000;
 constexpr char kOffline[]="{\"status\":\"OFFLINE\"}";
 constexpr size_t kActiveCapacity = sizeof("{\"status\":\"ACTIVE\",\"firmware_version\":\"\"}") + sizeof(kFirmwareVersion) - 1;
 inline size_t activeStatus(char* out, size_t capacity) {
@@ -73,7 +74,7 @@ class Runtime {
       if(running_){client.stop();running_=false;}
       state_=(!ready||!clock)?State::Unavailable:State::Offline;return;
     }
-    if(state_==State::Backoff&&uint32_t(now-since_)<wait_)return;
+    if(state_==State::Backoff&&uint32_t(now-since_)<kReconnectDelayMs)return;
     if(!running_){
       if(!client.start()){fault_=true;state_=State::Unavailable;return;}
       running_=true;state_=State::Connecting;since_=stamp(now);return;
@@ -82,7 +83,7 @@ class Runtime {
         (state_==State::Connecting&&uint32_t(now-since_)>=15000)){retry(now,client);return;}
     if(!client.connected())return;
     if(state_!=State::Online){
-      state_=State::Online;level_=0;lastStatus_=lastSample_=now;
+      state_=State::Online;lastStatus_=lastSample_=now;
       if(!client.status()){retry(now,client);return;}
       lastStatus_=lastSample_=stamp(now);
       return;
@@ -101,11 +102,10 @@ class Runtime {
  private:
   uint32_t stamp(uint32_t fallback)const{return monotonic_?monotonic_():fallback;}
   void retry(uint32_t now,Client& client){
-    client.stop();running_=false;const uint32_t delays[]={5000,10000,20000,30000};
-    wait_=delays[level_];if(level_<3)++level_;since_=stamp(now);state_=State::Backoff;
+    client.stop();running_=false;since_=stamp(now);state_=State::Backoff;
   }
-  State state_=State::Unavailable;bool running_=false,fault_=false;unsigned level_=0;
-  uint32_t since_=0,wait_=0,lastStatus_=0,lastSample_=0;
+  State state_=State::Unavailable;bool running_=false,fault_=false;
+  uint32_t since_=0,lastStatus_=0,lastSample_=0;
   uint32_t (*monotonic_)()=nullptr;
 };
 }

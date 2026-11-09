@@ -10,38 +10,56 @@
 #include <nvs.h>
 #include <esp_mac.h>
 #include <esp_log.h>
+#include <esp_heap_caps.h>
 #include <time.h>
 #include <atomic>
 namespace plant_mqtt {
 namespace {
+constexpr uint32_t kHeapLogIntervalMs=60000;
+constexpr uint32_t kInternalHeapCaps=MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT;
 portMUX_TYPE mux=portMUX_INITIALIZER_UNLOCKED;
 ::telemetry_snapshot::Snapshot latest;bool observed=false,started=false;
 Config config;Topics topics;
 Ingress ingress,configIngress;
 Subscriptions subscriptions;
 int fragmentTopic=-1; // MQTT delivers one contiguous fragmented message at a time.
-// Single MQTT worker scratch space; callbacks never access it. Keep payloads
-// off the worker stack and separate from the callback-owned ingress FIFO.
+// One reusable payload scratch buffer; parsed commands stay batched for atomic
+// connection-generation validation. Callbacks never access this worker storage.
 struct WorkerBatch {
-  char payloads[4][kCommandBytes];
-  size_t sizes[4];
+  char payload[kCommandBytes];
   uint64_t epochs[4],parsedEpochs[4];
   PumpCommand commands[4];
 } workerBatch;
 char commandTopic[64]={},configTopic[64]={},ackTopic[64]={};
 struct Lock{Lock(){portENTER_CRITICAL(&mux);}~Lock(){portEXIT_CRITICAL(&mux);}};
+void logInternalHeap(){
+  const size_t freeBytes=heap_caps_get_free_size(kInternalHeapCaps);
+  const size_t minimumBytes=heap_caps_get_minimum_free_size(kInternalHeapCaps);
+  const size_t largestBlock=heap_caps_get_largest_free_block(kInternalHeapCaps);
+  Serial.printf("[RAM] internal_free=%luB minimum_free=%luB largest_block=%luB\n",
+      static_cast<unsigned long>(freeBytes),static_cast<unsigned long>(minimumBytes),
+      static_cast<unsigned long>(largestBlock));
+}
 class EspClient:public Client {
  public:
   bool start()override{
     if(handle_||unhealthy_)return false;
     connected_.store(false);failed_.store(false);
     esp_mqtt_client_config_t c={};
-    if(!clientConfig(config,topics,c))return false;
+    if(!clientConfig(config,topics,c)){
+      Serial.println("[MQTT] broker/TLS configuration is invalid");
+      return false;
+    }
     handle_=esp_mqtt_client_init(&c);
-    if(!handle_)return false;
+    if(!handle_){
+      Serial.println("[MQTT] client initialization failed");
+      return false;
+    }
     if(esp_mqtt_client_register_event(handle_,MQTT_EVENT_ANY,event,this)!=ESP_OK||esp_mqtt_client_start(handle_)!=ESP_OK){
+      Serial.println("[MQTT] client event registration or start failed");
       esp_mqtt_client_destroy(handle_);handle_=nullptr;return false;
     }
+    Serial.println("[MQTT] connecting to broker");
     return true;
   }
   void stop()override{
@@ -80,35 +98,10 @@ class EspClient:public Client {
         if(pumpState!=1)return;
       }
     }
-    // Copy at most four envelopes while locked. Parsing and batch submission
-    // happen after releasing the ingress lock; connection/ON cancellation is
-    // rechecked under the existing admission lock.
-    size_t count=0;
-    uint64_t generation;
-    {
-      Lock lock;
-      if(!connected_.load())return;
-      generation=connectionGeneration_;
-      while(count<4&&ingress.pop(workerBatch.payloads[count],workerBatch.sizes[count],&workerBatch.epochs[count]))++count;
-    }
-    size_t parsed=0;
-    for(size_t i=0;i<count;++i)
-      if(parsePump(workerBatch.payloads[i],workerBatch.sizes[i],topics.identity,workerBatch.commands[parsed]))
-        workerBatch.parsedEpochs[parsed++]=workerBatch.epochs[i];
-    queueCommandBatch(workerBatch.commands,workerBatch.parsedEpochs,parsed,millis(),generation);
-    // Separate bounded FIFO: config traffic cannot consume the pump/OFF ingress.
-    count=0;
-    {
-      Lock lock;
-      if(!connected_.load())return;
-      generation=connectionGeneration_;
-      while(count<4&&configIngress.pop(workerBatch.payloads[count],workerBatch.sizes[count],&workerBatch.epochs[count]))++count;
-    }
-    parsed=0;
-    for(size_t i=0;i<count;++i)
-      if(parseConfiguration(workerBatch.payloads[i],workerBatch.sizes[i],topics.identity,workerBatch.commands[parsed]))
-        workerBatch.parsedEpochs[parsed++]=workerBatch.epochs[i];
-    queueCommandBatch(workerBatch.commands,workerBatch.parsedEpochs,parsed,millis(),generation);
+    // Keep pump and config FIFOs independent and preserve batch admission while
+    // reusing one bounded payload buffer instead of four copies per FIFO.
+    drain(ingress,false);
+    drain(configIngress,true);
     if(ackFlight_>=0){
       bool published=false;
       {Lock lock;for(int id:pubacks_)if(id==ackFlight_)published=true;}
@@ -136,6 +129,29 @@ class EspClient:public Client {
     return n&&usable()&&esp_mqtt_client_publish(handle_,topics.telemetry,bytes,int(n),0,0)>=0;
   }
  private:
+  void drain(Ingress& source,bool configuration){
+    uint64_t generation;
+    {
+      Lock lock;
+      if(!connected_.load())return;
+      generation=connectionGeneration_;
+    }
+    size_t parsed=0;
+    for(size_t i=0;i<4;++i){
+      size_t size=0;
+      uint64_t epoch=0;
+      {
+        Lock lock;
+        if(!connected_.load()||connectionGeneration_!=generation)return;
+        if(!source.pop(workerBatch.payload,size,&epoch))break;
+      }
+      const bool valid=configuration
+          ?parseConfiguration(workerBatch.payload,size,topics.identity,workerBatch.commands[parsed])
+          :parsePump(workerBatch.payload,size,topics.identity,workerBatch.commands[parsed]);
+      if(valid)workerBatch.parsedEpochs[parsed++]=epoch;
+    }
+    queueCommandBatch(workerBatch.commands,workerBatch.parsedEpochs,parsed,millis(),generation);
+  }
   bool usable()const{
     // Recheck after potentially blocking previous calls. Do not initiate a
     // publish if Wi-Fi runtime reports offline/provisioning at this check.
@@ -145,15 +161,23 @@ class EspClient:public Client {
     auto& self=*static_cast<EspClient*>(arg);
     auto* e=static_cast<esp_mqtt_event_t*>(data);
     if(id==MQTT_EVENT_CONNECTED){
-      Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(true);
-      self.subscribeStarted_.store(false);self.subscribed_.store(false);
-      for(auto& published:self.pubacks_)published=-1;
-      self.pubackIndex_=0;
-      self.connected_.store(true);
+      {
+        Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(true);
+        self.subscribeStarted_.store(false);self.subscribed_.store(false);
+        for(auto& published:self.pubacks_)published=-1;
+        self.pubackIndex_=0;
+        self.connected_.store(true);
+      }
+      Serial.println("[MQTT] connected with verified TLS");
     }
     else if(id==MQTT_EVENT_DISCONNECTED||id==MQTT_EVENT_ERROR){
-      Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(false);
-      self.subscribed_.store(false);self.connected_.store(false);self.failed_.store(true);
+      {
+        Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(false);
+        self.subscribed_.store(false);self.connected_.store(false);self.failed_.store(true);
+      }
+      Serial.println(id==MQTT_EVENT_ERROR
+          ? "[MQTT] TLS/transport error; reconnect scheduled"
+          : "[MQTT] disconnected; reconnect scheduled");
     }
     else if(id==MQTT_EVENT_SUBSCRIBED&&e){
       // SDK reports subscription failures using error_handle/return codes; require
@@ -196,8 +220,17 @@ void worker(void*){
   // No secret/SDK error payload logging; some underlying logs include URIs.
   esp_log_level_set("mqtt_client",ESP_LOG_NONE);
   uint8_t mac[6]={};
-  const bool ready=kTlsDateVerification&&esp_read_mac(mac,ESP_MAC_WIFI_STA)==ESP_OK&&topics.initialize(mac)&&loadConfig(mac,config)&&
-      (kTlsNativeDates||prepareMqttTrust(config.ca));
+  const bool tlsReady=kTlsDateVerification;
+  const bool identityReady=tlsReady&&esp_read_mac(mac,ESP_MAC_WIFI_STA)==ESP_OK&&topics.initialize(mac);
+  const bool configReady=identityReady&&loadConfig(mac,config);
+  const bool trustReady=configReady&&(kTlsNativeDates||prepareMqttTrust(config.ca));
+  const bool ready=tlsReady&&identityReady&&configReady&&trustReady;
+  if(!tlsReady)Serial.println("[MQTT] certificate date verification is unavailable in this build");
+  else if(!identityReady)Serial.println("[MQTT] could not initialize the device identity");
+  else if(!configReady)Serial.println("[MQTT] MQTT config missing/invalid; check provisioned host, TLS port, CA, username and password");
+  else if(!trustReady)Serial.println("[MQTT] CA certificate could not be prepared");
+  logInternalHeap();
+  uint32_t lastHeapLog=millis();
   EspClient client;Runtime runtime(millis);
   snprintf(commandTopic,sizeof(commandTopic),"iot/garden/%s/cmd",topics.identity);
   snprintf(configTopic,sizeof(configTopic),"iot/garden/%s/config",topics.identity);
@@ -223,8 +256,16 @@ void worker(void*){
       Serial.println("[MQTT] system clock ready");
       clockReadyLogged=true;
     }
+    const State previousState=runtime.state();
     runtime.service(millis(),ready,wifi,clock,copy,have,client);
+    if(runtime.state()==State::Backoff&&previousState!=State::Backoff)
+      Serial.println("[MQTT] connection failed; retrying in 5 seconds");
     client.commands();
+    const uint32_t now=millis();
+    if(uint32_t(now-lastHeapLog)>=kHeapLogIntervalMs){
+      logInternalHeap();
+      lastHeapLog=now;
+    }
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
