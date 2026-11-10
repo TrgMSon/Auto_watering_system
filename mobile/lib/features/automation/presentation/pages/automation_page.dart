@@ -132,8 +132,7 @@ class _AutomationPageState extends State<AutomationPage> {
                             ? (bleMode ?? config.autoMode)
                             : config.autoMode,
                         onChanged: state.isSaving ||
-                                (!widget.isDeviceOnline &&
-                                    (!bleConnected || bleMode == null))
+                                (!widget.isDeviceOnline && !bleConnected)
                             ? null
                             : (val) => _setAutoMode(
                                 context, config, val, canPersistToBackend),
@@ -273,12 +272,6 @@ class _AutomationPageState extends State<AutomationPage> {
   Future<void> _setAutoMode(BuildContext context, DeviceConfigModel config,
       bool enabled, bool canPersistToBackend) async {
     final cubit = context.read<BleSessionCubit>();
-    if (canPersistToBackend && !cubit.state.isConnectedTo(widget.deviceId)) {
-      context
-          .read<AutomationBloc>()
-          .add(AutomationConfigUpdated(config.copyWith(autoMode: enabled)));
-      return;
-    }
     if (!cubit.state.isConnectedTo(widget.deviceId)) {
       await cubit.connect(widget.deviceId);
     }

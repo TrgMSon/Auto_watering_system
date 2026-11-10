@@ -359,6 +359,12 @@ void process(const Event& e) {
       checked(esp_ble_gatts_start_service(handles[Service])); break;
     case Kind::Started: serviceReady = e.status == ESP_GATT_OK; if (!serviceReady) ++failures; break;
     case Kind::Connected:
+      if (ble_wifi_service::networkSnapshot().online) {
+        checked(esp_ble_gatts_close(interfaceId, e.connection));
+        ble_command_bridge::disconnect(e.connection);
+        { SecurityLock lock; securityBinding.cancel(e.generation); }
+        break;
+      }
       if (!ble_command_bridge::current(e.generation)) break;
       authentication.reset();
       if (session.connected) session.disconnect(session.connection);
@@ -563,7 +569,22 @@ void worker(void*) {
   uint32_t reportedFailures = 0, reportedSkips = 0;
   bool transportFailed = false;
   bool lastPairWindow=false;
+  bool wifiOnline = ble_wifi_service::networkSnapshot().online;
   for (;;) {
+    const bool currentWifiOnline = ble_wifi_service::networkSnapshot().online;
+    if (currentWifiOnline != wifiOnline) {
+      wifiOnline = currentWifiOnline;
+      if (wifiOnline) {
+        Serial.println("[BLE] Wi-Fi connected; stopping BLE advertising and disconnecting BLE clients");
+        checked(esp_ble_gap_stop_advertising());
+        advertiseInFlight = false;
+        advertisePending = true;
+        if (session.connected) checked(esp_ble_gatts_close(interfaceId, session.connection));
+      } else {
+        Serial.println("[BLE] Wi-Fi disconnected; BLE fallback is available");
+        advertisePending = true;
+      }
+    }
     if (eventOverflow.load() && !transportFailed) {
       // Fail closed on lost lifecycle/CCCD events. A reboot is required; never
       // risk inheriting an old subscription after queue overflow.
@@ -627,7 +648,7 @@ void worker(void*) {
         }
       }
 #endif
-      if (!session.connected && serviceReady && advDataReady && scanReady &&
+      if (!wifiOnline && !session.connected && serviceReady && advDataReady && scanReady &&
           advertisePending && !advertiseInFlight && uint32_t(now - lastAdvertisingMs) >= 2000) {
         lastAdvertisingMs = now;
         if (checked(esp_ble_gap_start_advertising(&advParams))) {
