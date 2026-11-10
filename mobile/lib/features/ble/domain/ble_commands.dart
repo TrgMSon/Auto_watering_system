@@ -65,6 +65,26 @@ class BlePumpOffCommand extends BleCommand {
   Map<String, Object> payloadFields() => {'cmd': 'PUMP_OFF', 'dur': 0};
 }
 
+/// Chuyển chế độ chạy trực tiếp trên ESP32, kể cả khi backend/MQTT offline.
+class BleAutoModeCommand extends BleCommand {
+  const BleAutoModeCommand(this.enabled);
+
+  final bool enabled;
+  String get _mode => enabled ? 'AUTO' : 'MANUAL';
+
+  @override
+  String get op => _mode;
+
+  @override
+  String get characteristicUuid => BleUuids.pump;
+
+  @override
+  String signingMessage(String nonce) => '$nonce|$_mode|0';
+
+  @override
+  Map<String, Object> payloadFields() => {'cmd': _mode, 'dur': 0};
+}
+
 /// Cấu hình qua `0003`. Firmware trả `PUMP_BUSY` khi bơm đang chạy và
 /// `STORAGE_ERROR` khi không lưu được vào bộ nhớ.
 class BleConfigCommand extends BleCommand {

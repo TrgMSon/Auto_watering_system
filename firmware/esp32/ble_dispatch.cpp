@@ -4,7 +4,8 @@ bool Dispatch::offPending() const {
   return slots_[0].state == State::Pending;
 }
 void Dispatch::cancelOn() {
-  for (auto& s : slots_) if (s.state == State::Pending && (s.command.op == Op::On || s.command.op == Op::Config)) {
+  for (auto& s : slots_) if (s.state == State::Pending &&
+      (s.command.op == Op::On || s.command.op == Op::Auto || s.command.op == Op::Config)) {
     s.state = State::Done; s.code = Code::None;
   }
 }
@@ -33,7 +34,8 @@ bool Dispatch::reserve(uint64_t generation, uint32_t transaction, const Command&
     s.ticket = ticket_; s.code = authentication;
     s.state = authentication == Code::Ok ? State::Pending : State::Done;
     if (command.op == Op::Off && s.state == State::Pending) {
-      for (unsigned j = 1; j < kSlots; ++j) if (slots_[j].state == State::Pending && (slots_[j].command.op == Op::On || slots_[j].command.op == Op::Config)) {
+      for (unsigned j = 1; j < kSlots; ++j) if (slots_[j].state == State::Pending &&
+          (slots_[j].command.op == Op::On || slots_[j].command.op == Op::Auto || slots_[j].command.op == Op::Config)) {
         slots_[j].state = State::Done; slots_[j].code = Code::None; // Superseded, no wire code.
       }
     }
@@ -72,6 +74,12 @@ void Dispatch::expire(uint32_t now) {
   }
 }
 Code execute(irrigation::System& system, const Command& command, Clock* clock) {
+  if (command.op == Op::Auto || command.op == Op::Manual) {
+    const auto result = system.command(command.op == Op::Auto ? "AUTO" : "MANUAL");
+    if (result == irrigation::Result::ModeStorageFailed || system.status().modeStorageError)
+      return Code::StorageError;
+    return result == irrigation::Result::Accepted ? Code::Ok : Code::None;
+  }
   if (command.op == Op::Config) {
     const auto& r = command.config;
     if (validateConfig(r) != Code::Ok) return Code::OutOfRange;

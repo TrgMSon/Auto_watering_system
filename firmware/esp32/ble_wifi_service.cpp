@@ -1,29 +1,15 @@
 #include "ble_wifi_service.h"
 #ifdef ARDUINO
 #include "wifi_esp32_adapters.h"
+#include "wifi_build_config.h"
 #include <Arduino.h>
 #include <esp_mac.h>
 #include <atomic>
-#if defined(__has_include)
-#if __has_include("wifi_local.h")
-#include "wifi_local.h"
-#endif
-#endif
-#ifndef WIFI_FIXED_ENABLED
-#define WIFI_FIXED_ENABLED 0
-#endif
-#ifndef WIFI_FIXED_SSID
-#define WIFI_FIXED_SSID ""
-#endif
-#ifndef WIFI_FIXED_PASSWORD
-#define WIFI_FIXED_PASSWORD ""
-#endif
-#if WIFI_FIXED_ENABLED != 0 && WIFI_FIXED_ENABLED != 1
-#error WIFI_FIXED_ENABLED must be 0 or 1
-#endif
 namespace ble_wifi_service {
 namespace {
+#if !WIFI_FIXED_ENABLED
 ble_wifi::Handoff slot;
+#endif
 portMUX_TYPE mux=portMUX_INITIALIZER_UNLOCKED;
 struct Lock{Lock(){portENTER_CRITICAL(&mux);}~Lock(){portEXIT_CRITICAL(&mux);}};
 std::atomic<bool> ready{false};bool started=false;
@@ -49,6 +35,7 @@ const char* reasonName(wifi_runtime::Reason reason){
     default:return "worker-unavailable";
   }
 }
+#if !WIFI_FIXED_ENABLED
 const char* persistenceName(ble_wifi::Persistence persistence){
   switch(persistence){
     case ble_wifi::Persistence::Verified:return "verified";
@@ -56,6 +43,7 @@ const char* persistenceName(ble_wifi::Persistence persistence){
     default:return "unconfirmed";
   }
 }
+#endif
 void publish(const wifi_runtime::Runtime& runtime){
   const auto copy=runtime.snapshot();
   bool changed;
@@ -64,8 +52,10 @@ void publish(const wifi_runtime::Runtime& runtime){
   if(changed)Serial.printf("[WIFI] runtime state=%s reason=%s online=%u\n",
       stateName(copy.state),reasonName(copy.reason),unsigned(copy.online));
 }
+#if !WIFI_FIXED_ENABLED
 uint64_t current(){Lock lock;return slot.current();}
 void complete(uint64_t generation,ble_commands::Code code){Lock lock;slot.complete(generation,code,millis());}
+#endif
 void worker(void*){
   uint8_t mac[6];
   if(esp_read_mac(mac,ESP_MAC_WIFI_STA)!=ESP_OK){Serial.println("[WIFI] worker identity-failed");vTaskDelete(nullptr);return;}
@@ -75,12 +65,8 @@ void worker(void*){
   static ble_wifi::NvsCredentialBlob blob;
   ble_wifi::CredentialStorage storage(blob,mac);
   wifi_runtime::Runtime runtime(radio,storage);
-  ble_wifi::Attempt attempt(millis);
-  ble_commands::WifiAuthentication request;
-  ble_commands::WifiSecurity admittedSecurity;
-  bool active=false;uint64_t generation=0;uint32_t attemptStarted=0;
-  ready.store(true);
 #if WIFI_FIXED_ENABLED
+  ready.store(true);
   static_assert(sizeof(WIFI_FIXED_SSID)>1 && sizeof(WIFI_FIXED_SSID)<=33,
       "Fixed Wi-Fi SSID must be 1..32 bytes");
   static_assert(sizeof(WIFI_FIXED_PASSWORD)>=9 && sizeof(WIFI_FIXED_PASSWORD)<=64,
@@ -88,12 +74,22 @@ void worker(void*){
   ble_commands::WifiRequest fixed;
   memcpy(fixed.ssid,WIFI_FIXED_SSID,sizeof(WIFI_FIXED_SSID));
   memcpy(fixed.password,WIFI_FIXED_PASSWORD,sizeof(WIFI_FIXED_PASSWORD));
-  Serial.println("[WIFI] fixed credentials enabled; RAM only; BLE Wi-Fi provisioning disabled");
+  Serial.println("[WIFI] fixed credentials enabled; BLE Wi-Fi provisioning compiled out");
   runtime.bootFixed(millis(),fixed);
   fixed.clear();
+  publish(runtime);
+  for(;;){
+    runtime.service(millis());
+    publish(runtime);
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
 #else
+  ble_wifi::Attempt attempt(millis);
+  ble_commands::WifiAuthentication request;
+  ble_commands::WifiSecurity admittedSecurity;
+  bool active=false;uint64_t generation=0;uint32_t attemptStarted=0;
+  ready.store(true);
   runtime.boot(millis());
-#endif
   publish(runtime);
   for(;;){
     if(!active){
@@ -130,18 +126,47 @@ void worker(void*){
     publish(runtime);
     vTaskDelay(pdMS_TO_TICKS(20));
   }
+#endif
 }
 }
 bool begin(){
   if(started)return false;
   started=true;
+#if WIFI_FIXED_ENABLED
+  return xTaskCreate(worker,"wifi-runtime",6144,nullptr,1,nullptr)==pdPASS;
+#else
   return xTaskCreate(worker,"wifi-provision",6144,nullptr,1,nullptr)==pdPASS;
+#endif
 }
 bool available(){return ready.load()&&!WIFI_FIXED_ENABLED;}
 wifi_runtime::Snapshot networkSnapshot(){Lock lock;return network;}
-void connection(uint64_t generation){Lock lock;slot.connection(generation);}
-bool reserve(const ble_commands::WifiAuthentication& auth,uint32_t now){Lock lock;return ready.load()&&!WIFI_FIXED_ENABLED&&slot.reserve(auth,now);}
-bool result(uint32_t now,uint64_t& generation,ble_commands::Code& code){Lock lock;return slot.result(now,generation,code);}
-void release(uint64_t generation){Lock lock;slot.release(generation);}
+void connection(uint64_t generation){
+#if !WIFI_FIXED_ENABLED
+  Lock lock;slot.connection(generation);
+#else
+  (void)generation;
+#endif
+}
+bool reserve(const ble_commands::WifiAuthentication& auth,uint32_t now){
+#if !WIFI_FIXED_ENABLED
+  Lock lock;return ready.load()&&slot.reserve(auth,now);
+#else
+  (void)auth;(void)now;return false;
+#endif
+}
+bool result(uint32_t now,uint64_t& generation,ble_commands::Code& code){
+#if !WIFI_FIXED_ENABLED
+  Lock lock;return slot.result(now,generation,code);
+#else
+  (void)now;(void)generation;(void)code;return false;
+#endif
+}
+void release(uint64_t generation){
+#if !WIFI_FIXED_ENABLED
+  Lock lock;slot.release(generation);
+#else
+  (void)generation;
+#endif
+}
 }
 #endif

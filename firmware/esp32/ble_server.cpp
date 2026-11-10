@@ -5,6 +5,7 @@
 #include "mqtt_commands.h"
 #include "ble_pairing_esp32.h"
 #include "ble_wifi_service.h"
+#include "wifi_build_config.h"
 #include <Arduino.h>
 #include "esp32-hal-bt.h"
 #include "esp32-hal-alloc-ble-mem.h"
@@ -24,9 +25,13 @@ namespace plant_ble {
 namespace {
 using ble_telemetry::Packet;
 using ble_telemetry::Session;
+constexpr UBaseType_t kEventQueueDepth = WIFI_FIXED_ENABLED ? 16 : 32;
 enum Attribute { Service, SensorDecl, Sensor, SensorCccd, PumpDecl, Pump,
   ConfigDecl, Config, NonceDecl, Nonce, ResultsDecl, Results, ResultsCccd,
-  WifiDecl, Wifi, TimeDecl, Time, Count };
+#if !WIFI_FIXED_ENABLED
+  WifiDecl, Wifi,
+#endif
+  TimeDecl, Time, Count };
 QueueHandle_t mailbox = nullptr;
 QueueHandle_t events = nullptr;
 // Callbacks copy bounded metadata and authenticated payload bytes, never a stack pointer.
@@ -44,16 +49,23 @@ struct Event {
   uint64_t pumpIngressEpoch = 0;
   uint8_t peer[6] = {};
   uint8_t authMode = 0;
+#if !WIFI_FIXED_ENABLED
   uint64_t encryptedWriteGeneration = 0;
   uint32_t wifiPayloadTicket = 0;
+#endif
   char payload[ble_commands::kConfigPayloadMax] = {};
 };
 std::atomic<bool> eventOverflow{false};
-std::atomic<uint16_t> sensorCccdHandle{0}, resultsCccdHandle{0}, pumpHandle{0}, configHandle{0}, timeHandle{0},wifiHandle{0};
+std::atomic<uint16_t> sensorCccdHandle{0}, resultsCccdHandle{0}, pumpHandle{0}, configHandle{0}, timeHandle{0};
+#if !WIFI_FIXED_ENABLED
+std::atomic<uint16_t> wifiHandle{0};
+#endif
 ble_pairing::State pairing;
 ble_pairing::EspSdk pairingSdk;
 ble_pairing::Binding securityBinding;
+#if !WIFI_FIXED_ENABLED
 ble_wifi::WriteBuffer wifiInput;
+#endif
 portMUX_TYPE securityMux=portMUX_INITIALIZER_UNLOCKED;
 struct SecurityLock {
   SecurityLock(){portENTER_CRITICAL(&securityMux);}
@@ -73,13 +85,17 @@ const ble_commands::KeySource* keySource = nullptr;
 esp_gatt_if_t interfaceId = ESP_GATT_IF_NONE;
 uint16_t handles[Count] = {};
 esp_gatts_attr_db_t attributes[Count] = {};
-uint8_t uuids[8][16] = {};
+uint8_t uuids[WIFI_FIXED_ENABLED ? 7 : 8][16] = {};
 uint16_t primaryUuid = ESP_GATT_UUID_PRI_SERVICE;
 uint16_t declarationUuid = ESP_GATT_UUID_CHAR_DECLARE;
 uint16_t cccdUuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-uint8_t properties[7] = {ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY,
+uint8_t properties[WIFI_FIXED_ENABLED ? 6 : 7] = {ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY,
   ESP_GATT_CHAR_PROP_BIT_WRITE, ESP_GATT_CHAR_PROP_BIT_WRITE, ESP_GATT_CHAR_PROP_BIT_READ,
+#if WIFI_FIXED_ENABLED
+  ESP_GATT_CHAR_PROP_BIT_NOTIFY, ESP_GATT_CHAR_PROP_BIT_WRITE};
+#else
   ESP_GATT_CHAR_PROP_BIT_NOTIFY, ESP_GATT_CHAR_PROP_BIT_WRITE, ESP_GATT_CHAR_PROP_BIT_WRITE};
+#endif
 uint8_t empty[2] = {};
 bool serviceReady = false, advDataReady = false, scanReady = false;
 bool advertisePending = false, advertiseInFlight = false;
@@ -108,22 +124,46 @@ void prepareProfile() {
   // UUIDs in the little-endian byte order required by Bluedroid.
   const uint8_t base[16] = {0x00,0x00,0x57,0xf4,0x27,0xd2,0x8b,0xb4,
       0x1b,0x53,0x9e,0x67,0x87,0x5e,0x97,0x07};
-  for (unsigned i = 0; i < 8; ++i) { memcpy(uuids[i], base, 16); uuids[i][0] = i; }
+  for (unsigned i = 0; i < sizeof(uuids)/sizeof(uuids[0]); ++i) { memcpy(uuids[i], base, 16); uuids[i][0] = i; }
   attribute(Service, ESP_UUID_LEN_16, reinterpret_cast<uint8_t*>(&primaryUuid),
       ESP_GATT_PERM_READ, 16, 16, uuids[0], true);
   const unsigned declarations[] = {SensorDecl, PumpDecl, ConfigDecl, NonceDecl,
-      ResultsDecl, WifiDecl, TimeDecl};
-  const unsigned values[] = {Sensor, Pump, Config, Nonce, Results, Wifi, Time};
-  for (unsigned i = 0; i < 7; ++i) {
+      ResultsDecl,
+#if !WIFI_FIXED_ENABLED
+      WifiDecl,
+#endif
+      TimeDecl};
+  const unsigned values[] = {Sensor, Pump, Config, Nonce, Results,
+#if !WIFI_FIXED_ENABLED
+      Wifi,
+#endif
+      Time};
+  const unsigned operationSuffix[] = {1,2,3,4,5,
+#if !WIFI_FIXED_ENABLED
+      6,
+#endif
+      7};
+  const unsigned uuidSlot[] = {1,2,3,4,5,
+#if !WIFI_FIXED_ENABLED
+      6,
+#endif
+      WIFI_FIXED_ENABLED ? 6u : 7u};
+  const unsigned propertySlot[] = {0,1,2,3,4,
+#if !WIFI_FIXED_ENABLED
+      5,
+#endif
+      WIFI_FIXED_ENABLED ? 5u : 6u};
+  constexpr unsigned characteristicCount=WIFI_FIXED_ENABLED?6u:7u;
+  for (unsigned i = 0; i < characteristicCount; ++i) {
     attribute(declarations[i], ESP_UUID_LEN_16, reinterpret_cast<uint8_t*>(&declarationUuid),
-        ESP_GATT_PERM_READ, 1, 1, &properties[i], true);
+        ESP_GATT_PERM_READ, 1, 1, &properties[propertySlot[i]], true);
     // WIFI only uses encrypted WRITE (no ordinary WRITE bit); CONFIG uses ordinary authenticated WRITE.
     const uint16_t permission = (i == 0 || i == 3) ? ESP_GATT_PERM_READ :
-        ble_commands::encryptedWifiWrite(i + 1) ? ESP_GATT_PERM_WRITE_ENCRYPTED : ble_commands::authenticatedWrite(i + 1) ? ESP_GATT_PERM_WRITE : 0;
-    attribute(values[i], ESP_UUID_LEN_128, uuids[i + 1], permission,
+        ble_commands::encryptedWifiWrite(operationSuffix[i]) ? ESP_GATT_PERM_WRITE_ENCRYPTED : ble_commands::authenticatedWrite(operationSuffix[i]) ? ESP_GATT_PERM_WRITE : 0;
+    attribute(values[i], ESP_UUID_LEN_128, uuids[uuidSlot[i]], permission,
         // Let the worker see over-limit writes (up to stack's ATT limit), so
         // rejecting them still consumes the nonce. Copy capacity is bounded by endpoint (128 pump/TIME, 192 CONFIG).
-        (ble_commands::encryptedWifiWrite(i + 1) || ble_commands::authenticatedWrite(i + 1)) ? ESP_GATT_MAX_ATTR_LEN : i == 3 ? 16 : ble_telemetry::kCapacity, 0, empty, false);
+        (ble_commands::encryptedWifiWrite(operationSuffix[i]) || ble_commands::authenticatedWrite(operationSuffix[i])) ? ESP_GATT_MAX_ATTR_LEN : i == 3 ? 16 : ble_telemetry::kCapacity, 0, empty, false);
   }
   for (unsigned index : {unsigned(SensorCccd), unsigned(ResultsCccd)})
     attribute(index, ESP_UUID_LEN_16, reinterpret_cast<uint8_t*>(&cccdUuid),
@@ -133,7 +173,11 @@ void response(uint16_t conn, uint32_t transaction, esp_gatt_status_t status, esp
   checked(esp_ble_gatts_send_response(interfaceId, conn, transaction, status, rsp));
 }
 bool manualHandle(uint16_t handle) {
-  const unsigned indices[] = {Sensor, SensorCccd, Pump, Config, Nonce, Results, ResultsCccd, Wifi, Time};
+  const unsigned indices[] = {Sensor, SensorCccd, Pump, Config, Nonce, Results, ResultsCccd,
+#if !WIFI_FIXED_ENABLED
+      Wifi,
+#endif
+      Time};
   for (unsigned i : indices) if (handles[i] && handles[i] == handle) return true;
   return false;  // Service and declarations are answered by the stack.
 }
@@ -163,7 +207,9 @@ void gapEvent(esp_gap_ble_cb_event_t kind, esp_ble_gap_cb_param_t* p) {
         if(!e.status)securityBinding.bonded(e.generation,false);
       }
       if(!e.status&&ble_command_bridge::current(e.generation)){
+#if !WIFI_FIXED_ENABLED
         {SecurityLock lock;wifiInput.clear();}
+#endif
         ble_wifi_service::connection(0);
       }
       break;
@@ -189,14 +235,22 @@ void gattEvent(esp_gatts_cb_event_t kind, esp_gatt_if_t id, esp_ble_gatts_cb_par
       e.generation = ble_command_bridge::connect(e.connection);
       if (!e.generation) { esp_ble_gatts_close(id, e.connection); return; }
       memcpy(e.peer,p->connect.remote_bda,6);
-      {SecurityLock lock;wifiInput.clear();securityBinding.connect(e.peer,e.generation);}
+      {SecurityLock lock;
+#if !WIFI_FIXED_ENABLED
+        wifiInput.clear();
+#endif
+        securityBinding.connect(e.peer,e.generation);}
       ble_wifi_service::connection(0);
       break;
     case ESP_GATTS_DISCONNECT_EVT:
       e.kind = Kind::Disconnected; e.connection = p->disconnect.conn_id;
       e.generation = ble_command_bridge::generation(e.connection);
       ble_command_bridge::disconnect(e.connection); // Before owner can claim old work.
-      {SecurityLock lock;if(e.generation)wifiInput.clear();securityBinding.disconnect(e.generation);}
+      {SecurityLock lock;
+#if !WIFI_FIXED_ENABLED
+        if(e.generation)wifiInput.clear();
+#endif
+        securityBinding.disconnect(e.generation);}
       if(e.generation)ble_wifi_service::connection(0);
       break;
     case ESP_GATTS_MTU_EVT: e.kind = Kind::Mtu; e.connection = p->mtu.conn_id; e.value = p->mtu.mtu; break;
@@ -216,6 +270,7 @@ void gattEvent(esp_gatts_cb_event_t kind, esp_gatt_if_t id, esp_ble_gatts_cb_par
       if ((e.handle == pumpHandle.load() || e.handle == timeHandle.load() || e.handle == configHandle.load()) && !e.prepared &&
           e.length <= (e.handle == configHandle.load() ? ble_commands::kConfigPayloadMax : ble_commands::kPayloadMax))
         memcpy(e.payload, p->write.value, e.length);
+#if !WIFI_FIXED_ENABLED
       if(e.handle==wifiHandle.load()){
         // Exact-IDF source guarantees encrypted permission BEFORE this callback.
         e.generation=ble_command_bridge::generation(e.connection);
@@ -227,6 +282,7 @@ void gattEvent(esp_gatts_cb_event_t kind, esp_gatt_if_t id, esp_ble_gatts_cb_par
             e.wifiPayloadTicket=wifiInput.store(e.generation,reinterpret_cast<const char*>(p->write.value),e.length);
         }
       }
+#endif
       break;
     case ESP_GATTS_EXEC_WRITE_EVT:
       e.kind = Kind::Execute; e.connection = p->exec_write.conn_id; e.transaction = p->exec_write.trans_id; break;
@@ -296,7 +352,10 @@ void process(const Event& e) {
       if (e.status != ESP_GATT_OK || e.length != Count) { ++failures; break; }
       memcpy(handles, e.table, sizeof(handles));
       sensorCccdHandle.store(handles[SensorCccd]); resultsCccdHandle.store(handles[ResultsCccd]);
-      pumpHandle.store(handles[Pump]); configHandle.store(handles[Config]); timeHandle.store(handles[Time]); wifiHandle.store(handles[Wifi]);
+      pumpHandle.store(handles[Pump]); configHandle.store(handles[Config]); timeHandle.store(handles[Time]);
+#if !WIFI_FIXED_ENABLED
+      wifiHandle.store(handles[Wifi]);
+#endif
       checked(esp_ble_gatts_start_service(handles[Service])); break;
     case Kind::Started: serviceReady = e.status == ESP_GATT_OK; if (!serviceReady) ++failures; break;
     case Kind::Connected:
@@ -361,6 +420,7 @@ void process(const Event& e) {
       if (!manualHandle(e.handle)) break;
       esp_gatt_status_t status = ESP_GATT_WRITE_NOT_PERMIT;
       const bool cccd = e.handle == handles[SensorCccd] || e.handle == handles[ResultsCccd];
+#if !WIFI_FIXED_ENABLED
       if(e.handle==handles[Wifi]&&session.matches(e.connection)){
         Serial.printf("[WIFI] stage=ble-write-received bytes=%u prepared=%u response=%u offset=%u\n",
             unsigned(e.length),unsigned(e.prepared),unsigned(e.response),unsigned(e.offset));
@@ -409,6 +469,7 @@ void process(const Event& e) {
         // ACK the bounded handoff now, never wait up to 30 seconds for connection.
         response(e.connection,e.transaction,ESP_GATT_OK);break;
       }
+#endif
       if ((e.handle == handles[Pump] || e.handle == handles[Time] || e.handle == handles[Config]) && session.matches(e.connection)) {
         // Consume even when this WRITE cannot enter the authenticated path.
         if (e.handle == handles[Config] ?
@@ -471,7 +532,11 @@ bool initialize() {
       esp_ble_gatts_register_callback(gattEvent) != ESP_OK ||
       esp_ble_gatt_set_local_mtu(185) != ESP_OK || esp_ble_gap_set_device_name(name) != ESP_OK) return false;
   Serial.println(pairing.setup(pairingSdk)?
+#if WIFI_FIXED_ENABLED
+      "BLE SC bonding ready (Just Works, no MITM); pairing window CLOSED; BLE Wi-Fi setup omitted":
+#else
       "BLE SC bonding ready (Just Works, no MITM); pairing window CLOSED; WIFI requires encrypted WRITE":
+#endif
       "BLE security setup failed; pairing disabled, gate=CLOSED");
   uint8_t advertisement[21] = {2, ESP_BLE_AD_TYPE_FLAG, ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT,
       17, ESP_BLE_AD_TYPE_128SRV_CMPL};
@@ -484,7 +549,6 @@ bool initialize() {
   if (esp_ble_gap_config_adv_data_raw(advertisement, sizeof(advertisement)) != ESP_OK ||
       esp_ble_gap_config_scan_rsp_data_raw(scanResponse, sizeof(scanResponse)) != ESP_OK ||
       esp_ble_gatts_app_register(0) != ESP_OK) return false;
-  if(!ble_wifi_service::begin())Serial.println("BLE WIFI worker unavailable; writes fail closed");
   advertisePending = true;
   return true;
 }
@@ -504,7 +568,9 @@ void worker(void*) {
       // Fail closed on lost lifecycle/CCCD events. A reboot is required; never
       // risk inheriting an old subscription after queue overflow.
       transportFailed = true; ++failures;
+#if !WIFI_FIXED_ENABLED
       {SecurityLock lock;wifiInput.clear();}
+#endif
       pairing.window.set(false,0);pairing.disconnect(sessionGeneration);ble_wifi_service::connection(0);
       authentication.reset();
       esp_ble_gap_stop_advertising();
@@ -547,6 +613,7 @@ void worker(void*) {
           ble_command_bridge::release(result.ticket);
         }
       }
+#if !WIFI_FIXED_ENABLED
       uint64_t wifiGeneration=0;ble_commands::Code wifiCode;
       if(ble_wifi_service::result(now,wifiGeneration,wifiCode)){
         if(wifiGeneration!=sessionGeneration||!ble_command_bridge::current(wifiGeneration))ble_wifi_service::release(wifiGeneration);
@@ -559,6 +626,7 @@ void worker(void*) {
           }
         }
       }
+#endif
       if (!session.connected && serviceReady && advDataReady && scanReady &&
           advertisePending && !advertiseInFlight && uint32_t(now - lastAdvertisingMs) >= 2000) {
         lastAdvertisingMs = now;
@@ -589,7 +657,9 @@ void worker(void*) {
 bool begin(const ble_commands::KeySource* keys) {
   if (mailbox) return false;  // Boot-only, no repeated radio allocation.
   keySource = keys; // Provider lifetime must cover boot initialization. Default missing.
-  events = xQueueCreate(32, sizeof(Event));
+  Serial.printf("[BLE] event_queue_depth=%u slot_bytes=%u reserved_bytes=%u\n",
+      unsigned(kEventQueueDepth),unsigned(sizeof(Event)),unsigned(kEventQueueDepth*sizeof(Event)));
+  events = xQueueCreate(kEventQueueDepth, sizeof(Event));
   mailbox = xQueueCreate(1, sizeof(ble_telemetry::Snapshot));
   if (!events || !mailbox) {
     if (events) vQueueDelete(events);

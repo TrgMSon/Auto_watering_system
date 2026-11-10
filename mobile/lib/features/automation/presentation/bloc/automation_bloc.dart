@@ -11,7 +11,8 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
   /// Tăng khi đổi thiết bị hoặc reset, để bỏ qua kết quả API của lần trước.
   int _activeScopeId = 0;
 
-  AutomationBloc({required this.repository}) : super(const AutomationInitial()) {
+  AutomationBloc({required this.repository})
+      : super(const AutomationInitial()) {
     on<AutomationLoadRequested>(_onLoadRequested);
     on<AutomationConfigUpdated>(_onConfigUpdated);
     on<AutomationScheduleAdded>(_onScheduleAdded);
@@ -33,6 +34,15 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
     Emitter<AutomationState> emit,
   ) async {
     final scopeId = ++_activeScopeId;
+    if (!event.loadFromBackend) {
+      emit(AutomationLoaded(
+        config: DeviceConfigModel.fromJson({'device_id': event.deviceId}),
+        schedules: const [],
+        errorMessage:
+            'Cloud offline. Thiết bị vẫn hoạt động độc lập; chế độ hiện tại được đọc qua BLE.',
+      ));
+      return;
+    }
     emit(const AutomationLoading());
     try {
       final config = await repository.getDeviceConfig(event.deviceId);
@@ -41,7 +51,12 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
       emit(AutomationLoaded(config: config, schedules: schedules));
     } catch (e) {
       if (scopeId != _activeScopeId) return;
-      emit(AutomationError(e.toString()));
+      emit(AutomationLoaded(
+        config: DeviceConfigModel.fromJson({'device_id': event.deviceId}),
+        schedules: const [],
+        errorMessage:
+            'Không kết nối được backend. Thiết bị vẫn có thể hoạt động độc lập; kết nối BLE để đổi chế độ tưới.',
+      ));
     }
   }
 
@@ -51,6 +66,12 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
   ) async {
     final currentState = state;
     if (currentState is! AutomationLoaded) return;
+
+    if (!event.persist) {
+      emit(currentState.copyWith(
+          config: event.config, isSaving: false, clearError: true));
+      return;
+    }
 
     final scopeId = _activeScopeId;
     emit(currentState.copyWith(
@@ -66,7 +87,7 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
       _finishSaving(
         scopeId,
         emit,
-        config: currentState.config,
+        config: event.config,
         errorMessage: e.toString(),
       );
     }
