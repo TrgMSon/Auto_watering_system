@@ -49,7 +49,7 @@ class FirmwareServiceImplTest {
     @SuppressWarnings("null")
     @Test
     void storesEsp32BinaryInDatabaseAndReturnsItsChecksum() throws Exception {
-        byte[] bytes = {(byte) 0xE9, 1, 2, 3};
+        byte[] bytes = {(byte) 0xE9, 1, 2, 3, '1', '.', '2', '.', '0', 0};
         MockMultipartFile file = firmwareFile("garden.bin", bytes);
         when(firmwareReleaseRepository.save(any(FirmwareRelease.class)))
                 .thenAnswer(invocation -> {
@@ -89,6 +89,15 @@ class FirmwareServiceImplTest {
                 () -> firmwareService.upload("1.2.0", null, firmwareFile("garden.ino", validFirmware())));
         assertThrows(IllegalArgumentException.class,
                 () -> firmwareService.upload("1.2.0", null, firmwareFile("garden.bin", new byte[] {1, 2, 3})));
+
+        verify(firmwareReleaseRepository, never()).save(any(FirmwareRelease.class));
+    }
+
+    @SuppressWarnings("null")
+    @Test
+    void rejectsReleaseVersionThatDoesNotMatchTheCompiledFirmware() {
+        assertThrows(IllegalArgumentException.class,
+                () -> firmwareService.upload("9.9.9", null, firmwareFile("garden.bin", validFirmware())));
 
         verify(firmwareReleaseRepository, never()).save(any(FirmwareRelease.class));
     }
@@ -174,7 +183,7 @@ class FirmwareServiceImplTest {
     }
 
     private static byte[] validFirmware() {
-        return new byte[] {(byte) 0xE9, 1, 2, 3};
+        return new byte[] {(byte) 0xE9, 1, 2, 3, '1', '.', '2', '.', '0', 0};
     }
 
     private static FirmwareRelease release(String version, String filename, String checksum, long size, int day) {

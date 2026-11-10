@@ -69,7 +69,12 @@ final GoRouter appRouter = GoRouter(
                   return dashboardState is DashboardLoaded &&
                       (dashboardState.pumpStatus ?? dashboardState.telemetry?.isPumpOn) == true;
                 });
-                return AutomationPage(deviceId: deviceId ?? '', isPumpOn: isPumpOn);
+                final isOnline = context.select<DashboardBloc, bool>((bloc) {
+                  final dashboardState = bloc.state;
+                  final device = dashboardState is DashboardLoaded ? dashboardState.selectedDevice : null;
+                  return device?.isOnline ?? false;
+                });
+                return AutomationPage(deviceId: deviceId ?? '', isPumpOn: isPumpOn, isDeviceOnline: isOnline);
               },
             ),
           ],

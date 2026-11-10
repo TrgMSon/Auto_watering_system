@@ -160,6 +160,7 @@ const char* applyConfiguration(irrigation::System& system,const PumpCommand& c){
     case irrigation::RemoteConfigResult::Ok:return "OK";
     case irrigation::RemoteConfigResult::Invalid:return "INVALID_CONFIG";
     case irrigation::RemoteConfigResult::PumpRunning:return "PUMP_RUNNING";
+    case irrigation::RemoteConfigResult::OtaInProgress:return "OTA_IN_PROGRESS";
     case irrigation::RemoteConfigResult::StorageError:return "STORAGE_ERROR";
   }
   return "STORAGE_ERROR";

@@ -98,6 +98,12 @@ class BleSessionCubit extends Cubit<BleSessionState> {
     return result.$2 ?? (result.$1!.isSuccess ? null : resultMessage(result.$1!.code));
   }
 
+  /// Đổi chế độ tưới cục bộ qua BLE, không cần backend hoặc MQTT.
+  Future<String?> setAutoMode(bool enabled) async {
+    final result = await _send(BleAutoModeCommand(enabled));
+    return result.$2 ?? (result.$1!.isSuccess ? null : resultMessage(result.$1!.code));
+  }
+
   /// Kết nối (nếu cần), ghép nối rồi gửi Wi-Fi. Trả về null khi ESP32 vào được Wi-Fi.
   Future<String?> sendWifi(String deviceId, {required String ssid, required String password}) async {
     final BleWifiCommand command;

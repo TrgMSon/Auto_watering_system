@@ -5,12 +5,12 @@
 namespace ble_commands {
 constexpr size_t kPayloadMax = 128, kKeyMax = 128;
 constexpr uint32_t kNonceTtlMs = 30000;
-enum class Op { Unknown, On, Off, Time, Config };
+enum class Op { Unknown, On, Off, Auto, Manual, Time, Config };
 // CONFIG uses the existing authenticated Write With Response policy.
 constexpr bool authenticatedWrite(unsigned suffix) { return suffix == 2 || suffix == 3 || suffix == 7; }
 constexpr bool encryptedWifiWrite(unsigned suffix) { return suffix == 6; }
 enum class Code { None, Ok, BadSig, NonceExpired, BadJson, OutOfRange,
-  LowWater, Maintenance, SensorError, PumpBusy, InvalidTime, WifiOk, WifiFail, StorageError };
+  LowWater, Maintenance, SensorError, PumpBusy, InvalidTime, WifiOk, WifiFail, StorageError, OtaInProgress };
 const char* name(Op op);
 const char* name(Code code);
 struct Crypto {

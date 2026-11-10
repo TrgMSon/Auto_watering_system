@@ -124,6 +124,8 @@ public class MqttConfig {
             } else if (topicName.endsWith("/telemetry")) {
                 sensorDataServiceImpl.recordSensorLog(topicName, payload);
             } else if (topicName.endsWith("/status")) {
+                logger.info("Received MQTT device status message; topic={}, payloadBytes={}",
+                        topicName, payload.length());
                 deviceLifecycleService.handleMqttStatus(topicName, payload);
             } else {
                 logger.info("MQTT message received; topic={}, payload={}", topicName, payload);

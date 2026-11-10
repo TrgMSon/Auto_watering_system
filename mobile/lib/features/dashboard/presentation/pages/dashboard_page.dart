@@ -52,16 +52,18 @@ class _DashboardPageState extends State<DashboardPage> {
             body: AppLoadingIndicator(message: 'Đang tải thiết bị...'),
           );
         }
-        
+
         if (state is DashboardError) {
           return Scaffold(
             body: AppErrorWidget(
               message: state.message,
-              onRetry: () => context.read<DashboardBloc>().add(const DashboardLoadRequested()),
+              onRetry: () => context
+                  .read<DashboardBloc>()
+                  .add(const DashboardLoadRequested()),
             ),
           );
         }
-        
+
         if (state is DashboardLoaded) {
           if (state.devices.isEmpty) {
             return Scaffold(
@@ -73,22 +75,27 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             );
           }
-          
+
           final selectedDevice = state.selectedDevice ?? state.devices.first;
           final isOnline = selectedDevice.isOnline;
           final ble = context.watch<BleSessionCubit>().state;
           final isBleConnected = ble.isConnectedTo(selectedDevice.id);
+          final autoMode = isBleConnected
+              ? (ble.sample?.isAutoMode ?? state.isAutoMode)
+              : state.isAutoMode;
           // Quy ước nhóm: thiết bị online thì điều khiển qua server, offline thì qua BLE.
           final useBle = isBleConnected && !isOnline;
           final bleSample = useBle ? ble.sample : null;
           final telemetry = bleSample != null
               ? _telemetryFromBle(selectedDevice.id, bleSample, state.telemetry)
               : state.telemetry;
-          final pumpStatus = useBle ? bleSample?.isPumpOn : (state.pumpStatus ?? telemetry?.isPumpOn);
+          final pumpStatus = useBle
+              ? bleSample?.isPumpOn
+              : (state.pumpStatus ?? telemetry?.isPumpOn);
           final isTogglingPump = useBle ? ble.isSending : state.isTogglingPump;
           final canControl = isOnline || isBleConnected;
           // Firmware chỉ nhận lệnh bật tay ở chế độ thủ công; lệnh tắt luôn được nhận.
-          final blocksManualOn = state.isAutoMode == true && pumpStatus != true;
+          final blocksManualOn = autoMode == true && pumpStatus != true;
 
           return Scaffold(
             appBar: AppBar(
@@ -105,10 +112,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   onChanged: (DeviceModel? newValue) {
                     if (newValue != null) {
-                      context.read<DashboardBloc>().add(DashboardDeviceSelected(newValue));
+                      context
+                          .read<DashboardBloc>()
+                          .add(DashboardDeviceSelected(newValue));
                     }
                   },
-                  items: state.devices.map<DropdownMenuItem<DeviceModel>>((DeviceModel device) {
+                  items: state.devices
+                      .map<DropdownMenuItem<DeviceModel>>((DeviceModel device) {
                     return DropdownMenuItem<DeviceModel>(
                       value: device,
                       child: Text(
@@ -136,7 +146,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        isOnline ? 'Online' : 'Offline',
+                        isOnline ? 'Online' : 'Cloud offline',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -161,7 +171,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         state.errorMessage!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
                       ),
                     ),
                   // Manual Pump Control Card
@@ -177,50 +188,67 @@ class _DashboardPageState extends State<DashboardPage> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.water_drop, color: AppColors.primary),
-                                								),
+                                  child: const Icon(Icons.water_drop,
+                                      color: AppColors.primary),
+                                ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Máy bơm',
-                                        style: Theme.of(context).textTheme.titleMedium,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       if (!canControl)
                                         Text(
-                                          'Thiết bị đang offline',
+                                          'Mất kết nối cloud; thiết bị vẫn hoạt động. Kết nối Bluetooth để điều khiển.',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: AppColors.textSecondary,
+                                              ),
                                         )
                                       else if (isTogglingPump)
                                         Text(
                                           'Đang chờ thiết bị xác nhận...',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: AppColors.textSecondary,
+                                              ),
                                         )
-                                      else if (!useBle && pumpStatus == true && state.pumpOffAt != null)
-                                        PumpCountdownText(pumpOffAt: state.pumpOffAt!)
+                                      else if (!useBle &&
+                                          pumpStatus == true &&
+                                          state.pumpOffAt != null)
+                                        PumpCountdownText(
+                                            pumpOffAt: state.pumpOffAt!)
                                       else if (blocksManualOn)
                                         Text(
                                           'Đang tưới tự động. Tắt chế độ này để bơm tay.',
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: AppColors.textSecondary,
+                                              ),
                                         )
                                       else
                                         Text(
@@ -231,11 +259,14 @@ class _DashboardPageState extends State<DashboardPage> {
                                                   : 'Đang tắt'),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: pumpStatus == true
-                                                ? AppColors.primary
-                                                : AppColors.textSecondary,
-                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: pumpStatus == true
+                                                    ? AppColors.primary
+                                                    : AppColors.textSecondary,
+                                              ),
                                         ),
                                     ],
                                   ),
@@ -250,7 +281,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                   height: 48,
                                   child: Padding(
                                     padding: EdgeInsets.all(14.0),
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   ),
                                 )
                               : Switch(
@@ -268,20 +300,21 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Sensor Grid
-                  Text('Thông số hiện tại', style: Theme.of(context).textTheme.titleMedium),
+                  Text('Thông số hiện tại',
+                      style: Theme.of(context).textTheme.titleMedium),
                   if (telemetry != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       'Cập nhật lần cuối: ${Formatters.formatDateTime(telemetry.recordedAt)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                            color: AppColors.textSecondary,
+                          ),
                     ),
                   ],
                   const SizedBox(height: 16),
-                  
+
                   if (!useBle && state.isTelemetryEmpty)
                     const Center(
                       child: Padding(
@@ -346,7 +379,9 @@ Future<void> _togglePumpViaBle(BuildContext context, bool turnOn) async {
   final error = await context.read<BleSessionCubit>().setPump(turnOn);
   if (error == null || !context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(error), backgroundColor: Theme.of(context).colorScheme.error),
+    SnackBar(
+        content: Text(error),
+        backgroundColor: Theme.of(context).colorScheme.error),
   );
 }
 
@@ -357,12 +392,11 @@ TelemetryModel _telemetryFromBle(
 ) {
   final usesFallback =
       (sample.soilMoisture == null && fallback?.soilMoisture != null) ||
-      (sample.temperature == null && fallback?.temperature != null) ||
-      (sample.humidity == null && fallback?.humidity != null) ||
-      (sample.waterLevelPercent == null && fallback?.waterLevel != null);
-  final recordedAt = usesFallback
-      ? fallback?.recordedAt ?? DateTime.now()
-      : DateTime.now();
+          (sample.temperature == null && fallback?.temperature != null) ||
+          (sample.humidity == null && fallback?.humidity != null) ||
+          (sample.waterLevelPercent == null && fallback?.waterLevel != null);
+  final recordedAt =
+      usesFallback ? fallback?.recordedAt ?? DateTime.now() : DateTime.now();
 
   return TelemetryModel(
     deviceId: deviceId,
@@ -384,7 +418,8 @@ class _BleConnectButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isConnecting = ble.status == BleSessionStatus.connecting && ble.deviceId == deviceId;
+    final isConnecting =
+        ble.status == BleSessionStatus.connecting && ble.deviceId == deviceId;
     if (isConnecting) {
       return const Padding(
         padding: EdgeInsets.all(14),
@@ -399,7 +434,9 @@ class _BleConnectButton extends StatelessWidget {
     return IconButton(
       tooltip: isConnected ? 'Ngắt Bluetooth' : 'Kết nối Bluetooth',
       icon: Icon(isConnected ? Icons.bluetooth_connected : Icons.bluetooth),
-      onPressed: () => isConnected ? context.read<BleSessionCubit>().disconnect() : _connect(context),
+      onPressed: () => isConnected
+          ? context.read<BleSessionCubit>().disconnect()
+          : _connect(context),
     );
   }
 
@@ -449,9 +486,9 @@ class SensorCard extends StatelessWidget {
                   child: Text(
                     value,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
                   ),
                 ),
                 Text(
@@ -459,8 +496,8 @@ class SensorCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                        color: AppColors.textSecondary,
+                      ),
                 ),
               ],
             ),

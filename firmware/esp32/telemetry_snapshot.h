@@ -8,6 +8,7 @@ struct Snapshot {
   float waterPercent = NAN;
   bool waterValid = false;
   bool actuatorOn = false;
+  bool automaticMode = false;
   uint32_t publishedAtMs = 0; // Publication never refreshes reading.sampledAtMs.
 };
 }

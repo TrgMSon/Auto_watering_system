@@ -32,7 +32,8 @@ bool reserve(uint64_t generation, uint32_t transaction, const ble_commands::Comm
     ble_commands::Code code, uint32_t now, uint64_t ingressEpoch) {
   Lock lock; (void)lock;
   reconcileMqtt();
-  if ((command.op == ble_commands::Op::On || command.op == ble_commands::Op::Config) && ingressEpoch != UINT64_MAX && ingressEpoch != offEpoch) return false;
+  if ((command.op == ble_commands::Op::On || command.op == ble_commands::Op::Auto ||
+      command.op == ble_commands::Op::Config) && ingressEpoch != UINT64_MAX && ingressEpoch != offEpoch) return false;
   const bool reserved = dispatch.reserve(generation, transaction, command, code, now);
   if (reserved && command.op == ble_commands::Op::Off && code == ble_commands::Code::Ok) {
     ++offEpoch;

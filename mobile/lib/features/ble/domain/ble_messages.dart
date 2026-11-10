@@ -20,6 +20,7 @@ class BleSensorSample extends Equatable {
     required this.humidity,
     required this.waterLevelPercent,
     required this.isPumpOn,
+    this.isAutoMode,
   });
 
   /// Ném [FormatException] nếu dữ liệu sai định dạng.
@@ -29,21 +30,28 @@ class BleSensorSample extends Equatable {
     if (pump != 0 && pump != 1) {
       throw const FormatException('Trường pump phải là 0 hoặc 1');
     }
+    final auto = json['auto'];
+    if (auto != null && auto != 0 && auto != 1) {
+      throw const FormatException('Trường auto phải là 0, 1 hoặc null');
+    }
     return BleSensorSample(
       soilMoisture: _optionalNumber(json, 'soil'),
       temperature: _optionalNumber(json, 'temp'),
       humidity: _optionalNumber(json, 'hum'),
       waterLevelPercent: _optionalNumber(json, 'water'),
       isPumpOn: pump == 1,
+      isAutoMode: auto == null ? null : auto == 1,
     );
   }
 
   final double? soilMoisture;
   final double? temperature;
   final double? humidity;
+
   /// Mực nước theo % bồn (0 đến 100), từ trường `water` của firmware.
   final double? waterLevelPercent;
   final bool isPumpOn;
+  final bool? isAutoMode;
 
   static double? _optionalNumber(Map<String, dynamic> json, String key) {
     final value = json[key];
@@ -53,7 +61,14 @@ class BleSensorSample extends Equatable {
   }
 
   @override
-  List<Object?> get props => [soilMoisture, temperature, humidity, waterLevelPercent, isPumpOn];
+  List<Object?> get props => [
+        soilMoisture,
+        temperature,
+        humidity,
+        waterLevelPercent,
+        isPumpOn,
+        isAutoMode
+      ];
 }
 
 /// Kết quả nghiệp vụ từ `0005`, ví dụ `{"op":"PUMP_ON","code":"OK"}`.

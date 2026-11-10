@@ -35,8 +35,8 @@ inline Packet serialize(const Snapshot& snapshot, uint32_t now) {
   Packet p;
   // Calibrated operational %, not water-column cm or actual tank volume %.
   const int n = snprintf(p.bytes, sizeof(p.bytes),
-      "{\"soil\":%s,\"temp\":%s,\"hum\":%s,\"water\":%s,\"pump\":%u}",
-      soil, temp, hum, water, snapshot.actuatorOn ? 1u : 0u);
+      "{\"soil\":%s,\"temp\":%s,\"hum\":%s,\"water\":%s,\"pump\":%u,\"auto\":%u}",
+      soil, temp, hum, water, snapshot.actuatorOn ? 1u : 0u, snapshot.automaticMode ? 1u : 0u);
   if (n > 0 && static_cast<size_t>(n) < sizeof(p.bytes)) p.size = static_cast<uint16_t>(n);
   else p.bytes[0] = 0;  // Never publish truncated JSON.
   return p;

@@ -59,7 +59,9 @@ class Parser {
   const char* p_; const char* end_;
 };
 }
-const char* name(Op op) { return op == Op::On ? "PUMP_ON" : op == Op::Off ? "PUMP_OFF" : op == Op::Time ? "TIME" : op == Op::Config ? "CONFIG" : nullptr; }
+const char* name(Op op) { return op == Op::On ? "PUMP_ON" : op == Op::Off ? "PUMP_OFF" :
+    op == Op::Auto ? "AUTO" : op == Op::Manual ? "MANUAL" : op == Op::Time ? "TIME" :
+    op == Op::Config ? "CONFIG" : nullptr; }
 const char* name(Code code) {
   switch (code) {
     case Code::Ok: return "OK"; case Code::BadSig: return "BAD_SIG";
@@ -68,6 +70,7 @@ const char* name(Code code) {
     case Code::Maintenance: return "MAINTENANCE"; case Code::SensorError: return "SENSOR_ERROR";
     case Code::PumpBusy: return "PUMP_BUSY"; case Code::InvalidTime: return "INVALID_TIME";
     case Code::StorageError: return "STORAGE_ERROR";
+    case Code::OtaInProgress: return "OTA_IN_PROGRESS";
     case Code::WifiOk: return "WIFI_OK"; case Code::WifiFail: return "WIFI_FAIL";
     default: return nullptr;
   }
@@ -85,7 +88,8 @@ Code parse(const char* bytes, size_t size, Command& command, Op endpoint) {
     if (!time && !strcmp(key, "cmd")) {
       if (cmd) { command.op = Op::Unknown; return Code::BadJson; }
       char op[16]; if (!p.string(op, sizeof(op))) return Code::BadJson;
-      cmd = true; command.op = !strcmp(op, "PUMP_ON") ? Op::On : !strcmp(op, "PUMP_OFF") ? Op::Off : Op::Unknown;
+      cmd = true; command.op = !strcmp(op, "PUMP_ON") ? Op::On : !strcmp(op, "PUMP_OFF") ? Op::Off :
+          !strcmp(op, "AUTO") ? Op::Auto : !strcmp(op, "MANUAL") ? Op::Manual : Op::Unknown;
     } else if (time && !strcmp(key, "unix")) {
       if (dur || !p.integer(command.unixSeconds, range)) return Code::BadJson;
       dur = true;
@@ -105,7 +109,8 @@ Code parse(const char* bytes, size_t size, Command& command, Op endpoint) {
       if (!p.done() || (!time && !cmd) || !dur || !sig || command.op == Op::Unknown) return Code::BadJson;
       if (time) return range || !validUnix(command.unixSeconds) ? Code::InvalidTime :
           badSig ? Code::BadSig : Code::Ok;
-      if (range || (command.op == Op::Off ? command.seconds != 0 : command.seconds < 1 || command.seconds > 600))
+      if (range || ((command.op == Op::Off || command.op == Op::Auto || command.op == Op::Manual) ?
+          command.seconds != 0 : command.seconds < 1 || command.seconds > 600))
         return Code::OutOfRange;
       return badSig ? Code::BadSig : Code::Ok;
     }

@@ -116,7 +116,7 @@ function FirmwareManagement({ accessToken }) {
         <form className="firmware-management__card" onSubmit={handleUpload}>
           <h2>Phát hành firmware mới</h2>
           <p className="firmware-management__hint">
-            Chỉ nhận file .bin ESP32 (tối đa 4 MB). Phiên bản mới tải lên sẽ được thiết bị nhận ở lần kiểm tra tiếp theo.
+            Chỉ nhận file .bin ESP32 (tối đa 4 MB). Phiên bản phải trùng với firmware_version.h trong file đã biên dịch.
           </p>
           <label className="firmware-management__field">
             Phiên bản
@@ -146,7 +146,7 @@ function FirmwareManagement({ accessToken }) {
               accept=".bin,application/octet-stream"
               onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })}
             />
-            <small>File phải là firmware đã biên dịch cho đúng loại board ESP32.</small>
+            <small>File phải đúng board ESP32 và vừa phân vùng OTA. Thiết bị tự kiểm tra HTTPS, chỉ cài đặt khi máy bơm OFF.</small>
           </label>
           <button className="firmware-management__submit" type="submit" disabled={isUploading}>
             {isUploading ? 'Đang tải lên...' : 'Tải lên và phát hành'}
@@ -195,7 +195,7 @@ function FirmwareManagement({ accessToken }) {
 
       <aside className="firmware-management__notice">
         <strong>Lưu ý tích hợp ESP32</strong>
-        <span>Thiết bị cần gọi GET /api/firmware/check?currentVersion=... định kỳ, sau đó tải file từ download_url. Backend chỉ phân phối firmware, không tự biên dịch mã nguồn hoặc cài đặt OTA trên thiết bị.</span>
+        <span>Thiết bị kiểm tra phiên bản mỗi giờ, xác minh SHA-256 rồi cài vào phân vùng OTA dự phòng khi máy bơm OFF. Cần build firmware với phân vùng OTA và phiên bản khớp bản phát hành.</span>
       </aside>
     </section>
   );
