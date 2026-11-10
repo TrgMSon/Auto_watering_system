@@ -28,8 +28,9 @@ int main() {
     assert(!d.waterValid && std::isnan(d.waterPercent) && !d.desiredPumpOn);
   }
   Controller c(config);
-  assert(!c.evaluate(reading(0, 30), 0).desiredPumpOn);
-  assert(!c.evaluate(reading(0, 50), 0).desiredPumpOn);
+  assert(Controller(config).evaluate(reading(0, 69.9f), 0).desiredPumpOn);
+  assert(!Controller(config).evaluate(reading(0, 70), 0).desiredPumpOn);
+  assert(!Controller(config).evaluate(reading(0, 20), 0, false).desiredPumpOn);
   assert(c.evaluate(r, 0).desiredPumpOn);
   assert(c.evaluate(reading(1000, 30), 1000).desiredPumpOn);
   assert(c.evaluate(reading(2000, 69.9f), 2000).desiredPumpOn);
@@ -73,6 +74,13 @@ int main() {
   assert(d.state == State::Cooldown && d.reason == Reason::Timeout && !d.desiredPumpOn);
   assert(timeout.evaluate(reading(6000), 6000).state == State::Cooldown);
   assert(timeout.evaluate(reading(35000, 70), 35000).state == State::Idle);
+  Controller oneShot(config);
+  assert(oneShot.evaluate(reading(0, 69.9f), 0).desiredPumpOn);
+  d = oneShot.evaluate(reading(5000, 69.9f), 5000);
+  assert(d.state == State::Cooldown && d.reason == Reason::Timeout && !d.desiredPumpOn);
+  assert(oneShot.evaluate(reading(35000, 60), 35000).desiredPumpOn);
+  assert(oneShot.evaluate(reading(36000, 70), 36000).state == State::Idle);
+  assert(oneShot.evaluate(reading(37000, 69.9f), 37000).desiredPumpOn);
   Controller rollover(config);
   const uint32_t start = std::numeric_limits<uint32_t>::max() - 1000;
   assert(rollover.evaluate(reading(start), start).desiredPumpOn);

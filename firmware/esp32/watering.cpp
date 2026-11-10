@@ -59,10 +59,16 @@ void Controller::completed(uint32_t now, const sensors::Reading& reading) {
   if (automaticRun_ && safe && reading.soilPercent >= config_.stopPercent) {
     state_ = State::Idle; attempts_ = 0; return;
   }
-  if (automaticRun_ && attempts_ >= 3) {
-    state_ = State::Locked;
-    retryLocked_ = true;
-  } else if (!safe) {
+  if (automaticRun_) {
+    if (!safe) {
+      interrupted();  // Unsafe data still latches the run immediately.
+    } else {
+      state_ = State::Cooldown;
+      cooldownStartedMs_ = now;
+    }
+    return;
+  }
+  if (!safe) {
     interrupted();  // A coincident timeout must not hide an unsafe interruption.
   } else {
     state_ = State::Cooldown;
@@ -85,6 +91,7 @@ Decision Controller::evaluate(const sensors::Reading& r, uint32_t now, bool auto
     if (retryLocked_) d.reason = Reason::RetryLimit;
     else if (state_ == State::Idle) d.reason = Reason::Wet;
     else if (state_ == State::Cooldown) d.reason = Reason::Timeout;
+    else if (state_ == State::Locked && d.reason == Reason::Idle) d.reason = Reason::Locked;
   } else if (state_ == State::Locked) {
     // Only a valid, fresh wet soil reading clears a lock. Water may remain unsafe.
     if (!retryLocked_ && d.reason != Reason::InvalidConfig && soilValid && fresh && r.soilPercent >= config_.stopPercent) {
@@ -103,7 +110,7 @@ Decision Controller::evaluate(const sensors::Reading& r, uint32_t now, bool auto
     } else if (state_ == State::Cooldown) {
       if (d.cooldownRemainingMs != 0) {
         d.reason = Reason::Cooldown;
-      } else if (automatic && r.soilPercent < config_.startPercent) {
+      } else if (automatic && r.soilPercent < config_.stopPercent) {
         if (attempts_ >= 3) { state_ = State::Locked; retryLocked_ = true; d.reason = Reason::RetryLimit; }
         else { state_ = State::Watering; latchRun(now, 5000); automaticRun_ = true; ++attempts_; d.reason = Reason::Dry; }
       } else {
@@ -117,7 +124,7 @@ Decision Controller::evaluate(const sensors::Reading& r, uint32_t now, bool auto
       d.reason = Reason::Wet;
     } else if (state_ == State::Watering) {
       d.reason = Reason::Hysteresis;
-    } else if (automatic && r.soilPercent < config_.startPercent) {
+    } else if (automatic && r.soilPercent < config_.stopPercent) {
       if (attempts_ >= 3) { state_ = State::Locked; retryLocked_ = true; d.reason = Reason::RetryLimit; }
       else { state_ = State::Watering; latchRun(now, 5000); automaticRun_ = true; ++attempts_; d.reason = Reason::Dry; }
     }
