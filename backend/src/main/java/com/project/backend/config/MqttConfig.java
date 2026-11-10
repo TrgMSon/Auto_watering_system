@@ -28,6 +28,7 @@ import com.project.backend.service.DeviceLifecycleService;
 import com.project.backend.service.impl.SensorDataServiceImpl;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
 
 @Configuration
 @ConditionalOnProperty(name = "app.mqtt.enabled", havingValue = "true")
@@ -60,7 +61,26 @@ public class MqttConfig {
 
     @EventListener
     public void onMqttConnectionFailed(MqttConnectionFailedEvent event) {
-        logger.error("MQTT client connection failed: {}", event.getSource(), event.getCause());
+        Object source = event.getSource();
+        String role = "unknown";
+        String failedClientId = "unknown";
+        if (source instanceof MqttPahoMessageDrivenChannelAdapter) {
+            role = "inbound";
+            failedClientId = clientId + "_inbound";
+        } else if (source instanceof MqttPahoMessageHandler) {
+            role = "outbound";
+            failedClientId = clientId + "_outbound";
+        }
+
+        int pahoReasonCode = -1;
+        for (Throwable cause = event.getCause(); cause != null; cause = cause.getCause()) {
+            if (cause instanceof MqttException mqttException) {
+                pahoReasonCode = mqttException.getReasonCode();
+                break;
+            }
+        }
+        logger.error("MQTT connection lost or failed; role={}, clientId={}, pahoReasonCode={}, sourceType={}",
+                role, failedClientId, pahoReasonCode, source.getClass().getSimpleName(), event.getCause());
     }
 
     @Bean

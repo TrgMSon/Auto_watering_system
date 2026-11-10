@@ -83,8 +83,8 @@ class _DashboardPageState extends State<DashboardPage> {
           final autoMode = isBleConnected
               ? (ble.sample?.isAutoMode ?? state.isAutoMode)
               : state.isAutoMode;
-          // Quy ước nhóm: thiết bị online thì điều khiển qua server, offline thì qua BLE.
-          final useBle = isBleConnected && !isOnline;
+          // Prefer the active local BLE session; otherwise use the cloud when online.
+          final useBle = isBleConnected;
           final bleSample = useBle ? ble.sample : null;
           final telemetry = bleSample != null
               ? _telemetryFromBle(selectedDevice.id, bleSample, state.telemetry)
