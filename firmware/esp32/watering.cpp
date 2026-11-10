@@ -60,7 +60,12 @@ void Controller::completed(uint32_t now, const sensors::Reading& reading) {
     state_ = State::Idle; attempts_ = 0; return;
   }
   if (automaticRun_) {
-    state_ = State::Locked;
+    if (!safe) {
+      interrupted();  // Unsafe data still latches the run immediately.
+    } else {
+      state_ = State::Cooldown;
+      cooldownStartedMs_ = now;
+    }
     return;
   }
   if (!safe) {

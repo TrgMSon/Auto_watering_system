@@ -71,14 +71,14 @@ int main() {
   timeout.evaluate(r, 0);
   assert(timeout.evaluate(reading(4999), 4999).desiredPumpOn);
   auto d = timeout.evaluate(reading(5000), 5000);
-  assert(d.state == State::Locked && d.reason == Reason::Locked && !d.desiredPumpOn);
-  assert(timeout.evaluate(reading(6000), 6000).state == State::Locked);
+  assert(d.state == State::Cooldown && d.reason == Reason::Timeout && !d.desiredPumpOn);
+  assert(timeout.evaluate(reading(6000), 6000).state == State::Cooldown);
   assert(timeout.evaluate(reading(35000, 70), 35000).state == State::Idle);
   Controller oneShot(config);
   assert(oneShot.evaluate(reading(0, 69.9f), 0).desiredPumpOn);
   d = oneShot.evaluate(reading(5000, 69.9f), 5000);
-  assert(d.state == State::Locked && d.reason == Reason::Locked && !d.desiredPumpOn);
-  assert(!oneShot.evaluate(reading(35000, 60), 35000).desiredPumpOn);
+  assert(d.state == State::Cooldown && d.reason == Reason::Timeout && !d.desiredPumpOn);
+  assert(oneShot.evaluate(reading(35000, 60), 35000).desiredPumpOn);
   assert(oneShot.evaluate(reading(36000, 70), 36000).state == State::Idle);
   assert(oneShot.evaluate(reading(37000, 69.9f), 37000).desiredPumpOn);
   Controller rollover(config);
