@@ -26,6 +26,8 @@ static configuration::PreferencesStorage configStorage;
 static pump::SerialCommands commands;
 static irrigation::System irrigationSystem;
 static bool deferredServicesStarted = false;
+static bool bleKeyInitialized = false;
+static bool bleStartAttempted = false;
 static bool mqttConnectedObserved = false;
 static uint32_t mqttConnectedSinceMs = 0;
 static uint32_t deferredServicesWaitStartedMs = 0;
@@ -114,14 +116,32 @@ void startDeferredServices() {
   ble_keys::NvsReader keyStorage;
   uint8_t staMac[6];
   ble_keys::Status keyStatus = ble_keys::Status::Invalid;
-  if (esp_read_mac(staMac, ESP_MAC_WIFI_STA) == ESP_OK)
+  if (esp_read_mac(staMac, ESP_MAC_WIFI_STA) == ESP_OK) {
     keyStatus = bleKeySource.initialize(keyStorage, staMac);
+    bleKeyInitialized = true;
+  }
   Serial.println(keyStatus == ble_keys::Status::Loaded ? "BLE key loaded" :
       keyStatus == ble_keys::Status::Missing ? "BLE key missing" : "BLE key invalid");
-  if (!plant_ble::begin(&bleKeySource)) Serial.println("BLE worker unavailable; irrigation unchanged");
   if (!plant_ota::begin()) Serial.println("[OTA] worker unavailable");
 #endif
   deferredServicesStarted = true;
+}
+
+void startBleWhenWifiUnavailable() {
+#if !defined(F31D_GUARD_TEST) || F31D_GUARD_TEST != 1
+  if (!deferredServicesStarted || bleStartAttempted || !bleKeyInitialized) return;
+  const auto wifi = ble_wifi_service::networkSnapshot();
+  // Do not start BLE while Wi-Fi is associating. Backoff means the Wi-Fi
+  // runtime has stopped its candidate connection; NoCredentials/Unavailable
+  // likewise mean it is not holding an active Wi-Fi link.
+  if (wifi.online || (wifi.state != wifi_runtime::State::Backoff &&
+      wifi.state != wifi_runtime::State::NoCredentials &&
+      wifi.state != wifi_runtime::State::Unavailable)) return;
+  bleStartAttempted = true;
+  Serial.println("[BLE] Wi-Fi unavailable; starting BLE fallback");
+  if (!plant_ble::begin(&bleKeySource))
+    Serial.println("[BLE] worker unavailable; irrigation unchanged");
+#endif
 }
 
 void setup() {
@@ -176,6 +196,7 @@ void loop() {
   }
 #endif
   startDeferredServices();
+  startBleWhenWifiUnavailable();
   servicePump();
   // Bound per-loop work even under a continuous Serial stream.
   for (unsigned i = 0; i < 32 && Serial.available() > 0; ++i) {
