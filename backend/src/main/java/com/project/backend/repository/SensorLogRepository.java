@@ -16,7 +16,11 @@ public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
 
     @Query(value = """
             SELECT
-                DATE_FORMAT(s.recorded_at, '%Y-%m-%d %H:00:00') AS time_label,
+                CASE WHEN ?3 = 1440
+                    THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
+                    ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                        '%Y-%m-%d %H:%i:00')
+                END AS time_label,
                 AVG(s.soil_moisture) AS avg_soil,
                 AVG(s.temperature) AS avg_temp,
                 AVG(s.humidity) AS avg_humid
@@ -24,21 +28,33 @@ public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
             WHERE s.device_id = ?1
               AND s.recorded_at >= ?2
               AND (s.soil_moisture IS NOT NULL OR s.temperature IS NOT NULL OR s.humidity IS NOT NULL)
-            GROUP BY DATE_FORMAT(s.recorded_at, '%Y-%m-%d %H:00:00')
+            GROUP BY CASE WHEN ?3 = 1440
+                THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
+                ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                    '%Y-%m-%d %H:%i:00')
+            END
             ORDER BY time_label ASC
             """, nativeQuery = true)
-    List<Object[]> getHourlyEnvironmentalStats(String deviceId, LocalDateTime startTime);
+    List<Object[]> getEnvironmentalStats(String deviceId, LocalDateTime startTime, int bucketMinutes);
 
     @Query(value = """
             SELECT
-                DATE_FORMAT(s.recorded_at, '%Y-%m-%d %H:00:00') AS time_label,
+                CASE WHEN ?3 = 1440
+                    THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
+                    ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                        '%Y-%m-%d %H:%i:00')
+                END AS time_label,
                 AVG(s.water_level) AS avg_water_level
             FROM sensor_log s
             WHERE s.device_id = ?1
               AND s.recorded_at >= ?2
               AND s.water_level IS NOT NULL
-            GROUP BY DATE_FORMAT(s.recorded_at, '%Y-%m-%d %H:00:00')
+            GROUP BY CASE WHEN ?3 = 1440
+                THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
+                ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                    '%Y-%m-%d %H:%i:00')
+            END
             ORDER BY time_label ASC
             """, nativeQuery = true)
-    List<Object[]> getHourlyWaterLevelStats(String deviceId, LocalDateTime startTime);
+    List<Object[]> getWaterLevelStats(String deviceId, LocalDateTime startTime, int bucketMinutes);
 }

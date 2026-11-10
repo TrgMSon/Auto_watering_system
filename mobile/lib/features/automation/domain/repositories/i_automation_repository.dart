@@ -8,6 +8,9 @@ abstract class IAutomationRepository {
   /// Update the configuration through the backend and MQTT command publisher.
   Future<bool> updateDeviceConfig(DeviceConfigModel config);
 
+  /// Change only the automatic/manual mode through the cloud command path.
+  Future<bool> setWateringMode(String deviceId, {required bool automatic});
+
   /// Fetch all schedules for a device
   Future<List<ScheduleModel>> getSchedules(String deviceId);
 

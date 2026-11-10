@@ -27,6 +27,16 @@ class AutomationConfigUpdated extends AutomationEvent {
   List<Object?> get props => [config, persist];
 }
 
+class AutomationModeUpdated extends AutomationEvent {
+  final String deviceId;
+  final bool automatic;
+
+  const AutomationModeUpdated({required this.deviceId, required this.automatic});
+
+  @override
+  List<Object?> get props => [deviceId, automatic];
+}
+
 class AutomationScheduleAdded extends AutomationEvent {
   final ScheduleModel schedule;
   const AutomationScheduleAdded(this.schedule);

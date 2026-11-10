@@ -26,7 +26,7 @@ class StatisticsSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Trung bình theo giờ',
+              'Trung bình theo khoảng thời gian',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
