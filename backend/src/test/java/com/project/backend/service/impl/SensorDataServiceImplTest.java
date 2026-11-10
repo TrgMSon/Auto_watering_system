@@ -55,16 +55,18 @@ class SensorDataServiceImplTest {
         association.setPermission(permission);
         when(userDeviceRepository.findByUser_IdAndDevice_Id(12, "device-1"))
                 .thenReturn(Optional.of(association));
-        when(sensorLogRepository.getHourlyEnvironmentalStats(
+        when(sensorLogRepository.getEnvironmentalStats(
                 org.mockito.ArgumentMatchers.eq("device-1"),
-                org.mockito.ArgumentMatchers.any()))
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(List.of());
 
         assertEquals(List.of(), sensorDataService.getEnvironmentalStats("device-1", 12, "24h"));
 
-        verify(sensorLogRepository).getHourlyEnvironmentalStats(
+        verify(sensorLogRepository).getEnvironmentalStats(
                 org.mockito.ArgumentMatchers.eq("device-1"),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(5));
     }
 
     @Test
@@ -76,9 +78,10 @@ class SensorDataServiceImplTest {
                 NotFoundException.class,
                 () -> sensorDataService.getWaterLevelStats("device-1", 12, "24h"));
 
-        verify(sensorLogRepository, never()).getHourlyWaterLevelStats(
+        verify(sensorLogRepository, never()).getWaterLevelStats(
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -92,8 +95,9 @@ class SensorDataServiceImplTest {
                 NotFoundException.class,
                 () -> sensorDataService.getEnvironmentalStats("device-1", 12, "24h"));
 
-        verify(sensorLogRepository, never()).getHourlyEnvironmentalStats(
+        verify(sensorLogRepository, never()).getEnvironmentalStats(
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 }
