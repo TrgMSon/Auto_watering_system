@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,6 +68,41 @@ class SensorDataServiceImplTest {
                 org.mockito.ArgumentMatchers.eq("device-1"),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.eq(5));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "24h, 5",
+            "7d, 60",
+            "30d, 1440"
+    })
+    void usesExpectedBucketSizeForEachStatisticsRange(String range, int bucketMinutes) {
+        UserDevice association = new UserDevice();
+        association.setPermission("owner");
+        when(userDeviceRepository.findByUser_IdAndDevice_Id(12, "device-1"))
+                .thenReturn(Optional.of(association));
+        when(sensorLogRepository.getEnvironmentalStats(
+                org.mockito.ArgumentMatchers.eq("device-1"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(List.of());
+        when(sensorLogRepository.getWaterLevelStats(
+                org.mockito.ArgumentMatchers.eq("device-1"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(List.of());
+
+        sensorDataService.getEnvironmentalStats("device-1", 12, range);
+        sensorDataService.getWaterLevelStats("device-1", 12, range);
+
+        verify(sensorLogRepository).getEnvironmentalStats(
+                org.mockito.ArgumentMatchers.eq("device-1"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(bucketMinutes));
+        verify(sensorLogRepository).getWaterLevelStats(
+                org.mockito.ArgumentMatchers.eq("device-1"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(bucketMinutes));
     }
 
     @Test

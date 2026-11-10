@@ -18,7 +18,8 @@ public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
             SELECT
                 CASE WHEN ?3 = 1440
                     THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
-                    ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                    ELSE DATE_FORMAT(
+                        TIMESTAMPADD(MINUTE, -MOD(MINUTE(s.recorded_at), ?3), s.recorded_at),
                         '%Y-%m-%d %H:%i:00')
                 END AS time_label,
                 AVG(s.soil_moisture) AS avg_soil,
@@ -30,7 +31,8 @@ public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
               AND (s.soil_moisture IS NOT NULL OR s.temperature IS NOT NULL OR s.humidity IS NOT NULL)
             GROUP BY CASE WHEN ?3 = 1440
                 THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
-                ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                ELSE DATE_FORMAT(
+                    TIMESTAMPADD(MINUTE, -MOD(MINUTE(s.recorded_at), ?3), s.recorded_at),
                     '%Y-%m-%d %H:%i:00')
             END
             ORDER BY time_label ASC
@@ -41,7 +43,8 @@ public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
             SELECT
                 CASE WHEN ?3 = 1440
                     THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
-                    ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                    ELSE DATE_FORMAT(
+                        TIMESTAMPADD(MINUTE, -MOD(MINUTE(s.recorded_at), ?3), s.recorded_at),
                         '%Y-%m-%d %H:%i:00')
                 END AS time_label,
                 AVG(s.water_level) AS avg_water_level
@@ -51,7 +54,8 @@ public interface SensorLogRepository extends JpaRepository<SensorLog, Integer> {
               AND s.water_level IS NOT NULL
             GROUP BY CASE WHEN ?3 = 1440
                 THEN DATE_FORMAT(s.recorded_at, '%Y-%m-%d 00:00:00')
-                ELSE DATE_FORMAT(s.recorded_at - INTERVAL (MINUTE(s.recorded_at) MOD ?3) MINUTE,
+                ELSE DATE_FORMAT(
+                    TIMESTAMPADD(MINUTE, -MOD(MINUTE(s.recorded_at), ?3), s.recorded_at),
                     '%Y-%m-%d %H:%i:00')
             END
             ORDER BY time_label ASC
