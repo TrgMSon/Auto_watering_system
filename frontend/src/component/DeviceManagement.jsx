@@ -516,7 +516,6 @@ function DeviceManagement({ accessToken }) {
             <li>Không thể đăng ký lại thiết bị đang hoạt động.</li>
             <li>Sau khi gán, tài khoản người dùng có thể truy cập thiết bị trong ứng dụng.</li>
           </ul>
-          <p>Danh sách thiết bị được tải từ backend. Người dùng phải tồn tại và có vai trò USER.</p>
         </aside>
       </div>
     </section>

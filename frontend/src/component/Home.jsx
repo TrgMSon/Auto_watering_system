@@ -47,12 +47,6 @@ function Home({ auth, onLogout }) {
         </nav>
 
         <div className="sidebar__bottom">
-          <div className="sidebar-help">
-            <span className="sidebar-help__icon"><HelpIcon /></span>
-            <strong>Cần trợ giúp?</strong>
-            <p>Đội ngũ Gardenia luôn sẵn sàng hỗ trợ bạn.</p>
-            <a href="mailto:support@gardenia.local">Liên hệ hỗ trợ <ArrowIcon /></a>
-          </div>
           <button className="sidebar-profile" onClick={onLogout}>
             <span className="avatar">{initials}</span>
             <span className="sidebar-profile__text"><strong>{userName}</strong><small>Quản trị viên</small></span>
@@ -69,7 +63,6 @@ function Home({ auth, onLogout }) {
           </div>
           <div className="topbar__actions">
             <div className="system-status"><span className="status-dot" /> Hệ thống hoạt động</div>
-            <button className="icon-button notification-button" aria-label="Thông báo"><BellIcon /><i /></button>
             <span className="topbar-avatar">{initials}</span>
           </div>
         </header>
