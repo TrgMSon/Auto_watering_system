@@ -21,6 +21,7 @@ constexpr uint32_t kHeapLogIntervalMs=60000;
 constexpr uint32_t kInternalHeapCaps=MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT;
 portMUX_TYPE mux=portMUX_INITIALIZER_UNLOCKED;
 ::telemetry_snapshot::Snapshot latest;bool observed=false,started=false;
+std::atomic<bool> brokerConnected{false};
 Config config;Topics topics;
 Ingress ingress,configIngress;
 Subscriptions subscriptions;
@@ -73,6 +74,7 @@ class EspClient:public Client {
     return true;
   }
   void stop()override{
+    brokerConnected.store(false);
     {Lock lock; ingress.reset();configIngress.reset();fragmentTopic=-1; connectionGeneration_=commandConnection(false);}
     if(handle_&&!unhealthy_){
       if(esp_mqtt_client_stop(handle_)!=ESP_OK||esp_mqtt_client_destroy(handle_)!=ESP_OK)unhealthy_=true;
@@ -187,6 +189,7 @@ class EspClient:public Client {
         for(auto& published:self.pubacks_)published=-1;
         self.pubackIndex_=0;
         self.connected_.store(true);
+        brokerConnected.store(true);
       }
       Serial.println("[MQTT] connected with verified TLS");
     }
@@ -194,6 +197,7 @@ class EspClient:public Client {
       {
         Lock lock;ingress.reset();configIngress.reset();fragmentTopic=-1;subscriptions.reset();self.connectionGeneration_=commandConnection(false);
         self.subscribed_.store(false);self.connected_.store(false);self.failed_.store(true);
+        brokerConnected.store(false);
       }
       if(id==MQTT_EVENT_ERROR){
         if(e&&e->error_handle){
@@ -308,6 +312,11 @@ bool begin(){
   started=true;
   return xTaskCreate(worker,"mqtt-telemetry",kWorkerStackBytes,nullptr,1,nullptr)==pdPASS;
 }
+bool connected(){return brokerConnected.load();}
 void publish(const ::telemetry_snapshot::Snapshot& snapshot){Lock lock;latest=snapshot;observed=true;}
+}
+#else
+namespace plant_mqtt {
+bool connected(){return false;}
 }
 #endif

@@ -5,7 +5,7 @@
 namespace ble_commands {
 constexpr size_t kPayloadMax = 128, kKeyMax = 128;
 constexpr uint32_t kNonceTtlMs = 30000;
-enum class Op { Unknown, On, Off, Time, Config };
+enum class Op { Unknown, On, Off, Auto, Manual, Time, Config };
 // CONFIG uses the existing authenticated Write With Response policy.
 constexpr bool authenticatedWrite(unsigned suffix) { return suffix == 2 || suffix == 3 || suffix == 7; }
 constexpr bool encryptedWifiWrite(unsigned suffix) { return suffix == 6; }

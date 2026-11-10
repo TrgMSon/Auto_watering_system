@@ -369,9 +369,10 @@ void worker(void*) {
 
 bool begin() {
   if (started) return false;
-  started = true;
-  nextCheck.store(millis() + 30000);
-  Serial.println("[OTA] HTTPS updater scheduled");
+  // Keep the OTA code and boot confirmation support available, but do not
+  // start the periodic HTTPS updater while MQTT/TLS RAM use is being diagnosed.
+  started = false;
+  Serial.println("[OTA] automatic HTTPS updater temporarily disabled");
   return true;
 }
 

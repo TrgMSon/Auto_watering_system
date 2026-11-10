@@ -126,6 +126,7 @@ class FakeEsp32 implements BleTransport {
         'hum': 68.0,
         'water': waterPercent,
         'pump': isPumpOn ? 1 : 0,
+        'auto': isAutoMode ? 1 : 0,
       }));
 
   /// Theo thứ tự kiểm tra của `System::startManual` trong firmware.
@@ -134,9 +135,18 @@ class FakeEsp32 implements BleTransport {
     final cmd = json?['cmd'];
     final dur = json?['dur'];
     final sig = json?['sig'];
-    if (cmd is! String || dur is! int || sig is! String) return ('PUMP', 'BAD_JSON');
-    if (cmd != 'PUMP_ON' && cmd != 'PUMP_OFF') return (cmd, 'BAD_JSON');
-    final isRangeValid = cmd == 'PUMP_OFF' ? dur == 0 : dur >= 1 && dur <= 600;
+    if (cmd is! String || dur is! int || sig is! String) {
+      return ('PUMP', 'BAD_JSON');
+    }
+    if (cmd != 'PUMP_ON' &&
+        cmd != 'PUMP_OFF' &&
+        cmd != 'AUTO' &&
+        cmd != 'MANUAL') {
+      return (cmd, 'BAD_JSON');
+    }
+    final isRangeValid = (cmd == 'PUMP_OFF' || cmd == 'AUTO' || cmd == 'MANUAL')
+        ? dur == 0
+        : dur >= 1 && dur <= 600;
 
     final authError = _authenticate(sig, (nonce) => '$nonce|$cmd|$dur');
     if (authError != null) return (cmd, authError);
@@ -147,9 +157,16 @@ class FakeEsp32 implements BleTransport {
       isAutoMode = false;
       return (cmd, 'OK');
     }
+    if (cmd == 'AUTO' || cmd == 'MANUAL') {
+      isAutoMode = cmd == 'AUTO';
+      isPumpOn = false;
+      return (cmd, 'OK');
+    }
     if (isAutoMode) return (cmd, null);
     if (isPumpOn) return (cmd, 'PUMP_BUSY');
-    if (dur > maxRunSeconds || dur > qualificationSeconds) return (cmd, 'OUT_OF_RANGE');
+    if (dur > maxRunSeconds || dur > qualificationSeconds) {
+      return (cmd, 'OUT_OF_RANGE');
+    }
     if (isBlockedByController) return (cmd, null);
     final water = waterPercent;
     if (!isSoilValid || water == null) return (cmd, 'SENSOR_ERROR');
@@ -167,18 +184,27 @@ class FakeEsp32 implements BleTransport {
     final maxDur = json?['max_dur'];
     final minWater = json?['min_water'];
     final sig = json?['sig'];
-    if (min is! double || max is! double || auto is! int || maxDur is! int) return 'BAD_JSON';
+    if (min is! double || max is! double || auto is! int || maxDur is! int) {
+      return 'BAD_JSON';
+    }
     if (minWater is! double || sig is! String) return 'BAD_JSON';
 
     final authError = _authenticate(
       sig,
-      (nonce) => '$nonce|CONFIG|${min.toStringAsFixed(1)}|${max.toStringAsFixed(1)}'
+      (nonce) =>
+          '$nonce|CONFIG|${min.toStringAsFixed(1)}|${max.toStringAsFixed(1)}'
           '|$auto|$maxDur|${minWater.toStringAsFixed(1)}',
     );
     if (authError != null) return authError;
 
-    final isValid = min >= 0 && min < max && max <= 100 && (auto == 0 || auto == 1) &&
-        maxDur >= 60 && maxDur <= 600 && minWater >= 20 && minWater <= 100;
+    final isValid = min >= 0 &&
+        min < max &&
+        max <= 100 &&
+        (auto == 0 || auto == 1) &&
+        maxDur >= 60 &&
+        maxDur <= 600 &&
+        minWater >= 20 &&
+        minWater <= 100;
     if (!isValid) return 'OUT_OF_RANGE';
     if (isPumpOn) return 'PUMP_BUSY';
 
@@ -194,7 +220,9 @@ class FakeEsp32 implements BleTransport {
     final json = _decode(value);
     final unix = json?['unix'];
     final sig = json?['sig'];
-    if (unix is! int || sig is! String) return 'BAD_JSON';
+    if (unix is! int || sig is! String) {
+      return 'BAD_JSON';
+    }
 
     final authError = _authenticate(sig, (nonce) => '$nonce|TIME|$unix');
     if (authError != null) return authError;
@@ -220,8 +248,12 @@ class FakeEsp32 implements BleTransport {
 
     final ssidBytes = utf8.encode(ssid).length;
     final passBytes = utf8.encode(pass).length;
-    final isValid = ssidBytes >= 1 && ssidBytes <= 32 && passBytes >= 8 && passBytes <= 63 &&
-        !ssid.contains('|') && !pass.contains('|');
+    final isValid = ssidBytes >= 1 &&
+        ssidBytes <= 32 &&
+        passBytes >= 8 &&
+        passBytes <= 63 &&
+        !ssid.contains('|') &&
+        !pass.contains('|');
     if (!isValid) return 'OUT_OF_RANGE';
     if (!wifiConnects) return 'WIFI_FAIL';
     savedSsid = ssid;
@@ -234,14 +266,16 @@ class FakeEsp32 implements BleTransport {
   }
 
   /// Nonce chỉ dùng một lần, bị tiêu thụ kể cả khi chữ ký sai.
-  String? _authenticate(String sig, String Function(String nonce) buildMessage) {
+  String? _authenticate(
+      String sig, String Function(String nonce) buildMessage) {
     final nonce = _nonce;
     final issuedAt = _nonceIssuedAt;
     _consumeNonce();
     if (nonce == null || issuedAt == null) return 'NONCE_EXPIRED';
     if (_now().difference(issuedAt) >= nonceLifetime) return 'NONCE_EXPIRED';
 
-    final digest = Hmac(sha256, utf8.encode(secretKey)).convert(utf8.encode(buildMessage(nonce)));
+    final digest = Hmac(sha256, utf8.encode(secretKey))
+        .convert(utf8.encode(buildMessage(nonce)));
     return digest.toString().substring(0, 16) == sig ? null : 'BAD_SIG';
   }
 

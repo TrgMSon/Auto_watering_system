@@ -549,7 +549,6 @@ bool initialize() {
   if (esp_ble_gap_config_adv_data_raw(advertisement, sizeof(advertisement)) != ESP_OK ||
       esp_ble_gap_config_scan_rsp_data_raw(scanResponse, sizeof(scanResponse)) != ESP_OK ||
       esp_ble_gatts_app_register(0) != ESP_OK) return false;
-  if(!ble_wifi_service::begin())Serial.println("Wi-Fi runtime worker unavailable");
   advertisePending = true;
   return true;
 }

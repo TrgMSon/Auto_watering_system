@@ -13,6 +13,7 @@
 #include "ble_pairing.h"
 #include "ble_command_bridge.h"
 #include "ble_key_nvs.h"
+#include "ble_wifi_service.h"
 #include <esp_mac.h>
 static ble_keys::KeySource bleKeySource;
 static ble_commands::SystemClock bleClock;
@@ -24,6 +25,12 @@ static configuration::PreferencesStorage configStorage;
 
 static pump::SerialCommands commands;
 static irrigation::System irrigationSystem;
+static bool deferredServicesStarted = false;
+static bool mqttConnectedObserved = false;
+static uint32_t mqttConnectedSinceMs = 0;
+static uint32_t deferredServicesWaitStartedMs = 0;
+static constexpr uint32_t kMqttStableBeforeServicesMs = 10000;
+static constexpr uint32_t kMqttStartupFallbackMs = 60000;
 #if WATERING_AUTONOMOUS_TEST
 #include "autonomous_nvs.h"
 #include "mqtt_commands.h"
@@ -83,6 +90,40 @@ void servicePump() {
 #endif
 }
 
+void startDeferredServices() {
+  if (deferredServicesStarted) return;
+  const uint32_t now = millis();
+  if (plant_mqtt::connected()) {
+    if (!mqttConnectedObserved) {
+      mqttConnectedObserved = true;
+      mqttConnectedSinceMs = now;
+    }
+  } else {
+    mqttConnectedObserved = false;
+  }
+  const bool mqttStable = mqttConnectedObserved &&
+      static_cast<uint32_t>(now - mqttConnectedSinceMs) >= kMqttStableBeforeServicesMs;
+  const bool startupWaitExpired = static_cast<uint32_t>(now - deferredServicesWaitStartedMs) >=
+      kMqttStartupFallbackMs;
+  if (!mqttStable && !startupWaitExpired) return;
+
+  if (mqttStable) Serial.println("[BOOT] MQTT stable; starting deferred services");
+  else Serial.println("[BOOT] MQTT not connected after startup window; enabling local services and continuing retries");
+  sensors::begin();
+#if !defined(F31D_GUARD_TEST) || F31D_GUARD_TEST != 1
+  ble_keys::NvsReader keyStorage;
+  uint8_t staMac[6];
+  ble_keys::Status keyStatus = ble_keys::Status::Invalid;
+  if (esp_read_mac(staMac, ESP_MAC_WIFI_STA) == ESP_OK)
+    keyStatus = bleKeySource.initialize(keyStorage, staMac);
+  Serial.println(keyStatus == ble_keys::Status::Loaded ? "BLE key loaded" :
+      keyStatus == ble_keys::Status::Missing ? "BLE key missing" : "BLE key invalid");
+  if (!plant_ble::begin(&bleKeySource)) Serial.println("BLE worker unavailable; irrigation unchanged");
+  if (!plant_ota::begin()) Serial.println("[OTA] worker unavailable");
+#endif
+  deferredServicesStarted = true;
+}
+
 void setup() {
 #if WATERING_AUTONOMOUS_TEST
   irrigationSystem.setActivationGate(plant_mqtt::commandIngressEpoch,autonomousActivationAllowed,autonomousStartReserved);
@@ -102,20 +143,17 @@ void setup() {
   Serial.println("F2.4: CONFIG / SET / RESET_CONFIG / ON / OFF / STATUS / AUTO / MANUAL / RESET_WATERING (newline); boot MANUAL/OFF.");
   Serial.println("BLE_PAIR / BLE_PAIR_CLOSE: local USB pairing window; open requires MANUAL/OFF (60s)");
   printPumpStatus();
-  sensors::begin();
 #if !defined(F31D_GUARD_TEST) || F31D_GUARD_TEST != 1
-  ble_keys::NvsReader keyStorage;
-  uint8_t staMac[6];
-  ble_keys::Status keyStatus = ble_keys::Status::Invalid;
-  if (esp_read_mac(staMac, ESP_MAC_WIFI_STA) == ESP_OK)
-    keyStatus = bleKeySource.initialize(keyStorage, staMac);
-  Serial.println(keyStatus == ble_keys::Status::Loaded ? "BLE key loaded" :
-      keyStatus == ble_keys::Status::Missing ? "BLE key missing" : "BLE key invalid");
-  if (!plant_ble::begin(&bleKeySource)) Serial.println("BLE worker unavailable; irrigation unchanged");
-  if (!plant_mqtt::begin())
+  if (!ble_wifi_service::begin()) Serial.println("[WIFI] runtime worker unavailable");
+  const bool mqttStarted = plant_mqtt::begin();
+  if (!mqttStarted)
     Serial.println("[MQTT] worker unavailable (TLS date verification unsupported or task creation failed)");
-  if (!plant_ota::begin()) Serial.println("[OTA] worker unavailable");
   plant_ota::confirmBoot();
+  deferredServicesWaitStartedMs = millis();
+  if (!mqttStarted) deferredServicesWaitStartedMs -= kMqttStartupFallbackMs;
+#else
+  sensors::begin();
+  deferredServicesStarted = true;
 #endif
 }
 
@@ -137,6 +175,7 @@ void loop() {
     return;
   }
 #endif
+  startDeferredServices();
   servicePump();
   // Bound per-loop work even under a continuous Serial stream.
   for (unsigned i = 0; i < 32 && Serial.available() > 0; ++i) {
@@ -187,7 +226,7 @@ void loop() {
   sensors::Reading reading;
   // Leave a guard window for the bounded sensor transaction near pump expiry.
   const uint32_t remaining = irrigationSystem.status().remainingMs;
-  if ((!remaining || remaining > 250) && sensors::poll(reading)) {
+  if (deferredServicesStarted && (!remaining || remaining > 250) && sensors::poll(reading)) {
     irrigationSystem.update(reading);  // Stop on new unsafe data before logging.
     servicePump();
     Serial.printf("t=%lu ms soil_raw=%.2f soil_pct=%.2f soil_valid=%d "

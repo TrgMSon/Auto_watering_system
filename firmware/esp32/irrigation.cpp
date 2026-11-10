@@ -332,6 +332,7 @@ telemetry_snapshot::Snapshot System::telemetrySnapshot(uint32_t now) const {
   snapshot.waterPercent = decision.waterPercent;
   snapshot.waterValid = decision.waterValid;
   snapshot.actuatorOn = pump::isOn();
+  snapshot.automaticMode = status_.mode == Mode::Auto;
   snapshot.publishedAtMs = now;
   return snapshot;
 }

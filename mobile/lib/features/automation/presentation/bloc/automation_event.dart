@@ -11,18 +11,20 @@ sealed class AutomationEvent extends Equatable {
 
 class AutomationLoadRequested extends AutomationEvent {
   final String deviceId;
-  const AutomationLoadRequested(this.deviceId);
+  final bool loadFromBackend;
+  const AutomationLoadRequested(this.deviceId, {this.loadFromBackend = true});
 
   @override
-  List<Object?> get props => [deviceId];
+  List<Object?> get props => [deviceId, loadFromBackend];
 }
 
 class AutomationConfigUpdated extends AutomationEvent {
   final DeviceConfigModel config;
-  const AutomationConfigUpdated(this.config);
+  final bool persist;
+  const AutomationConfigUpdated(this.config, {this.persist = true});
 
   @override
-  List<Object?> get props => [config];
+  List<Object?> get props => [config, persist];
 }
 
 class AutomationScheduleAdded extends AutomationEvent {
@@ -45,7 +47,8 @@ class AutomationScheduleDeleted extends AutomationEvent {
   final int scheduleId;
   final String deviceId;
 
-  const AutomationScheduleDeleted({required this.scheduleId, required this.deviceId});
+  const AutomationScheduleDeleted(
+      {required this.scheduleId, required this.deviceId});
 
   @override
   List<Object?> get props => [scheduleId, deviceId];
