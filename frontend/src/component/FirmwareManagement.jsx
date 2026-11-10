@@ -193,10 +193,6 @@ function FirmwareManagement({ accessToken }) {
         </section>
       </div>
 
-      <aside className="firmware-management__notice">
-        <strong>Lưu ý tích hợp ESP32</strong>
-        <span>Thiết bị kiểm tra phiên bản mỗi giờ, xác minh SHA-256 rồi cài vào phân vùng OTA dự phòng khi máy bơm OFF. Cần build firmware với phân vùng OTA và phiên bản khớp bản phát hành.</span>
-      </aside>
     </section>
   );
 }

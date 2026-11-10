@@ -87,14 +87,17 @@ public class SensorDataServiceImpl implements SensorDataService {
         LocalDateTime startTime = calculateStartTime(range);
 
         // 2. Gọi repository với cả 2 tham số
-        List<Object[]> results = sensorLogRepository.getHourlyEnvironmentalStats(deviceId, startTime);
+        List<Object[]> results = sensorLogRepository.getEnvironmentalStats(
+                deviceId, startTime, bucketMinutes(range));
 
         List<EnvironmentalStatsResponse> responseList = new ArrayList<>();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         for (Object[] row : results) {
             String timeStr = (String) row[0];
-            LocalDateTime timeLabel = (timeStr != null) ? LocalDateTime.parse(timeStr, formatter) : null;
+            LocalDateTime timeLabel = (timeStr != null)
+                    ? LocalDateTime.parse(normalizeTimeLabel(timeStr), formatter)
+                    : null;
 
             Float avgSoil = row[1] != null ? ((Number) row[1]).floatValue() : null;
             Float avgTemp = row[2] != null ? ((Number) row[2]).floatValue() : null;
@@ -114,7 +117,8 @@ public class SensorDataServiceImpl implements SensorDataService {
         LocalDateTime startTime = calculateStartTime(range);
 
         // 2. Truy vấn dữ liệu từ database
-        List<Object[]> results = sensorLogRepository.getHourlyWaterLevelStats(deviceId, startTime);
+        List<Object[]> results = sensorLogRepository.getWaterLevelStats(
+                deviceId, startTime, bucketMinutes(range));
 
         List<WaterLevelStatsResponse> responseList = new ArrayList<>();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -122,7 +126,9 @@ public class SensorDataServiceImpl implements SensorDataService {
         // 3. Ánh xạ thủ công từ Object[] sang DTO
         for (Object[] row : results) {
             String timeStr = (String) row[0];
-            LocalDateTime timeLabel = (timeStr != null) ? LocalDateTime.parse(timeStr, formatter) : null;
+            LocalDateTime timeLabel = (timeStr != null)
+                    ? LocalDateTime.parse(normalizeTimeLabel(timeStr), formatter)
+                    : null;
 
             Float avgWaterLevel = row[1] != null ? ((Number) row[1]).floatValue() : null;
 
@@ -144,11 +150,27 @@ public class SensorDataServiceImpl implements SensorDataService {
     // Hàm phụ trợ tính mốc thời gian
     private LocalDateTime calculateStartTime(String range) {
         LocalDateTime now = LocalDateTime.now();
-        return switch (range.toLowerCase()) {
+        return switch (normalizedRange(range)) {
             case "7d" -> now.minusDays(7);
             case "30d" -> now.minusDays(30);
             default -> now.minusHours(24); // Mặc định 24h
         };
+    }
+
+    private int bucketMinutes(String range) {
+        return switch (normalizedRange(range)) {
+            case "7d" -> 60;
+            case "30d" -> 1440;
+            default -> 5;
+        };
+    }
+
+    private String normalizedRange(String range) {
+        return range == null ? "24h" : range.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String normalizeTimeLabel(String timeLabel) {
+        return timeLabel.length() == 16 ? timeLabel + ":00" : timeLabel;
     }
 
     private String deviceIdFromTopic(String topic) {

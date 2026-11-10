@@ -95,8 +95,6 @@ class _AutomationPageState extends State<AutomationPage> {
           }
           if (state is AutomationLoaded) {
             final config = state.config;
-            final canPersistToBackend =
-                widget.isDeviceOnline && state.errorMessage == null;
             final bleState = context.watch<BleSessionCubit>().state;
             final bleConnected = bleState.isConnectedTo(widget.deviceId);
             final bleMode = bleState.sample?.isAutoMode;
@@ -134,8 +132,7 @@ class _AutomationPageState extends State<AutomationPage> {
                         onChanged: state.isSaving ||
                                 (!widget.isDeviceOnline && !bleConnected)
                             ? null
-                            : (val) => _setAutoMode(
-                                context, config, val, canPersistToBackend),
+                            : (val) => _setAutoMode(context, config, val),
                       ),
                       const Divider(height: 1),
                       ListTile(
@@ -269,8 +266,16 @@ class _AutomationPageState extends State<AutomationPage> {
     }
   }
 
-  Future<void> _setAutoMode(BuildContext context, DeviceConfigModel config,
-      bool enabled, bool canPersistToBackend) async {
+  Future<void> _setAutoMode(
+      BuildContext context, DeviceConfigModel config, bool enabled) async {
+    if (widget.isDeviceOnline) {
+      context.read<AutomationBloc>().add(AutomationModeUpdated(
+            deviceId: widget.deviceId,
+            automatic: enabled,
+          ));
+      return;
+    }
+
     final cubit = context.read<BleSessionCubit>();
     if (!cubit.state.isConnectedTo(widget.deviceId)) {
       await cubit.connect(widget.deviceId);
@@ -291,10 +296,10 @@ class _AutomationPageState extends State<AutomationPage> {
       return;
     }
     final updated = config.copyWith(autoMode: enabled);
-    // BLE đã áp dụng lệnh tại thiết bị; chỉ đồng bộ backend khi cloud online.
+    // BLE applies the mode directly while the device is offline.
     context
         .read<AutomationBloc>()
-        .add(AutomationConfigUpdated(updated, persist: canPersistToBackend));
+        .add(AutomationConfigUpdated(updated, persist: false));
   }
 
   void _showError(BuildContext context, String message) {

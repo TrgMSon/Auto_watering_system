@@ -36,6 +36,15 @@ class AutomationRepositoryImpl implements IAutomationRepository {
   }
 
   @override
+  Future<bool> setWateringMode(String deviceId, {required bool automatic}) async {
+    await _apiClient.post(
+      '${_devicePath(deviceId)}/mode',
+      body: {'mode': automatic ? 'auto' : 'manual'},
+    );
+    return true;
+  }
+
+  @override
   Future<List<ScheduleModel>> getSchedules(String deviceId) async {
     final response = await _apiClient.get('${_devicePath(deviceId)}/schedules');
     final rows = response['data'];

@@ -15,6 +15,7 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
       : super(const AutomationInitial()) {
     on<AutomationLoadRequested>(_onLoadRequested);
     on<AutomationConfigUpdated>(_onConfigUpdated);
+    on<AutomationModeUpdated>(_onModeUpdated);
     on<AutomationScheduleAdded>(_onScheduleAdded);
     on<AutomationScheduleUpdated>(_onScheduleUpdated);
     on<AutomationScheduleDeleted>(_onScheduleDeleted);
@@ -87,9 +88,32 @@ class AutomationBloc extends Bloc<AutomationEvent, AutomationState> {
       _finishSaving(
         scopeId,
         emit,
-        config: event.config,
+        config: currentState.config,
         errorMessage: e.toString(),
       );
+    }
+  }
+
+  Future<void> _onModeUpdated(
+    AutomationModeUpdated event,
+    Emitter<AutomationState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! AutomationLoaded) return;
+
+    final scopeId = _activeScopeId;
+    emit(currentState.copyWith(isSaving: true, clearError: true));
+    try {
+      await repository.setWateringMode(event.deviceId, automatic: event.automatic);
+      if (scopeId != _activeScopeId || state is! AutomationLoaded) return;
+      emit((state as AutomationLoaded).copyWith(
+        config: currentState.config.copyWith(autoMode: event.automatic),
+        isSaving: false,
+        clearError: true,
+      ));
+    } catch (e) {
+      _finishSaving(scopeId, emit,
+          config: currentState.config, errorMessage: e.toString());
     }
   }
 
