@@ -58,9 +58,8 @@ function Login({ onLogin }) {
         </div>
 
         <div className="showcase-copy">
-          <span className="eyebrow eyebrow--light">NÔNG NGHIỆP THÔNG MINH</span>
-          <h1>Chăm sóc khu vườn, <em>theo cách thông minh hơn.</em></h1>
-          <p>Theo dõi sức khỏe cây trồng và quản lý hệ thống tưới của bạn trong một không gian duy nhất.</p>
+          <span className="eyebrow eyebrow--light">TRANG QUẢN TRỊ</span>
+          <h1>Hệ thống <em>tưới cây thông minh</em></h1>
         </div>
 
         <div className="showcase-visual" aria-hidden="true">
@@ -85,15 +84,9 @@ function Login({ onLogin }) {
       </section>
 
       <section className="login-panel">
-        <div className="login-panel__top">
-          <span className="login-panel__hint">Chưa có quyền truy cập?</span>
-          <a href="mailto:admin@gardenia.local">Liên hệ quản trị viên <ArrowIcon /></a>
-        </div>
 
         <div className="login-card">
-          <span className="eyebrow">CỔNG QUẢN TRỊ</span>
           <h2>Chào mừng trở lại<span className="brand__dot">.</span></h2>
-          <p className="login-card__subtitle">Đăng nhập để tiếp tục quản lý khu vườn của bạn.</p>
 
           <form onSubmit={handleSubmit} className="login-form">
             <label htmlFor="login-email">Địa chỉ email</label>
@@ -141,7 +134,6 @@ function Login({ onLogin }) {
             </button>
           </form>
 
-          <div className="login-security"><ShieldIcon /> Kết nối của bạn được bảo mật và mã hóa.</div>
         </div>
 
         <div className="login-panel__footer">
