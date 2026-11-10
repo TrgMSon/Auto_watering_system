@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_error_widget.dart';
 import '../../../../core/widgets/app_loading_indicator.dart';
-import '../../domain/entities/sensor_reading.dart';
 import '../../domain/entities/statistics_point.dart';
 import '../bloc/statistics_bloc.dart';
-import 'telemetry_line_chart.dart';
+import 'statistics_line_chart.dart';
 
 class StatisticsSection extends StatelessWidget {
   final String deviceId;
@@ -73,64 +71,25 @@ class StatisticsSection extends StatelessWidget {
         child: Center(child: Text('Chưa có dữ liệu thống kê trong khoảng này')),
       );
     }
+    final charts = [
+      ('Độ ẩm đất', '%', AppColors.moisture, (StatisticsPoint p) => p.soilMoisture),
+      ('Nhiệt độ', '°C', AppColors.temperature, (StatisticsPoint p) => p.temperature),
+      ('Độ ẩm không khí', '%', AppColors.humidity, (StatisticsPoint p) => p.humidity),
+      ('Mực nước', '%', AppColors.waterLevel, (StatisticsPoint p) => p.waterLevel),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildChart(state.points, 'Độ ẩm đất', '%', AppColors.moisture, (p) => p.soilMoisture),
-        _buildChart(state.points, 'Nhiệt độ', '°C', AppColors.temperature, (p) => p.temperature),
-        _buildChart(state.points, 'Độ ẩm không khí', '%', AppColors.humidity, (p) => p.humidity),
-        _buildChart(state.points, 'Mực nước', '%', AppColors.waterLevel, (p) => p.waterLevel),
-      ],
-    );
-  }
-
-  Widget _buildChart(
-    List<StatisticsPoint> points,
-    String title,
-    String unit,
-    Color color,
-    double? Function(StatisticsPoint) value,
-  ) {
-    final readings = [
-      for (final point in points)
-        if (value(point) case final double pointValue)
-          SensorReading(
-            id: 0,
-            soilMoisture: pointValue,
-            temperature: 0,
-            humidity: 0,
-            lightIntensity: 0,
-            timestamp: point.time,
+        for (final (title, unit, color, valueOf) in charts)
+          StatisticsLineChart(
+            points: state.points,
+            range: state.range,
+            title: title,
+            unit: unit,
+            color: color,
+            valueOf: valueOf,
           ),
-    ];
-    if (readings.isEmpty) return const SizedBox.shrink();
-
-    final format = DateFormat('dd/MM HH:mm');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TelemetryLineChart(
-              readings: readings,
-              title: title,
-              valueExtractor: (reading) => reading.soilMoisture,
-              color: color,
-              unit: unit,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                '${format.format(readings.first.timestamp)} – '
-                '${format.format(readings.last.timestamp)}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
