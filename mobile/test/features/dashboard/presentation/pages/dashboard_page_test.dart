@@ -15,8 +15,7 @@ import 'package:watering_app/features/dashboard/presentation/pages/dashboard_pag
 import 'package:watering_app/features/ble/domain/ble_messages.dart';
 import 'package:watering_app/features/ble/presentation/bloc/ble_session_cubit.dart';
 
-class MockDashboardBloc extends MockBloc<DashboardEvent, DashboardState>
-    implements DashboardBloc {}
+class MockDashboardBloc extends MockBloc<DashboardEvent, DashboardState> implements DashboardBloc {}
 
 class MockBleSessionCubit extends MockCubit<BleSessionState> implements BleSessionCubit {}
 
@@ -132,7 +131,8 @@ void main() {
       verify(() => mockDashboardBloc.add(const DashboardLoadRequested())).called(2);
     });
 
-    testWidgets('renders empty message, icon, instructions and reload button when device list is empty', (tester) async {
+    testWidgets('renders empty message, icon, instructions and reload button when device list is empty',
+        (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(const DashboardLoaded(devices: []));
 
       await tester.pumpWidget(buildTestWidget());
@@ -251,6 +251,38 @@ void main() {
       verifyNever(() => mockDashboardBloc.add(any()));
     });
 
+    testWidgets('online device connected over BLE pumps via BLE', (tester) async {
+      when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
+        devices: [testDevice1],
+        selectedDevice: testDevice1,
+        telemetry: testTelemetryOff,
+        pumpStatus: false,
+      ));
+      when(() => mockBleCubit.state).thenReturn(BleSessionState(
+        status: BleSessionStatus.connected,
+        deviceId: testDevice1.id,
+        sample: const BleSensorSample(
+          soilMoisture: 33.3,
+          temperature: 29.0,
+          humidity: 60.0,
+          waterLevelPercent: 55.0,
+          isPumpOn: true,
+        ),
+      ));
+      when(() => mockBleCubit.setPump(any())).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(buildTestWidget());
+      clearInteractions(mockDashboardBloc);
+
+      expect(find.text('Đang tưới nước'), findsOneWidget);
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      verify(() => mockBleCubit.setPump(false)).called(1);
+      verifyNever(() => mockDashboardBloc.add(any()));
+    });
+
     testWidgets('keeps server readings when BLE sensors are null during pump toggle', (tester) async {
       final lastTelemetry = TelemetryModel(
         deviceId: testDevice2.id,
@@ -309,8 +341,7 @@ void main() {
           isPumpOn: false,
         ),
       ));
-      when(() => mockBleCubit.setPump(any()))
-          .thenAnswer((_) async => 'Bồn nước gần cạn, thiết bị không bơm.');
+      when(() => mockBleCubit.setPump(any())).thenAnswer((_) async => 'Bồn nước gần cạn, thiết bị không bơm.');
 
       await tester.pumpWidget(buildTestWidget());
       await tester.tap(find.byType(Switch));
@@ -345,8 +376,13 @@ void main() {
 
       expect(find.byIcon(Icons.wifi_off), findsOneWidget);
       expect(find.byIcon(Icons.wifi), findsNothing);
-      expect(find.text('Offline'), findsOneWidget);
-      expect(find.text('Thiết bị đang offline'), findsOneWidget);
+      expect(find.text('Cloud offline'), findsOneWidget);
+      expect(
+        find.text(
+          'Mất kết nối cloud; thiết bị vẫn hoạt động. Kết nối Bluetooth để điều khiển.',
+        ),
+        findsOneWidget,
+      );
 
       final pumpSwitch = tester.widget<Switch>(find.byType(Switch));
       expect(pumpSwitch.onChanged, isNull);
@@ -384,7 +420,8 @@ void main() {
       expect(find.text('Độ ẩm đất'), findsNothing);
     });
 
-    testWidgets('renders loading spinner replacing switch and pending text when isTogglingPump is true', (tester) async {
+    testWidgets('renders loading spinner replacing switch and pending text when isTogglingPump is true',
+        (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
@@ -429,7 +466,8 @@ void main() {
   });
 
   group('DashboardPage User Interactions', () {
-    testWidgets('tapping switch when pump is OFF dispatches DashboardPumpToggled(true) without a duration picker', (tester) async {
+    testWidgets('tapping switch when pump is OFF dispatches DashboardPumpToggled(true) without a duration picker',
+        (tester) async {
       when(() => mockDashboardBloc.state).thenReturn(DashboardLoaded(
         devices: [testDevice1],
         selectedDevice: testDevice1,
