@@ -1,4 +1,5 @@
 #include "wifi_esp32_adapters.h"
+#include "device_identity.h"
 #ifdef ARDUINO
 #include <esp_wifi.h>
 #include <esp_wifi_default.h>
@@ -144,7 +145,9 @@ bool EspRadioSdk::configureRam(const ble_commands::WifiRequest& r){
 bool EspRadioSdk::startConnect(){
   candidateReported_=false;
   printf("[WIFI] stage=start-connect\n");
-  return wifiChecked("driver-start",esp_wifi_start())&&wifiChecked("connect",esp_wifi_connect());
+  if(!wifiChecked("driver-start",esp_wifi_start()))return false;
+  if(!wifiChecked("station-mac",esp_wifi_set_mac(WIFI_IF_STA,device_identity::kStationMac)))return false;
+  return wifiChecked("connect",esp_wifi_connect());
 }
 bool EspRadioSdk::candidateIp(const ble_commands::WifiRequest& r){
   ipv4_=0;

@@ -22,6 +22,14 @@ và `Documents/Arduino/libraries/Adafruit_Unified_Sensor`.
 Giữ partition table tương thích với firmware Arduino đang cài trên board; đổi
 bố cục partition có thể làm NVS cũ không còn truy cập được.
 
+## Định danh thiết bị
+
+MAC Wi-Fi STA và device ID được cố định thành `AA:BB:CC:DD:EF:FE` trong
+`device_identity.h`; firmware áp dụng MAC cục bộ này trước khi kết nối Wi-Fi.
+Thay đổi này cũng đổi định danh MQTT/BLE. Cần đăng ký ID mới ở backend và
+provision lại Wi-Fi, MQTT và BLE key; các bản ghi cũ gắn với định danh trước đó
+sẽ không được chấp nhận.
+
 ## Thiết lập lần đầu
 
 Chạy một lần cho thư mục build này. Thay hai đường dẫn thư viện bằng đường dẫn

@@ -1,4 +1,5 @@
 #include "mqtt_service.h"
+#include "device_identity.h"
 #ifdef ARDUINO
 #include "mqtt_telemetry.h"
 #include "mqtt_client_config.h"
@@ -8,7 +9,6 @@
 #include <Arduino.h>
 #include <mqtt_client.h>
 #include <nvs.h>
-#include <esp_mac.h>
 #include <esp_log.h>
 #include <esp_heap_caps.h>
 #include <time.h>
@@ -255,7 +255,8 @@ void worker(void*){
   esp_log_level_set(kLogTag,ESP_LOG_NONE);
   uint8_t mac[6]={};
   const bool tlsReady=kTlsDateVerification;
-  const bool identityReady=tlsReady&&esp_read_mac(mac,ESP_MAC_WIFI_STA)==ESP_OK&&topics.initialize(mac);
+  device_identity::copyStationMac(mac);
+  const bool identityReady=tlsReady&&topics.initialize(mac);
   const bool configReady=identityReady&&loadConfig(mac,config);
   const bool trustReady=configReady&&(kTlsNativeDates||prepareMqttTrust(config.ca));
   const bool ready=tlsReady&&identityReady&&configReady&&trustReady;

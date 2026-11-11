@@ -2,8 +2,8 @@
 #ifdef ARDUINO
 #include "wifi_esp32_adapters.h"
 #include "wifi_build_config.h"
+#include "device_identity.h"
 #include <Arduino.h>
-#include <esp_mac.h>
 #include <atomic>
 namespace ble_wifi_service {
 namespace {
@@ -58,7 +58,7 @@ void complete(uint64_t generation,ble_commands::Code code){Lock lock;slot.comple
 #endif
 void worker(void*){
   uint8_t mac[6];
-  if(esp_read_mac(mac,ESP_MAC_WIFI_STA)!=ESP_OK){Serial.println("[WIFI] worker identity-failed");vTaskDelete(nullptr);return;}
+  device_identity::copyStationMac(mac);
   // Stable lifetime; all SDK/NVS methods are invoked ONLY in this worker.
   static ble_wifi::EspRadioSdk sdk;
   static ble_wifi::EspRadio radio(sdk);
