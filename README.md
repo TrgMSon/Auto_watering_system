@@ -292,16 +292,6 @@ Mobile gửi kết quả BLE qua `POST /api/devices/{id}/ble-status` với `{"re
 
 Kết nối STOMP tại `/ws` yêu cầu gửi JWT access token trong native header `Authorization` ở frame `CONNECT` với scheme Bearer; backend xác định user từ claim đã ký, không nhận `userId` do client tự khai báo. Khi subscribe `/topic/notification/{deviceId}`, backend chỉ cho phép owner hoặc viewer chưa bị khóa của thiết bị đó. Chủ sở hữu và viewer chưa bị khóa nhận trạng thái bơm tại `/users/queue/pump-status` với JSON dạng `{"deviceId":"AA:BB:CC:DD:EE:FF","status":"ON"}`. Client nhận thông báo chia sẻ thiết bị bằng cách subscribe `/users/queue/notifications`; event có dạng `{"type":"device_shared","deviceId":"...","deviceName":"...","message":"..."}`. Các thông báo này là realtime, không được lưu để đọc lại khi client offline.
 
-Nếu database đang có role tài khoản `owner` hoặc `viewer`, cập nhật dữ liệu trước khi triển khai phiên bản mới:
-
-```sql
-UPDATE `user`
-SET role = 'user'
-WHERE LOWER(role) IN ('owner', 'viewer');
-```
-
-Role converter có ánh xạ tương thích các giá trị cũ sang `USER` khi đọc, nhưng câu lệnh trên đảm bảo dữ liệu MySQL chỉ còn `user`/`admin`. Người dùng cần đăng nhập lại để nhận JWT mới với role `USER`.
-
 ### Ngừng sử dụng thiết bị
 
 Chỉ quản trị viên mới được quyết định ngừng sử dụng thiết bị thông qua `POST /api/admin/devices/{id}/decommission`; chủ sở hữu không có API tự chuyển trạng thái này. Khi admin thu hồi quyền sử dụng, backend xóa MQTT user khỏi EMQX trước, sau đó đặt trạng thái `decommissioned`, xóa khóa BLE/MQTT trong database và gỡ tất cả liên kết người dùng. Nếu không xóa được broker user, thao tác thất bại để admin có thể xử lý và thử lại. Xóa user chặn các kết nối MQTT mới sau khi EMQX áp dụng thay đổi, nhưng có thể không ngắt ngay phiên đang kết nối. MQTT topic status vẫn cần ACL/authorization riêng theo từng thiết bị; Authentication không tự ngăn client hợp lệ giả mạo status trên topic thiết bị khác.
