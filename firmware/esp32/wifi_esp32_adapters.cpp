@@ -144,7 +144,8 @@ bool EspRadioSdk::configureRam(const ble_commands::WifiRequest& r){
 bool EspRadioSdk::startConnect(){
   candidateReported_=false;
   printf("[WIFI] stage=start-connect\n");
-  return wifiChecked("driver-start",esp_wifi_start())&&wifiChecked("connect",esp_wifi_connect());
+  if(!wifiChecked("driver-start",esp_wifi_start()))return false;
+  return wifiChecked("connect",esp_wifi_connect());
 }
 bool EspRadioSdk::candidateIp(const ble_commands::WifiRequest& r){
   ipv4_=0;

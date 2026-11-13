@@ -1,41 +1,50 @@
 # Hệ thống tưới cây thông minh (Auto Watering System)
 
-> Nền tảng IoT theo dõi môi trường trồng cây và điều khiển tưới, gồm dashboard quản trị, backend API và thiết bị ESP32.
+Nền tảng IoT theo dõi môi trường trồng cây và điều khiển tưới tự động hoặc thủ
+công. Hệ thống gồm thiết bị ESP32, backend xử lý dữ liệu/lệnh, dashboard quản
+trị và ứng dụng Flutter cho người dùng.
 
 | Thành phần | Công nghệ | Trạng thái |
 | --- | --- | --- |
-| Backend API | Java 21 · Spring Boot 3 · MySQL · MQTT | Kết nối thiết bị và lưu dữ liệu |
+| Backend API | Java 21 · Spring Boot 3 · TiDB (MySQL-compatible) · MQTT | Kết nối thiết bị và lưu dữ liệu |
 | Dashboard quản trị | React | Gọi API backend |
 | Ứng dụng mobile | Flutter · BLoC | Kết nối API backend, hiển thị dữ liệu thực |
 | Thiết bị IoT | ESP32 · MQTT | Telemetry, lệnh và xác nhận |
 
 ## Nội dung
 
-- [Tổng quan và kiến trúc](#tổng-quan-và-kiến-trúc)
+- [Giới thiệu](#giới-thiệu)
+- [Kiến trúc](#kiến-trúc)
 - [Yêu cầu](#yêu-cầu)
 - [Cài đặt và chạy](#cài-đặt-và-chạy)
+- [Triển khai](#triển-khai)
+- [MQTT: topic và QoS](#mqtt-topic-và-qos)
 - [API thiết bị và xác nhận lệnh](#api-thiết-bị-và-xác-nhận-lệnh)
 
-## Tổng quan và kiến trúc
+## Giới thiệu
 
-### Chức năng chính
+Các chức năng chính:
 
 - **Dashboard quản trị:** đăng nhập dành cho ADMIN; tra cứu, khởi tạo và gán thiết bị cho người dùng; theo dõi trạng thái, bảo trì hoặc thu hồi thiết bị; tìm kiếm tài khoản và khóa/mở khóa tài khoản USER.
 - **Quản lý thiết bị qua API:** xem thiết bị đã gán, cấu hình ngưỡng cảm biến, chọn chế độ tưới, tạo/cập nhật/xóa lịch tưới và chia sẻ quyền owner/viewer.
-- **Điều khiển và giám sát:** gửi lệnh bật/tắt máy bơm, theo dõi xác nhận lệnh; nhận telemetry và trạng thái thiết bị qua MQTT, lưu dữ liệu cảm biến trong MySQL.
+- **Điều khiển và giám sát:** gửi lệnh bật/tắt máy bơm, theo dõi xác nhận lệnh; nhận telemetry và trạng thái thiết bị qua MQTT, lưu dữ liệu cảm biến trong TiDB.
 - **Vòng đời và kết nối thiết bị:** provisioning thông tin MQTT/BLE, theo dõi trạng thái online/offline, hỗ trợ bảo trì và decommission; thiết bị giao tiếp với backend qua MQTT.
 - **Cập nhật firmware OTA:** quản trị viên phát hành file `.bin` ESP32 từ dashboard; thiết bị kiểm tra phiên bản mới và tải file từ backend qua HTTP.
 - **Thống kê cảm biến:** backend có API lấy dữ liệu thống kê môi trường và mực nước; hiện chưa có màn hình thống kê trên dashboard quản trị.
 - **Ứng dụng mobile:** đăng nhập và lấy dữ liệu thiết bị/cảm biến thực tế từ backend; hỗ trợ các màn hình tổng quan, tự động hóa, theo dõi cảm biến, quản lý thiết bị/người dùng và hồ sơ.
 
-### Sơ đồ hệ thống
+## Kiến trúc
+
+Backend là trung tâm giao tiếp: dashboard và mobile gọi REST API/WebSocket; ESP32
+gửi telemetry, nhận lệnh và gửi xác nhận qua MQTT. Backend dùng TiDB (tương thích
+giao thức MySQL) để lưu tài khoản, thiết bị, cấu hình và dữ liệu cảm biến.
 
 ```mermaid
 flowchart LR
     Admin[Quản trị viên] --> Web[Frontend web - React]
     API[Backend - Spring Boot]
     Web -->|REST API / JWT| API
-    API --> DB[(MySQL)]
+    API --> DB[(TiDB)]
     API <-->|MQTT| Broker[MQTT Broker]
     Broker <-->|Telemetry / lệnh / xác nhận| Device[Thiết bị IoT]
     User[Người dùng] --> Mobile[Ứng dụng mobile - Flutter]
@@ -44,7 +53,7 @@ flowchart LR
 
 ### Các thành phần
 
-- **Backend (`backend/`)**: Java 21 và Spring Boot 3, tổ chức theo controller, service, repository và model. Spring Security/JWT xác thực người dùng; Spring Data JPA truy cập MySQL; Spring Integration MQTT nhận telemetry/trạng thái/xác nhận và gửi lệnh/cấu hình. Backend cũng cung cấp API thống kê và cấu hình WebSocket.
+- **Backend (`backend/`)**: Java 21 và Spring Boot 3, tổ chức theo controller, service, repository và model. Spring Security/JWT xác thực người dùng; Spring Data JPA truy cập TiDB bằng MySQL Connector/J; Spring Integration MQTT nhận telemetry/trạng thái/xác nhận và gửi lệnh/cấu hình. Backend cũng cung cấp API thống kê và cấu hình WebSocket.
 - **Frontend (`frontend/`)**: React, dashboard quản trị Gardenia để quản lý thiết bị và tài khoản người dùng. Dashboard chưa có màn hình thống kê.
 - **Mobile (`mobile/`)**: Ứng dụng Flutter sử dụng BLoC để quản lý trạng thái, GoRouter để điều hướng và GetIt để đăng ký phụ thuộc. Mã nguồn tổ chức theo tính năng (`auth`, `dashboard`, `automation`, `sensor_monitor`, `device_management`, `user_management`, `profile`) với các lớp domain, data và presentation. Ứng dụng gọi REST API của backend để đăng nhập và lấy dữ liệu thực tế; giao tiếp với thiết bị được thực hiện thông qua backend.
 - **Thiết bị IoT**: Gửi dữ liệu cảm biến lên MQTT, nhận lệnh điều khiển/cấu hình và phản hồi trên topic xác nhận.
@@ -67,7 +76,7 @@ Firmware ESP32 DevKit V1 không cần PSRAM. Để theo dõi heap RAM nội bộ
 
 ### MQTT: quản lý tài khoản trên EMQX Cloud
 
-`MQTT_USERNAME`/`MQTT_PASSWORD` trong cấu hình backend là tài khoản kết nối của backend tới broker, khác với tài khoản riêng của ESP32. Khi admin tạo thiết bị, backend sinh `mqtt_username`/`mqtt_password`, lưu chúng vào MySQL và tạo cùng user đó trong built-in authentication database của EMQX qua Management API. Khi admin decommission thiết bị, backend xóa user khỏi EMQX trước khi xóa credential và liên kết trong MySQL. Nếu EMQX API lỗi, thao tác thiết bị thất bại thay vì trả về thành công giả.
+`MQTT_USERNAME`/`MQTT_PASSWORD` trong cấu hình backend là tài khoản kết nối của backend tới broker, khác với tài khoản riêng của ESP32. Khi admin tạo thiết bị, backend sinh `mqtt_username`/`mqtt_password`, lưu chúng vào TiDB và tạo cùng user đó trong built-in authentication database của EMQX qua Management API. Khi admin decommission thiết bị, backend xóa user khỏi EMQX trước khi xóa credential và liên kết trong TiDB. Nếu EMQX API lỗi, thao tác thiết bị thất bại thay vì trả về thành công giả.
 
 Cấu hình backend bằng các biến môi trường (không commit API secret):
 
@@ -79,49 +88,66 @@ Cấu hình backend bằng các biến môi trường (không commit API secret)
 
 Trong EMQX Cloud Console, vào **Deployment Overview** và kéo xuống phần **Deployment API Key** (ảnh minh họa trong console). Dùng **New API Key** để tạo App ID/App Secret cho deployment; lưu App Secret ngay lúc tạo và đặt App ID vào `EMQX_API_KEY`, App Secret vào `EMQX_API_SECRET`. Sao chép nguyên **API Endpoint** trong cùng phần vào `EMQX_MANAGEMENT_BASE_URL`; endpoint này đã kết thúc bằng `/api/v5`, không tự thêm hậu tố lần nữa. Xác định authenticator ID của **Default Authentication / Built-in Database**, sau đó đặt các giá trị trong secret manager/environment backend. API key/secret được gửi dưới HTTP Basic Authentication qua HTTPS; backend không log credential MQTT thiết bị hoặc API secret. Không gửi secrets trong chat hoặc commit vào repository. Backend gọi `POST /authentication/{authenticatorId}/users` tương đối với API Endpoint, body gồm `user_id`, `password`, `is_superuser=false`, và `DELETE` trên cùng endpoint theo `user_id`.
 
-Sau khi cập nhật cấu hình và triển khai backend, tạo thiết bị thử nghiệm và xác nhận username xuất hiện trong danh sách built-in users của EMQX; thử kết nối thiết bị bằng username/password trả về một lần trong API tạo thiết bị. Khi admin decommission, backend trước hết tra cứu các phiên theo username, ngắt từng phiên đang kết nối, rồi xóa user khỏi EMQX; chỉ sau khi broker xác nhận mới xóa credential và liên kết trong MySQL. Nếu tra cứu/ngắt phiên/xóa user thất bại, API trả lỗi và không chuyển trạng thái DB sang `decommissioned`; thao tác có thể thử lại an toàn. Authentication cũng không tự giới hạn topic: cấu hình authorization/ACL trong EMQX để mỗi device chỉ được truy cập topic theo MAC của chính nó.
+Sau khi cập nhật cấu hình và triển khai backend, tạo thiết bị thử nghiệm và xác nhận username xuất hiện trong danh sách built-in users của EMQX; thử kết nối thiết bị bằng username/password trả về một lần trong API tạo thiết bị. Khi admin decommission, backend trước hết tra cứu các phiên theo username, ngắt từng phiên đang kết nối, rồi xóa user khỏi EMQX; chỉ sau khi broker xác nhận mới xóa credential và liên kết trong TiDB. Nếu tra cứu/ngắt phiên/xóa user thất bại, API trả lỗi và không chuyển trạng thái DB sang `decommissioned`; thao tác có thể thử lại an toàn. Authentication cũng không tự giới hạn topic: cấu hình authorization/ACL trong EMQX để mỗi device chỉ được truy cập topic theo MAC của chính nó.
 
 ## Yêu cầu
 
-- Java Development Kit (JDK) 21.
-- MySQL và một database đã được tạo, có schema phù hợp với ứng dụng. Hibernate hiện đặt `ddl-auto=none`, repository không cung cấp tập tin SQL khởi tạo schema.
-- Một MQTT broker có thể truy cập được từ backend.
-- Node.js và npm để chạy frontend.
-- Flutter SDK (Dart SDK tương thích với ràng buộc `sdk: ^3.5.0` trong `mobile/pubspec.yaml`) và Android emulator hoặc thiết bị Android để chạy mobile.
-- Git nếu cần lấy mã nguồn.
+- Git.
+- JDK 21 (backend), một cluster TiDB có endpoint MySQL-compatible và một MQTT broker có thể truy cập được.
+- Node.js và npm (frontend).
+- Flutter SDK với Dart tương thích `sdk: ^3.5.0` (mobile); Android emulator hoặc thiết bị Android nếu chạy mobile.
+
+Backend dùng MySQL Connector/J để kết nối TiDB qua giao thức MySQL và đặt
+`spring.jpa.hibernate.ddl-auto=none`; repository hiện không có script
+migration/SQL để tạo schema. Trước khi chạy, cần chuẩn bị database trên TiDB có
+schema tương thích với các entity trong backend.
 
 ## Cài đặt và chạy
 
-> **Thứ tự khởi động:** chuẩn bị MySQL và MQTT broker, cấu hình và chạy backend trước, sau đó chạy frontend và/hoặc mobile. Mobile cần kết nối được tới backend để tải dữ liệu thực tế.
+Các lệnh dưới đây dùng PowerShell và giả sử terminal đang ở thư mục gốc
+repository. Thứ tự chạy: TiDB và MQTT broker, backend, rồi frontend và/hoặc
+mobile.
 
 ### 1. Chuẩn bị cấu hình backend
 
-Từ thư mục gốc repository, sao chép cấu hình mẫu:
+Tạo file môi trường local từ mẫu:
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) {
+  Copy-Item .env.example .env
+}
 ```
 
-Backend tự đọc `.env` ở thư mục gốc hoặc `backend\.env` (nếu có cả hai, file `backend\.env` được ưu tiên). Không commit `.env`.
+Backend đọc `.env` ở thư mục gốc hoặc `backend\.env`; nếu có cả hai thì
+`backend\.env` được ưu tiên. Chỉ cần duy trì một file cấu hình. Không commit
+file `.env` hoặc chia sẻ secrets.
 
-Chỉnh `backend\.env` và điền thông tin thực tế, không commit thông tin bí mật:
+Điền các giá trị phù hợp vào `.env`:
 
 | Biến | Ý nghĩa |
 | --- | --- |
-| `DB_URL` | JDBC URL của database, ví dụ `jdbc:mysql://localhost:3306/auto_watering` |
-| `DB_USERNAME`, `DB_PASSWORD` | Tài khoản MySQL |
-| `JWT_SECRET_KEY` | Khóa bí mật để ký JWT |
-| `JWT_ACCESS_TOKEN_EXPIRATION` | Thời hạn access token theo định dạng backend yêu cầu |
-| `CORS_ALLOWED_ORIGIN_PATTERNS` | Các origin được phép gọi API, ví dụ `http://localhost:3000` |
-| `REFRESH_TOKEN_EXPIRATION_DAYS` | Thời hạn refresh token tính theo ngày |
+| `DB_URL` | JDBC URL TiDB theo giao thức MySQL; dùng endpoint/port và tùy chọn TLS TiDB cung cấp, ví dụ `jdbc:mysql://<HOST>:4000/<DATABASE>?sslMode=VERIFY_IDENTITY` |
+| `DB_USERNAME`, `DB_PASSWORD` | Username/password do TiDB cấp |
+| `JWT_SECRET_KEY` | Khóa ký JWT dạng Base64, tối thiểu 256 bit; lưu trong secret manager khi deploy |
+| `JWT_ACCESS_TOKEN_EXPIRATION` | Thời hạn access token tính bằng mili giây |
+| `CORS_ALLOWED_ORIGIN_PATTERNS` | Danh sách origin được phép gọi API, phân tách bằng dấu phẩy; local thường gồm `http://localhost:3000` |
+| `REFRESH_TOKEN_EXPIRATION_DAYS` | Thời hạn refresh token tính theo ngày, ví dụ `30` |
 | `MQTT_BROKER_URL` | Địa chỉ broker, ví dụ `tcp://localhost:1883` hoặc `ssl://<MQTT_HOST>:8883` |
-| `MQTT_USERNAME`, `MQTT_PASSWORD` | Thông tin xác thực broker nếu broker yêu cầu |
-| `MQTT_CLIENT_ID` | Client ID của backend trên broker |
-| `MQTT_TLS_TRUST_ALL` | Bỏ qua xác thực chứng chỉ broker khi dùng `ssl://`; mặc định `false`. Chỉ bật (`true`) cho mục đích thử nghiệm vì kết nối sẽ dễ bị giả mạo trung gian (MITM). |
+| `MQTT_USERNAME`, `MQTT_PASSWORD` | Tài khoản dịch vụ của backend trên broker |
+| `MQTT_CLIENT_ID` | Client ID duy nhất của backend trên broker |
+| `MQTT_TLS_TRUST_ALL` | Tùy chọn; mặc định `false`. Không bật trong production |
 
-Các biến CORS và refresh token không có trong `.env.example`; hãy bổ sung chúng vào `backend\.env`. MQTT được bật trong cấu hình backend, vì vậy cần cung cấp broker có thể kết nối.
+`EMQX_MANAGEMENT_BASE_URL`, `EMQX_API_KEY`, `EMQX_API_SECRET` và
+`EMQX_AUTHENTICATOR_ID` chỉ cần cấu hình nếu muốn backend tự tạo/xóa tài khoản
+MQTT thiết bị qua EMQX Management API. Tạo thiết bị sẽ sinh credentials riêng;
+không dùng tài khoản broker của backend cho ESP32.
 
-Đảm bảo MySQL đang chạy, database đã có schema cần thiết và broker MQTT sẵn sàng trước khi khởi động backend.
+Với TiDB Cloud, lấy host, port, username, database và yêu cầu TLS từ phần
+**Connect** của cluster; dùng đúng username (có thể gồm prefix của cluster) và
+giữ các tham số JDBC/TLS do TiDB cung cấp khi điền `DB_URL`. Thêm địa chỉ
+outbound của môi trường chạy backend vào IP access list/firewall của TiDB.
+Đảm bảo schema đã sẵn sàng và broker MQTT đang hoạt động trước khi khởi động
+backend. Xem [hướng dẫn TiDB Cloud](deployment/README.md#tham-khảo-tidb-cloud).
 
 ### 2. Chạy backend
 
@@ -139,50 +165,58 @@ Backend mặc định chạy tại `http://localhost:8080`. Để chạy kiểm 
 
 ### 3. Cài đặt và chạy frontend
 
-Mở terminal thứ hai tại thư mục `frontend`, cài dependencies và chạy ứng dụng:
+Mở terminal thứ hai tại thư mục `frontend`, cài dependencies từ lockfile và chạy
+ứng dụng:
 
 ```powershell
-npm install
+npm ci
 npm start
 ```
 
-Frontend mặc định mở tại `http://localhost:3000` và đã cấu hình gọi backend local tại
-`http://localhost:8080` trong `frontend\.env.development`. Nếu backend chạy ở
-máy hoặc địa chỉ khác, cập nhật biến `REACT_APP_API_BASE_URL` trong tệp này rồi
-khởi động lại frontend. Với bản production, đặt biến này thành URL backend
-production trước khi chạy `npm run build`; React đọc biến môi trường tại thời
-điểm build.
+Frontend mở tại `http://localhost:3000`. Cấu hình API local mặc định nằm trong
+`frontend\.env.development` (`REACT_APP_API_BASE_URL=http://localhost:8080`).
+Nếu backend ở địa chỉ khác, sửa giá trị này rồi khởi động lại frontend.
 
-Origin của frontend cũng cần được cho phép trong `CORS_ALLOWED_ORIGIN_PATTERNS` của backend. Đăng nhập bằng tài khoản có role `ADMIN`; tài khoản khác không được truy cập dashboard quản trị.
+Origin của frontend cần được cho phép trong
+`CORS_ALLOWED_ORIGIN_PATTERNS`. Đăng nhập dashboard bằng tài khoản có role
+`ADMIN`. Endpoint đăng ký công khai tạo tài khoản `USER`, không tạo tài khoản
+quản trị.
 
-Tạo bản build production bằng:
+Tạo bản build production để kiểm tra:
 
 ```powershell
 npm run build
 ```
 
-#### Triển khai frontend cùng backend trên Render
-
-Docker image của backend build React frontend và đóng gói vào Spring Boot, vì vậy
-trang đăng nhập và API dùng chung một origin. Trên Render, đặt **Root Directory**
-trống (repository root), **Dockerfile Path** là `backend/Dockerfile`, và
-**Docker Build Context Directory** là `.`. Sau đó deploy lại Web Service backend.
-Không cần tạo Static Site riêng hay đặt `REACT_APP_API_BASE_URL` cho bản này:
-frontend production gọi API tương đối dưới `/api`. Khi mở URL của backend, người
-dùng chưa đăng nhập sẽ thấy form đăng nhập; token quản trị còn hạn trong
-`localStorage` sẽ đưa thẳng vào dashboard. Route `/login` cũng được backend
-chuyển về ứng dụng frontend khi tải lại trang.
+Để triển khai production trên Render cùng broker MQTT, xem
+[deployment/README.md](deployment/README.md).
 
 ### 4. Cài đặt và chạy ứng dụng mobile
 
-Mở terminal tại thư mục `mobile`, tải dependencies và khởi chạy ứng dụng trên emulator/thiết bị đang kết nối:
+Mở terminal tại thư mục `mobile`, tải dependencies và khởi chạy ứng dụng trên
+Android emulator:
 
 ```powershell
 flutter pub get
 flutter run
 ```
 
-Có thể xem các thiết bị Flutter nhận diện bằng `flutter devices`, sau đó chọn thiết bị cụ thể với `flutter run -d <device_id>`. Mobile lấy dữ liệu và thực hiện các thao tác thông qua API backend, vì vậy backend cần chạy và URL API phải truy cập được từ emulator hoặc thiết bị. Backend cũng cần kết nối MySQL và MQTT broker để cung cấp dữ liệu thiết bị.
+Emulator Android mặc định gọi `http://10.0.2.2:8080/api`. Với thiết bị thật,
+truyền địa chỉ backend có thể truy cập từ thiết bị:
+
+```powershell
+flutter run --dart-define=API_BASE_URL=http://192.168.1.20:8080/api
+```
+
+Thay địa chỉ ví dụ bằng IP LAN hoặc URL HTTPS của backend. Mobile lấy dữ liệu và
+thực hiện thao tác qua API; ứng dụng không kết nối MQTT trực tiếp. Xem thêm
+[mobile/README.md](mobile/README.md).
+
+## Triển khai
+
+Hướng dẫn deploy backend/dashboard trên Render, cấu hình TiDB và EMQX broker
+nằm trong [deployment/README.md](deployment/README.md). Cấu hình build firmware
+ESP32 được mô tả tại [firmware/esp32/idf/README.md](firmware/esp32/idf/README.md).
 
 ## API thiết bị và xác nhận lệnh
 

@@ -22,6 +22,13 @@ và `Documents/Arduino/libraries/Adafruit_Unified_Sensor`.
 Giữ partition table tương thích với firmware Arduino đang cài trên board; đổi
 bố cục partition có thể làm NVS cũ không còn truy cập được.
 
+## Định danh thiết bị
+
+Firmware đọc MAC Wi-Fi STA từ địa chỉ phần cứng của ESP32 và không ghi đè MAC.
+Định danh MQTT/BLE được tạo từ MAC của từng board, vì vậy hãy đăng ký đúng ID
+thực tế của board ở backend và provision thông tin MQTT/BLE key tương ứng; các
+bản ghi đã provision theo ID khác sẽ không được chấp nhận.
+
 ## Thiết lập lần đầu
 
 Chạy một lần cho thư mục build này. Thay hai đường dẫn thư viện bằng đường dẫn

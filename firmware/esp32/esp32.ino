@@ -14,7 +14,7 @@
 #include "ble_command_bridge.h"
 #include "ble_key_nvs.h"
 #include "ble_wifi_service.h"
-#include <esp_mac.h>
+#include "device_identity.h"
 static ble_keys::KeySource bleKeySource;
 static ble_commands::SystemClock bleClock;
 #include "guard_test_harness.h"
@@ -116,12 +116,14 @@ void startDeferredServices() {
   ble_keys::NvsReader keyStorage;
   uint8_t staMac[6];
   ble_keys::Status keyStatus = ble_keys::Status::Invalid;
-  if (esp_read_mac(staMac, ESP_MAC_WIFI_STA) == ESP_OK) {
+  if (!device_identity::readStationMac(staMac)) {
+    Serial.println("[BLE] could not read ESP32 station MAC; BLE key unavailable");
+  } else {
     keyStatus = bleKeySource.initialize(keyStorage, staMac);
     bleKeyInitialized = true;
+    Serial.println(keyStatus == ble_keys::Status::Loaded ? "BLE key loaded" :
+        keyStatus == ble_keys::Status::Missing ? "BLE key missing" : "BLE key invalid");
   }
-  Serial.println(keyStatus == ble_keys::Status::Loaded ? "BLE key loaded" :
-      keyStatus == ble_keys::Status::Missing ? "BLE key missing" : "BLE key invalid");
   if (!plant_ota::begin()) Serial.println("[OTA] worker unavailable");
 #endif
   deferredServicesStarted = true;

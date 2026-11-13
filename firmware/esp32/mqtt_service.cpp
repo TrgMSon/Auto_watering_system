@@ -1,4 +1,5 @@
 #include "mqtt_service.h"
+#include "device_identity.h"
 #ifdef ARDUINO
 #include "mqtt_telemetry.h"
 #include "mqtt_client_config.h"
@@ -8,7 +9,6 @@
 #include <Arduino.h>
 #include <mqtt_client.h>
 #include <nvs.h>
-#include <esp_mac.h>
 #include <esp_log.h>
 #include <esp_heap_caps.h>
 #include <time.h>
@@ -255,13 +255,15 @@ void worker(void*){
   esp_log_level_set(kLogTag,ESP_LOG_NONE);
   uint8_t mac[6]={};
   const bool tlsReady=kTlsDateVerification;
-  const bool identityReady=tlsReady&&esp_read_mac(mac,ESP_MAC_WIFI_STA)==ESP_OK&&topics.initialize(mac);
+  const bool macReady=device_identity::readStationMac(mac);
+  const bool identityReady=macReady&&tlsReady&&topics.initialize(mac);
   const bool configReady=identityReady&&loadConfig(mac,config);
   const bool trustReady=configReady&&(kTlsNativeDates||prepareMqttTrust(config.ca));
   const bool ready=tlsReady&&identityReady&&configReady&&trustReady;
   Serial.printf("[MQTT] startup checks tls=%u identity=%u nvs_config=%u ca_ready=%u\n",
       tlsReady?1u:0u,identityReady?1u:0u,configReady?1u:0u,trustReady?1u:0u);
   if(!tlsReady)Serial.println("[MQTT] certificate date verification is unavailable in this build");
+  else if(!macReady)Serial.println("[MQTT] could not read ESP32 station MAC");
   else if(!identityReady)Serial.println("[MQTT] could not initialize the device identity");
   else if(!configReady)Serial.println("[MQTT] MQTT config missing/invalid; check provisioned host, TLS port, CA, username and password");
   else if(!trustReady)Serial.println("[MQTT] CA certificate could not be prepared");

@@ -1,4 +1,5 @@
 #include "ble_server.h"
+#include "device_identity.h"
 #include "ble_telemetry.h"
 #include "ble_crypto.h"
 #include "ble_command_bridge.h"
@@ -13,7 +14,6 @@
 #include "esp_gap_ble_api.h"
 #include "esp_gatt_common_api.h"
 #include "esp_gatts_api.h"
-#include "esp_mac.h"
 #include "freertos/queue.h"
 #include <atomic>
 
@@ -526,7 +526,11 @@ void process(const Event& e) {
 }
 bool initialize() {
   uint8_t mac[6]; char deviceId[18], name[16];
-  if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK || !ble_telemetry::identity(mac, deviceId, name)) return false;
+  if(!device_identity::readStationMac(mac)){
+    Serial.println("[BLE] could not read ESP32 station MAC");
+    return false;
+  }
+  if (!ble_telemetry::identity(mac, deviceId, name)) return false;
   Serial.printf("BLE device_id=%s name=%s (F3.3c.1 authenticated pump/TIME)\n", deviceId, name);
   authentication.loadKey(keySource);
   if (!authentication.hasKey()) Serial.println("BLE authenticated commands disabled: no provisioned key source");
