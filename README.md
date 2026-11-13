@@ -215,8 +215,7 @@ thực hiện thao tác qua API; ứng dụng không kết nối MQTT trực ti�
 ## Triển khai
 
 Hướng dẫn deploy backend/dashboard trên Render, cấu hình TiDB và EMQX broker
-nằm trong [deployment/README.md](deployment/README.md). Cấu hình build firmware
-ESP32 được mô tả tại [firmware/esp32/idf/README.md](firmware/esp32/idf/README.md).
+nằm trong [deployment/README.md](deployment/README.md). Thông tin chi tiết về cơ sở dữ liệu và phần cứng được mô tả tại [documents/Báo cáo.pdf](documents/Báo%20cáo.pdf).
 
 ## API thiết bị và xác nhận lệnh
 
