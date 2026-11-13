@@ -4,12 +4,12 @@ Nền tảng IoT theo dõi môi trường trồng cây và điều khiển tư�
 công. Hệ thống gồm thiết bị ESP32, backend xử lý dữ liệu/lệnh, dashboard quản
 trị và ứng dụng Flutter cho người dùng.
 
-| Thành phần | Công nghệ | Trạng thái |
+| Thành phần | Công nghệ | Vai trò chính |
 | --- | --- | --- |
-| Backend API | Java 21 · Spring Boot 3 · TiDB (MySQL-compatible) · MQTT | Kết nối thiết bị và lưu dữ liệu |
-| Dashboard quản trị | React | Gọi API backend |
-| Ứng dụng mobile | Flutter · BLoC | Kết nối API backend, hiển thị dữ liệu thực |
-| Thiết bị IoT | ESP32 · MQTT | Telemetry, lệnh và xác nhận |
+| Backend API | Java 21 · Spring Boot 3 · TiDB (MySQL-compatible) · MQTT | Xử lý API, dữ liệu và giao tiếp MQTT với thiết bị |
+| Dashboard quản trị | React | Quản lý thiết bị, tài khoản và firmware |
+| Ứng dụng mobile | Flutter · BLoC | Theo dõi dữ liệu và điều khiển thiết bị cho người dùng |
+| Thiết bị IoT | ESP32 · MQTT | Đọc cảm biến, điều khiển tưới và trao đổi dữ liệu với backend |
 
 ## Nội dung
 
