@@ -1,11 +1,9 @@
 #pragma once
 #include <stdint.h>
-#include <string.h>
+#include <esp_mac.h>
 
 namespace device_identity {
-constexpr uint8_t kStationMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEF, 0xFE};
-
-inline void copyStationMac(uint8_t (&output)[6]) {
-  memcpy(output, kStationMac, sizeof(kStationMac));
+inline bool readStationMac(uint8_t (&output)[6]) {
+  return esp_read_mac(output, ESP_MAC_WIFI_STA) == ESP_OK;
 }
 }  // namespace device_identity

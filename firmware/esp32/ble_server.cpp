@@ -526,7 +526,10 @@ void process(const Event& e) {
 }
 bool initialize() {
   uint8_t mac[6]; char deviceId[18], name[16];
-  device_identity::copyStationMac(mac);
+  if(!device_identity::readStationMac(mac)){
+    Serial.println("[BLE] could not read ESP32 station MAC");
+    return false;
+  }
   if (!ble_telemetry::identity(mac, deviceId, name)) return false;
   Serial.printf("BLE device_id=%s name=%s (F3.3c.1 authenticated pump/TIME)\n", deviceId, name);
   authentication.loadKey(keySource);

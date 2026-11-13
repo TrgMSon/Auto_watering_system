@@ -24,11 +24,10 @@ bố cục partition có thể làm NVS cũ không còn truy cập được.
 
 ## Định danh thiết bị
 
-MAC Wi-Fi STA và device ID được cố định thành `AA:BB:CC:DD:EF:FE` trong
-`device_identity.h`; firmware áp dụng MAC cục bộ này trước khi kết nối Wi-Fi.
-Thay đổi này cũng đổi định danh MQTT/BLE. Cần đăng ký ID mới ở backend và
-provision lại Wi-Fi, MQTT và BLE key; các bản ghi cũ gắn với định danh trước đó
-sẽ không được chấp nhận.
+Firmware đọc MAC Wi-Fi STA từ địa chỉ phần cứng của ESP32 và không ghi đè MAC.
+Định danh MQTT/BLE được tạo từ MAC của từng board, vì vậy hãy đăng ký đúng ID
+thực tế của board ở backend và provision thông tin MQTT/BLE key tương ứng; các
+bản ghi đã provision theo ID khác sẽ không được chấp nhận.
 
 ## Thiết lập lần đầu
 

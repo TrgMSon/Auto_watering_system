@@ -58,7 +58,10 @@ void complete(uint64_t generation,ble_commands::Code code){Lock lock;slot.comple
 #endif
 void worker(void*){
   uint8_t mac[6];
-  device_identity::copyStationMac(mac);
+  if(!device_identity::readStationMac(mac)){
+    Serial.println("[WIFI] could not read ESP32 station MAC");
+    vTaskDelete(nullptr);return;
+  }
   // Stable lifetime; all SDK/NVS methods are invoked ONLY in this worker.
   static ble_wifi::EspRadioSdk sdk;
   static ble_wifi::EspRadio radio(sdk);
